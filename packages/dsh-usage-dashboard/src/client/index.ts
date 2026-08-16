@@ -16,13 +16,15 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { mountUsageEntry } from './UsageEntry.tsx'
-import { UsageRecorder, setCurrentModel, setCurrentTitle } from './UsageRecorder.tsx'
+import { UsageRecorder, getActiveSessionId, setCurrentModel } from './UsageRecorder.tsx'
 import { UsageSettingsCard, type UsageSettingsCardProps } from './UsageSettingsCard.tsx'
+import { PricingCard, type PricingCardProps } from './PricingCard.tsx'
 import { NS, en, zh } from './locales.ts'
 
 export { openDashboard, closeDashboard, mountUsageEntry } from './UsageEntry.tsx'
 export type { UsageRecorderProps } from './UsageRecorder.tsx'
 export type { UsageSettingsCardProps } from './UsageSettingsCard.tsx'
+export type { PricingCardProps } from './PricingCard.tsx'
 export type { UsageSummary } from './DashboardPanel.tsx'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -65,9 +67,11 @@ export function apply(ctx: ClientContext): void {
     return () => disposeEntry?.()
   }, 'usage-dashboard: sidebar entry')
 
-  // Model-name subscription: poll the connection's most recent session and
-  // feed its model into the recorder so uploads carry a real model label
-  // instead of "unknown". Best-effort — failures leave the last known value.
+  // Model-name subscription: poll the recorder's ACTIVE session (not the
+  // newest list row — session.list items carry no title and items[0] is
+  // whatever was touched last) so uploads carry a real per-session model
+  // label instead of "unknown". Best-effort — failures leave the last
+  // known value. Titles ride the live `title` projection in the recorder.
   ctx.effect(() => {
     const connection = ctx.get('connection') as { api?: { sessions?: {
       list(request: { sessionId?: string; cursor?: string }): Promise<unknown>
@@ -76,13 +80,9 @@ export function apply(ctx: ClientContext): void {
     if (connection?.api?.sessions === undefined) return () => {}
     let cancelled = false
     const tick = async (): Promise<void> => {
+      const sessionId = getActiveSessionId()
+      if (sessionId === undefined || cancelled) return
       try {
-        const listRes = await connection.api?.sessions?.list({ cursor: '' })
-        const list = listRes as { result?: { value?: { items?: Array<{ sessionId: string; title?: string }> } } } | undefined
-        const item = list?.result?.value?.items?.[0]
-        const sessionId = item?.sessionId
-        if (item?.title !== undefined && !cancelled) setCurrentTitle(item.title)
-        if (sessionId === undefined || cancelled) return
         const modelsRes = await connection.api?.sessions?.models({ sessionId })
         const models = modelsRes as { result?: { value?: { current?: { provider?: string; model?: string } } } } | undefined
         const model = models?.result?.value?.current?.model
@@ -115,4 +115,12 @@ export function apply(ctx: ClientContext): void {
     order: 130,
     locale: NS,
   }, UsageSettingsCard as never))
+
+  // Pricing snapshot card: shows the effective price table and refresh.
+  ctx.slots.inject('web-ui.plugin.item', () => ctx.slots.register({
+    name: 'web-ui.plugin.item',
+    id: 'usage-pricing',
+    order: 131,
+    locale: NS,
+  }, PricingCard as never))
 }

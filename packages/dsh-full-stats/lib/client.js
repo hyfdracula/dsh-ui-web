@@ -6,8 +6,8 @@ window.__ModuleLoader__.load({
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 		let react = require("react");
 		let react_jsx_runtime = require("react/jsx-runtime");
-		//#region \0dsh-css:D:\Desktop\DeepSeek Harness\dsh-web-ui-0.1.10\packages\dsh-full-stats\src\client\card.module.css.mjs
-		const css = ".GIDN6W_card{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:8px;list-style:none;transition:border-color .16s,background .16s;overflow:hidden}.GIDN6W_cardOpen{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-label-dimmed)}.GIDN6W_header{cursor:pointer;text-align:left;width:100%;font:inherit;background:0 0;border:0;align-items:center;gap:8px;padding:10px 14px;transition:background .12s;display:flex}.GIDN6W_header:hover{background:var(--dsw-alias-interactive-bg-hover)}.GIDN6W_header:active{background:var(--dsw-alias-interactive-bg-hover-solid)}.GIDN6W_header:focus-visible{box-shadow:inset 0 0 0 2px var(--dsw-alias-button-info-fill);outline:none}.GIDN6W_headText{flex-direction:column;flex:1;gap:2px;min-width:0;display:flex}.GIDN6W_name{color:var(--dsw-alias-label-primary);font-weight:600}.GIDN6W_description{color:var(--dsw-alias-label-tertiary);font-size:12px}.GIDN6W_chevron{color:var(--dsw-alias-label-tertiary);transition:transform .12s}.GIDN6W_chevronOpen{transform:rotate(180deg)}.GIDN6W_body{flex-direction:column;gap:12px;padding:0 14px 14px;display:flex}.GIDN6W_desc{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:1.6}.GIDN6W_field{flex-direction:column;gap:3px;display:flex}.GIDN6W_fieldLabel{color:var(--dsw-alias-label-secondary);font-size:12px}.GIDN6W_input{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);border-radius:6px;padding:5px 8px;font-size:13px}.GIDN6W_input::placeholder{color:var(--dsw-alias-label-tertiary)}.GIDN6W_actions{align-items:center;gap:10px;display:flex}.GIDN6W_saveBtn{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:6px;padding:4px 12px;font-size:12px}.GIDN6W_saveBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.GIDN6W_saveBtn:disabled{opacity:.6;cursor:default}.GIDN6W_savedHint{color:var(--dsw-alias-state-success-primary);font-size:12px}";
+		//#region \0dsh-css:C:\Users\19161\Documents\dsh-work\dsh-ui-web\packages\dsh-full-stats\src\client\card.module.css.mjs
+		const css = ".Qk3cNW_card{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:8px;list-style:none;transition:border-color .16s,background .16s;overflow:hidden}.Qk3cNW_cardOpen{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-label-dimmed)}.Qk3cNW_header{cursor:pointer;text-align:left;width:100%;font:inherit;background:0 0;border:0;align-items:center;gap:8px;padding:10px 14px;transition:background .12s;display:flex}.Qk3cNW_header:hover{background:var(--dsw-alias-interactive-bg-hover)}.Qk3cNW_header:active{background:var(--dsw-alias-interactive-bg-hover-solid)}.Qk3cNW_header:focus-visible{box-shadow:inset 0 0 0 2px var(--dsw-alias-button-info-fill);outline:none}.Qk3cNW_headText{flex-direction:column;flex:1;gap:2px;min-width:0;display:flex}.Qk3cNW_name{color:var(--dsw-alias-label-primary);font-weight:600}.Qk3cNW_description{color:var(--dsw-alias-label-tertiary);font-size:12px}.Qk3cNW_chevron{color:var(--dsw-alias-label-tertiary);transition:transform .12s}.Qk3cNW_chevronOpen{transform:rotate(180deg)}.Qk3cNW_body{flex-direction:column;gap:12px;padding:0 14px 14px;display:flex}.Qk3cNW_desc{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:1.6}.Qk3cNW_field{flex-direction:column;gap:3px;display:flex}.Qk3cNW_fieldLabel{color:var(--dsw-alias-label-secondary);font-size:12px}.Qk3cNW_input{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);border-radius:6px;padding:5px 8px;font-size:13px}.Qk3cNW_input::placeholder{color:var(--dsw-alias-label-tertiary)}.Qk3cNW_actions{align-items:center;gap:10px;display:flex}.Qk3cNW_saveBtn{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:6px;padding:4px 12px;font-size:12px}.Qk3cNW_saveBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.Qk3cNW_saveBtn:disabled{opacity:.6;cursor:default}.Qk3cNW_savedHint{color:var(--dsw-alias-state-success-primary);font-size:12px}";
 		const tagId = "@captain1275/dsh-full-stats/card.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -17,22 +17,22 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var card_module_css_default = {
-			"actions": "GIDN6W_actions",
-			"body": "GIDN6W_body",
-			"card": "GIDN6W_card",
-			"cardOpen": "GIDN6W_cardOpen",
-			"chevron": "GIDN6W_chevron",
-			"chevronOpen": "GIDN6W_chevronOpen",
-			"desc": "GIDN6W_desc",
-			"description": "GIDN6W_description",
-			"field": "GIDN6W_field",
-			"fieldLabel": "GIDN6W_fieldLabel",
-			"headText": "GIDN6W_headText",
-			"header": "GIDN6W_header",
-			"input": "GIDN6W_input",
-			"name": "GIDN6W_name",
-			"saveBtn": "GIDN6W_saveBtn",
-			"savedHint": "GIDN6W_savedHint"
+			"actions": "Qk3cNW_actions",
+			"body": "Qk3cNW_body",
+			"card": "Qk3cNW_card",
+			"cardOpen": "Qk3cNW_cardOpen",
+			"chevron": "Qk3cNW_chevron",
+			"chevronOpen": "Qk3cNW_chevronOpen",
+			"desc": "Qk3cNW_desc",
+			"description": "Qk3cNW_description",
+			"field": "Qk3cNW_field",
+			"fieldLabel": "Qk3cNW_fieldLabel",
+			"headText": "Qk3cNW_headText",
+			"header": "Qk3cNW_header",
+			"input": "Qk3cNW_input",
+			"name": "Qk3cNW_name",
+			"saveBtn": "Qk3cNW_saveBtn",
+			"savedHint": "Qk3cNW_savedHint"
 		};
 		//#endregion
 		//#region src/client/FullStatsSettingsCard.tsx

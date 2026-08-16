@@ -39,13 +39,13 @@ export function UsageSettingsCard(_props: UsageSettingsCardProps): ReactNode {
         ? (
           <div className={css.body}>
             <div className={css.legendRow}>
-              <span className={css.dot} style={{ background: '#f472b6' }} /> 每次响应的 token 用量自动记录
+              <span className={css.dot} style={{ background: '#3f76d8' }} /> 每次响应的 token 用量自动记录
             </div>
             <div className={css.legendRow}>
-              <span className={css.dot} style={{ background: '#fb923c' }} /> 侧边栏彩色图表按钮打开看板
+              <span className={css.dot} style={{ background: '#6e9be8' }} /> 侧边栏图表按钮打开看板
             </div>
             <div className={css.legendRow}>
-              <span className={css.dot} style={{ background: '#4ade80' }} /> 数据保存在 ~/.dsh/usage.json（本机）
+              <span className={css.dot} style={{ background: '#a8ccf2' }} /> 数据保存在 ~/.dsh/usage.json（本机）
             </div>
           </div>
         )

@@ -1,0 +1,59 @@
+/* EffortTrigger：composer 工具条右侧的档位入口 chip + 上弹浮动面板。 */
+
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.trigger:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--dsw-alias-label-secondary);
+  outline-offset: 2px;
+}
+
+.label {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  color: var(--dsw-alias-label-caption);
+  flex: none;
+}
+
+.popup {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 40;
+}
+
+/* 面板自身是 absolute（为其它宿主设计），在触发器弹层里改回 normal flow，
+ * 让 .popup 按内容撑开，右缘对齐触发器。 */
+.popup [data-effort-panel='true'] {
+  position: relative;
+  top: auto;
+  left: auto;
+}

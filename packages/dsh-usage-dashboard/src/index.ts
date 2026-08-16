@@ -13,6 +13,9 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
 import { estimateCost } from './cost.ts'
+import { mergeFreshSnapshot, pricingMeta, userPricingPath, writeUserPricing } from './pricing.ts'
+import type { PricingSnapshot } from './pricing-normalize.d.mts'
+import { fetchLiteLLMPricing, normalizeLiteLLM, DEFAULT_FX } from './pricing-normalize.mjs'
 
 /** 稳定插件名（对应 cordis.patch.yml 的 insert id）。 */
 export const name = 'ui-usage-dashboard'
@@ -33,12 +36,14 @@ export interface UsageRecord {
   model: string
   /** 时间戳（ms）。 */
   ts: number
-  /** 输入 token（含缓存读取）。 */
+  /** 输入 token（不含缓存）。 */
   inputTokens: number
   /** 输出 token。 */
   outputTokens: number
   /** 缓存命中 token。 */
   cacheReadTokens: number
+  /** 缓存写入 token（按普通输入价计费）。 */
+  cacheWriteTokens: number
 }
 
 /** 持久化聚合数据。 */
@@ -51,6 +56,7 @@ export interface UsageStore {
     inputTokens: number
     outputTokens: number
     cacheReadTokens: number
+    cacheWriteTokens: number
     calls: number
   }>
   /** 按天聚合（YYYY-MM-DD）。 */
@@ -58,6 +64,7 @@ export interface UsageStore {
     inputTokens: number
     outputTokens: number
     cacheReadTokens: number
+    cacheWriteTokens: number
     calls: number
   }>
   /** 按模型聚合。 */
@@ -65,6 +72,7 @@ export interface UsageStore {
     inputTokens: number
     outputTokens: number
     cacheReadTokens: number
+    cacheWriteTokens: number
     calls: number
   }>
   /** 全量累计。 */
@@ -72,13 +80,14 @@ export interface UsageStore {
     inputTokens: number
     outputTokens: number
     cacheReadTokens: number
+    cacheWriteTokens: number
     calls: number
   }
 }
 
 /** 空聚合。 */
 export function emptyUsage(): UsageStore {
-  return { bySession: {}, byDay: {}, byModel: {}, total: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, calls: 0 } }
+  return { bySession: {}, byDay: {}, byModel: {}, total: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 0 } }
 }
 
 /** 配置文件路径：$DSH_HOME/usage.json。 */
@@ -103,7 +112,7 @@ export function readUsage(): UsageStore {
       bySession: raw.bySession ?? {},
       byDay: raw.byDay ?? {},
       byModel: raw.byModel ?? {},
-      total: raw.total ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, calls: 0 },
+      total: raw.total ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 0 },
     }
   } catch {
     return emptyUsage()
@@ -130,16 +139,7 @@ export function applyRecord(store: UsageStore, record: UsageRecord): void {
   const prevInput = existing?.inputTokens ?? 0
   const prevOutput = existing?.outputTokens ?? 0
   const prevCache = existing?.cacheReadTokens ?? 0
-  const session: UsageStore['bySession'][string] = {
-    title: record.sessionTitle || existing?.title || `会话 ${sessionId.slice(0, 8)}`,
-    lastModel: record.model || existing?.lastModel || 'unknown',
-    lastTs: Math.max(existing?.lastTs ?? 0, record.ts),
-    inputTokens: record.inputTokens,
-    outputTokens: record.outputTokens,
-    cacheReadTokens: record.cacheReadTokens,
-    calls: (existing?.calls ?? 0) + 1,
-  }
-  store.bySession[sessionId] = session
+  const prevCacheWrite = existing?.cacheWriteTokens ?? 0
 
   // Day / model buckets: running deltas relative to the previous snapshot.
   // The first upload for a session contributes its full snapshot; later
@@ -148,33 +148,52 @@ export function applyRecord(store: UsageStore, record: UsageRecord): void {
   const dInput = Math.max(0, record.inputTokens - prevInput)
   const dOutput = Math.max(0, record.outputTokens - prevOutput)
   const dCache = Math.max(0, record.cacheReadTokens - prevCache)
-  if (dInput + dOutput + dCache <= 0) return
+  const dCacheWrite = Math.max(0, record.cacheWriteTokens - prevCacheWrite)
+  // calls 语义是"真实响应轮数"：只有 token 实际增长的上报才算一轮。
+  // 重放同一快照（页面刷新后的基线对齐、会话来回切换）不再虚增计数。
+  const grew = dInput + dOutput + dCache + dCacheWrite > 0
+  const session: UsageStore['bySession'][string] = {
+    title: record.sessionTitle || existing?.title || `会话 ${sessionId.slice(0, 8)}`,
+    lastModel: record.model || existing?.lastModel || 'unknown',
+    lastTs: Math.max(existing?.lastTs ?? 0, record.ts),
+    inputTokens: record.inputTokens,
+    outputTokens: record.outputTokens,
+    cacheReadTokens: record.cacheReadTokens,
+    cacheWriteTokens: record.cacheWriteTokens,
+    calls: (existing?.calls ?? 0) + (grew ? 1 : 0),
+  }
+  store.bySession[sessionId] = session
+
+  if (!grew) return
 
   const day = dayKey(record.ts)
-  const dayBucket = store.byDay[day] ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, calls: 0 }
+  const dayBucket = store.byDay[day] ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 0 }
   dayBucket.inputTokens += dInput
   dayBucket.outputTokens += dOutput
   dayBucket.cacheReadTokens += dCache
+  dayBucket.cacheWriteTokens = (dayBucket.cacheWriteTokens ?? 0) + dCacheWrite
   dayBucket.calls += 1
   store.byDay[day] = dayBucket
 
   const model = record.model || 'unknown'
-  const modelBucket = store.byModel[model] ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, calls: 0 }
+  const modelBucket = store.byModel[model] ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 0 }
   modelBucket.inputTokens += dInput
   modelBucket.outputTokens += dOutput
   modelBucket.cacheReadTokens += dCache
+  modelBucket.cacheWriteTokens = (modelBucket.cacheWriteTokens ?? 0) + dCacheWrite
   modelBucket.calls += 1
   store.byModel[model] = modelBucket
 
   store.total.inputTokens += dInput
   store.total.outputTokens += dOutput
   store.total.cacheReadTokens += dCache
+  store.total.cacheWriteTokens = (store.total.cacheWriteTokens ?? 0) + dCacheWrite
   store.total.calls += 1
 }
 
 /** 最近 N 天的按天序列（缺失日补零，便于画图）。 */
-export function recentDays(store: UsageStore, days: number): Array<{ day: string; inputTokens: number; outputTokens: number; calls: number }> {
-  const out: Array<{ day: string; inputTokens: number; outputTokens: number; calls: number }> = []
+export function recentDays(store: UsageStore, days: number): Array<{ day: string; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; calls: number }> {
+  const out: Array<{ day: string; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; calls: number }> = []
   const now = Date.now()
   for (let offset = days - 1; offset >= 0; offset--) {
     const ts = now - offset * DAY_MS
@@ -184,6 +203,8 @@ export function recentDays(store: UsageStore, days: number): Array<{ day: string
       day: key,
       inputTokens: bucket?.inputTokens ?? 0,
       outputTokens: bucket?.outputTokens ?? 0,
+      cacheReadTokens: bucket?.cacheReadTokens ?? 0,
+      cacheWriteTokens: bucket?.cacheWriteTokens ?? 0,
       calls: bucket?.calls ?? 0,
     })
   }
@@ -205,7 +226,7 @@ export function sessionRanking(store: UsageStore, limit: number): Array<{
       title: s.title,
       model: s.lastModel,
       lastTs: s.lastTs,
-      totalTokens: s.inputTokens + s.outputTokens + s.cacheReadTokens,
+      totalTokens: s.inputTokens + s.outputTokens + s.cacheReadTokens + (s.cacheWriteTokens ?? 0),
       calls: s.calls,
     }))
     .sort((a, b) => b.totalTokens - a.totalTokens)
@@ -237,7 +258,8 @@ function normalizeRecord(raw: Partial<UsageRecord>): UsageRecord | undefined {
   const inputTokens = typeof raw.inputTokens === 'number' && Number.isFinite(raw.inputTokens) ? Math.max(0, Math.round(raw.inputTokens)) : 0
   const outputTokens = typeof raw.outputTokens === 'number' && Number.isFinite(raw.outputTokens) ? Math.max(0, Math.round(raw.outputTokens)) : 0
   const cacheReadTokens = typeof raw.cacheReadTokens === 'number' && Number.isFinite(raw.cacheReadTokens) ? Math.max(0, Math.round(raw.cacheReadTokens)) : 0
-  if (inputTokens + outputTokens + cacheReadTokens <= 0) return undefined
+  const cacheWriteTokens = typeof raw.cacheWriteTokens === 'number' && Number.isFinite(raw.cacheWriteTokens) ? Math.max(0, Math.round(raw.cacheWriteTokens)) : 0
+  if (inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens <= 0) return undefined
   return {
     sessionId: typeof raw.sessionId === 'string' ? raw.sessionId : 'default',
     sessionTitle: typeof raw.sessionTitle === 'string' ? raw.sessionTitle : '',
@@ -246,6 +268,7 @@ function normalizeRecord(raw: Partial<UsageRecord>): UsageRecord | undefined {
     inputTokens,
     outputTokens,
     cacheReadTokens,
+    cacheWriteTokens,
   }
 }
 
@@ -274,14 +297,17 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
     const modelCosts = Object.fromEntries(
       Object.entries(store.byModel).map(([model, b]) => [
         model,
-        estimateCost(model, b.inputTokens, b.outputTokens, b.cacheReadTokens),
+        estimateCost(model, b.inputTokens, b.outputTokens, b.cacheReadTokens, b.cacheWriteTokens ?? 0),
       ]),
     )
     const totalCost = Object.values(modelCosts).reduce((a, b) => a + b, 0)
-    const sessions = sessionRanking(store, 20).map((s) => ({
-      ...s,
-      cost: estimateCost(s.model, store.bySession[s.id]?.inputTokens ?? 0, store.bySession[s.id]?.outputTokens ?? 0, store.bySession[s.id]?.cacheReadTokens ?? 0),
-    }))
+    const sessions = sessionRanking(store, 20).map((s) => {
+      const bucket = store.bySession[s.id]
+      return {
+        ...s,
+        cost: estimateCost(s.model, bucket?.inputTokens ?? 0, bucket?.outputTokens ?? 0, bucket?.cacheReadTokens ?? 0, bucket?.cacheWriteTokens ?? 0),
+      }
+    })
     sendJson(res, 200, {
       ok: true,
       total: store.total,
@@ -299,10 +325,54 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
   sendJson(res, 404, { ok: false, error: 'not found' })
 }
 
+/** 价目表路由前缀。 */
+export const USAGE_PRICING_API_PREFIX = '/api/usage-pricing'
+
+/**
+ * 价目表请求分发：
+ * - GET  /api/usage-pricing         当前生效表元信息（来源/更新时间/覆盖量）
+ * - POST /api/usage-pricing/refresh 拉取 LiteLLM 最新价目并写用户级覆盖
+ */
+function handlePricing(req: IncomingMessage, res: ServerResponse): void {
+  const url = new URL(req.url ?? '/', 'http://dsh.local')
+  if (url.pathname === USAGE_PRICING_API_PREFIX && req.method === 'GET') {
+    sendJson(res, 200, { ok: true, pricing: pricingMeta() })
+    return
+  }
+  if (url.pathname === `${USAGE_PRICING_API_PREFIX}/refresh` && req.method === 'POST') {
+    void (async (): Promise<void> => {
+      const { text, url: sourceUrl } = await fetchLiteLLMPricing()
+      const { snapshot, stats } = normalizeLiteLLM(text, DEFAULT_FX)
+      snapshot._url = sourceUrl
+      // 保留用户自定义条目（LiteLLM 快照里没有的模型/别名），
+      // 避免一次刷新把手写的 k3-256k 等条目冲掉。
+      let existing: PricingSnapshot | null = null
+      try {
+        const parsed: unknown = JSON.parse(readFileSync(userPricingPath(), 'utf8'))
+        if (typeof parsed === 'object' && parsed !== null
+          && typeof (parsed as { models?: unknown }).models === 'object'
+          && typeof (parsed as { aliases?: unknown }).aliases === 'object') {
+          existing = parsed as PricingSnapshot
+        }
+      } catch {
+        /* 用户文件缺失/损坏：直接全量写入 */
+      }
+      const path = writeUserPricing(mergeFreshSnapshot(existing, snapshot))
+      sendJson(res, 200, { ok: true, pricing: pricingMeta(), stats, path })
+    })().catch((error) => {
+      sendJson(res, 502, { ok: false, error: error instanceof Error ? error.message : String(error) })
+    })
+    return
+  }
+  sendJson(res, 404, { ok: false, error: 'not found' })
+}
+
 /** 宿主插件体：注册配置路由（无 webServer 服务时为空操作）。 */
 export function apply(ctx: Context): void {
   ctx.inject(['webServer'], (httpCtx) => {
     const dispose = httpCtx.webServer.register({ kind: 'prefix', path: USAGE_API_PREFIX, handler: handle })
     httpCtx.effect(() => dispose, 'ui-usage-dashboard: usage route')
+    const disposePricing = httpCtx.webServer.register({ kind: 'prefix', path: USAGE_PRICING_API_PREFIX, handler: handlePricing })
+    httpCtx.effect(() => disposePricing, 'ui-usage-dashboard: pricing route')
   })
 }

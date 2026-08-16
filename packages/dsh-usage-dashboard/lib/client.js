@@ -8,8 +8,8 @@ window.__ModuleLoader__.load({
 		let react = require("react");
 		let react_dom = require("react-dom");
 		let react_jsx_runtime = require("react/jsx-runtime");
-		//#region \0dsh-css:D:\Desktop\DeepSeek Harness\dsh-web-ui-0.1.10\packages\dsh-usage-dashboard\src\client\usage.module.css.mjs
-		const css$2 = ".lkZm-a_overlay{z-index:2147483001;justify-content:center;align-items:center;display:flex;position:fixed;inset:0}.lkZm-a_mask{-webkit-backdrop-filter:blur(6px);background:#050814b8;position:absolute;inset:0}.lkZm-a_panel{z-index:1;box-sizing:border-box;color:#e6eaff;background:linear-gradient(165deg,#141a34f5,#0a0e1efa);border:1px solid #8ca0ff40;border-radius:20px;flex-direction:column;width:880px;max-width:calc(100vw - 48px);max-height:calc(100vh - 48px);padding:22px 26px;font-size:13px;display:flex;position:relative;overflow:auto;box-shadow:0 18px 60px #0000008c,inset 0 1px #ffffff0f}.lkZm-a_header{justify-content:space-between;align-items:center;margin-bottom:16px;display:flex}.lkZm-a_title{background:linear-gradient(90deg,#f472b6,#fb923c,#facc15,#4ade80,#22d3ee,#818cf8);color:#0000;-webkit-background-clip:text;background-clip:text;margin:0;font-size:18px;font-weight:700}.lkZm-a_close{color:#b9c2e8;cursor:pointer;background:#8ca0ff1f;border:none;border-radius:8px;flex:none;justify-content:center;align-items:center;width:30px;height:30px;transition:background .12s,color .12s;display:inline-flex}.lkZm-a_close:hover{color:#fff;background:#8ca0ff3d}.lkZm-a_body{flex-direction:column;gap:18px;display:flex}.lkZm-a_statGrid{grid-template-columns:repeat(4,1fr);gap:12px;display:grid}.lkZm-a_statCard{border:1px solid;border-radius:14px;flex-direction:column;gap:3px;padding:14px 16px;display:flex}.lkZm-a_statValue{font-variant-numeric:tabular-nums;font-size:26px;font-weight:800;line-height:1.1}.lkZm-a_statLabel{color:#e6eaffd9;font-size:12px;font-weight:600}.lkZm-a_statSub{color:#e6eaff8c;font-size:11px}.lkZm-a_section{flex-direction:column;gap:6px;display:flex}.lkZm-a_sectionTitle{color:#e6eaff;font-size:13px;font-weight:700}.lkZm-a_sectionSub{color:#e6eaff80;font-size:11px}.lkZm-a_twoCol{grid-template-columns:1fr 1.2fr;align-items:start;gap:20px;display:grid}.lkZm-a_chart{width:100%;height:auto;margin-top:4px}.lkZm-a_axisLabel{fill:#e6eaff73;font-size:9px}.lkZm-a_donutWrap{align-items:center;gap:16px;display:flex}.lkZm-a_donut{flex:none;width:150px;height:150px}.lkZm-a_donutTotal{fill:#e6eaff;font-size:16px;font-weight:800}.lkZm-a_donutLabel{fill:#e6eaff80;font-size:9px}.lkZm-a_legend{flex-direction:column;gap:5px;min-width:0;display:flex}.lkZm-a_legendRow{align-items:center;gap:7px;font-size:11px;display:flex}.lkZm-a_legendDot{border-radius:3px;flex:none;width:9px;height:9px}.lkZm-a_legendName{text-overflow:ellipsis;white-space:nowrap;color:#e6eaffd9;flex:1;min-width:0;overflow:hidden}.lkZm-a_legendVal{font-variant-numeric:tabular-nums;color:#e6eaff99}.lkZm-a_sessionList{flex-direction:column;gap:9px;max-height:320px;display:flex;overflow:auto}.lkZm-a_sessionRow{align-items:center;gap:10px;display:flex}.lkZm-a_sessionRank{text-align:center;flex:none;width:20px;font-size:14px;font-weight:800}.lkZm-a_sessionInfo{flex-direction:column;flex:1;gap:2px;min-width:0;display:flex}.lkZm-a_sessionName{color:#e6eaff;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600;overflow:hidden}.lkZm-a_sessionMeta{color:#e6eaff80;font-size:10px}.lkZm-a_sessionBar{background:#8ca0ff1f;border-radius:999px;height:4px;margin-top:2px;overflow:hidden}.lkZm-a_sessionBarFill{border-radius:999px;height:100%;transition:width .4s}.lkZm-a_sessionTokens{font-variant-numeric:tabular-nums;color:#e6eaff;flex-direction:column;flex:none;align-items:flex-end;gap:2px;font-size:12px;font-weight:700;display:flex}.lkZm-a_sessionCost{color:#e6eaff8c;font-size:10px;font-weight:600}.lkZm-a_empty{flex-direction:column;align-items:center;gap:8px;padding:60px 0;display:flex}.lkZm-a_emptyTitle{color:#e6eaffbf;font-size:15px;font-weight:700}.lkZm-a_emptyHint{color:#e6eaff73;text-align:center;font-size:12px;line-height:1.6}.lkZm-a_error{color:#fca5a5;background:#f8717124;border:1px solid #f8717159;border-radius:10px;padding:10px 14px;font-size:12px}@media (width<=720px){.lkZm-a_panel{border-radius:0;width:100%;max-width:100vw;max-height:100vh;padding:16px}.lkZm-a_statGrid,.lkZm-a_twoCol{grid-template-columns:1fr}}";
+		//#region \0dsh-css:C:\Users\19161\Desktop\dsh-ui-web\packages\dsh-usage-dashboard\src\client\usage.module.css.mjs
+		const css$2 = ".dgj50q_overlay{z-index:2147483001;justify-content:center;align-items:center;display:flex;position:fixed;inset:0}.dgj50q_mask{-webkit-backdrop-filter:blur(6px);background:#eaf2fc8c;position:absolute;inset:0}body[data-ds-dark-theme] .dgj50q_mask{background:#0409108c}.dgj50q_panel{z-index:1;box-sizing:border-box;width:880px;max-width:calc(100vw - 48px);max-height:calc(100vh - 48px);backdrop-filter:blur(var(--dsh-aqua-blur,14px));color:var(--dsw-alias-label-primary,#132d53);background:linear-gradient(#ffffffc7,#ffffffa3);border:1px solid #132d5342;border-radius:20px;flex-direction:column;padding:22px 26px;font-size:13px;display:flex;position:relative;overflow:auto;box-shadow:inset 0 1px #ffffff80,0 18px 60px #132d532e}body[data-ds-dark-theme] .dgj50q_panel{color:var(--dsw-alias-label-primary,#dbe7f7);background:linear-gradient(#2a2e38d9,#161922d9);border-color:#94b4dc52;box-shadow:inset 0 1px #ffffff12,0 18px 60px #02060e80}.dgj50q_header{justify-content:space-between;align-items:center;margin-bottom:16px;display:flex}.dgj50q_title{color:var(--dsw-alias-label-primary,#132d53);margin:0;font-size:18px;font-weight:700}body[data-ds-dark-theme] .dgj50q_title{color:var(--dsw-alias-label-primary,#dbe7f7)}.dgj50q_close{width:30px;height:30px;color:var(--dsw-alias-label-secondary,#132d539e);cursor:pointer;background:#132d5314;border:none;border-radius:8px;flex:none;justify-content:center;align-items:center;transition:background .12s,color .12s;display:inline-flex}.dgj50q_close:hover{color:var(--dsw-alias-label-primary,#132d53);background:#132d5329}body[data-ds-dark-theme] .dgj50q_close{color:#94b4dccc;background:#94b4dc1f}body[data-ds-dark-theme] .dgj50q_close:hover{color:#fff;background:#94b4dc38}.dgj50q_body{flex-direction:column;gap:18px;display:flex}.dgj50q_statGrid{grid-template-columns:repeat(4,1fr);gap:12px;display:grid}.dgj50q_statCard{border:1px solid;border-radius:14px;flex-direction:column;gap:3px;padding:14px 16px;display:flex}.dgj50q_statValue{font-variant-numeric:tabular-nums;font-size:26px;font-weight:800;line-height:1.1}.dgj50q_statLabel{color:var(--dsw-alias-label-secondary,#132d53b3);font-size:12px;font-weight:600}body[data-ds-dark-theme] .dgj50q_statLabel{color:var(--dsw-alias-label-secondary,#dbe7f7d9)}.dgj50q_statSub{color:var(--dsw-alias-label-tertiary,#132d5380);font-size:11px}body[data-ds-dark-theme] .dgj50q_statSub{color:var(--dsw-alias-label-tertiary,#dbe7f78c)}.dgj50q_section{flex-direction:column;gap:6px;display:flex}.dgj50q_sectionTitle{color:var(--dsw-alias-label-primary,#132d53);font-size:13px;font-weight:700}body[data-ds-dark-theme] .dgj50q_sectionTitle{color:var(--dsw-alias-label-primary,#dbe7f7)}.dgj50q_sectionSub{color:var(--dsw-alias-label-tertiary,#132d5380);font-size:11px}body[data-ds-dark-theme] .dgj50q_sectionSub{color:var(--dsw-alias-label-tertiary,#dbe7f780)}.dgj50q_twoCol{grid-template-columns:1fr 1.2fr;align-items:start;gap:20px;display:grid}.dgj50q_chart{width:100%;height:auto;margin-top:4px}.dgj50q_axisLabel{fill:var(--dsw-alias-label-tertiary,#132d5373);font-size:9px}body[data-ds-dark-theme] .dgj50q_axisLabel{fill:var(--dsw-alias-label-tertiary,#dbe7f773)}.dgj50q_gridLine{stroke:var(--dsw-alias-label-tertiary,#132d531f);stroke-dasharray:3 3;stroke-width:1px}body[data-ds-dark-theme] .dgj50q_gridLine{stroke:var(--dsw-alias-label-tertiary,#dbe7f71f)}.dgj50q_axisValue{fill:var(--dsw-alias-label-tertiary,#132d5380);font-size:9px}body[data-ds-dark-theme] .dgj50q_axisValue{fill:var(--dsw-alias-label-tertiary,#dbe7f780)}.dgj50q_donutWrap{align-items:center;gap:16px;display:flex}.dgj50q_donut{flex:none;width:150px;height:150px}.dgj50q_donutTotal{fill:var(--dsw-alias-label-primary,#132d53);font-size:16px;font-weight:800}body[data-ds-dark-theme] .dgj50q_donutTotal{fill:var(--dsw-alias-label-primary,#dbe7f7)}.dgj50q_donutLabel{fill:var(--dsw-alias-label-tertiary,#132d5380);font-size:9px}body[data-ds-dark-theme] .dgj50q_donutLabel{fill:var(--dsw-alias-label-tertiary,#dbe7f780)}.dgj50q_legend{flex-direction:column;gap:5px;min-width:0;display:flex}.dgj50q_legendRow{align-items:center;gap:7px;font-size:11px;display:flex}.dgj50q_legendDot{border-radius:3px;flex:none;width:9px;height:9px}.dgj50q_legendName{text-overflow:ellipsis;white-space:nowrap;min-width:0;color:var(--dsw-alias-label-secondary,#132d53b3);flex:1;overflow:hidden}body[data-ds-dark-theme] .dgj50q_legendName{color:var(--dsw-alias-label-secondary,#dbe7f7d9)}.dgj50q_legendVal{font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-tertiary,#132d538c)}body[data-ds-dark-theme] .dgj50q_legendVal{color:var(--dsw-alias-label-tertiary,#dbe7f799)}.dgj50q_sessionList{flex-direction:column;gap:9px;max-height:320px;display:flex;overflow:auto}.dgj50q_sessionRow{align-items:center;gap:10px;display:flex}.dgj50q_sessionRank{text-align:center;flex:none;width:20px;font-size:14px;font-weight:800}.dgj50q_sessionInfo{flex-direction:column;flex:1;gap:2px;min-width:0;display:flex}.dgj50q_sessionName{color:var(--dsw-alias-label-primary,#132d53);text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600;overflow:hidden}body[data-ds-dark-theme] .dgj50q_sessionName{color:var(--dsw-alias-label-primary,#dbe7f7)}.dgj50q_sessionMeta{color:var(--dsw-alias-label-tertiary,#132d5380);font-size:10px}body[data-ds-dark-theme] .dgj50q_sessionMeta{color:var(--dsw-alias-label-tertiary,#dbe7f780)}.dgj50q_sessionBar{background:#132d5314;border-radius:999px;height:4px;margin-top:2px;overflow:hidden}body[data-ds-dark-theme] .dgj50q_sessionBar{background:#94b4dc1f}.dgj50q_sessionBarFill{border-radius:999px;height:100%;transition:width .4s}.dgj50q_sessionTokens{font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-primary,#132d53);flex-direction:column;flex:none;align-items:flex-end;gap:2px;font-size:12px;font-weight:700;display:flex}body[data-ds-dark-theme] .dgj50q_sessionTokens{color:var(--dsw-alias-label-primary,#dbe7f7)}.dgj50q_sessionCost{color:var(--dsw-alias-label-tertiary,#132d538c);font-size:10px;font-weight:600}body[data-ds-dark-theme] .dgj50q_sessionCost{color:var(--dsw-alias-label-tertiary,#dbe7f78c)}.dgj50q_empty{flex-direction:column;align-items:center;gap:8px;padding:60px 0;display:flex}.dgj50q_emptyTitle{color:var(--dsw-alias-label-secondary,#132d53b3);font-size:15px;font-weight:700}body[data-ds-dark-theme] .dgj50q_emptyTitle{color:var(--dsw-alias-label-secondary,#dbe7f7bf)}.dgj50q_emptyHint{color:var(--dsw-alias-label-tertiary,#132d5373);text-align:center;font-size:12px;line-height:1.6}body[data-ds-dark-theme] .dgj50q_emptyHint{color:var(--dsw-alias-label-tertiary,#dbe7f773)}.dgj50q_error{color:#c63e3e;background:#d645451a;border:1px solid #d645454d;border-radius:10px;padding:10px 14px;font-size:12px}body[data-ds-dark-theme] .dgj50q_error{color:#fca5a5;background:#f8717124;border-color:#f8717159}@media (width<=720px){.dgj50q_panel{border-radius:0;width:100%;max-width:100vw;max-height:100vh;padding:16px}.dgj50q_statGrid,.dgj50q_twoCol{grid-template-columns:1fr}}";
 		const tagId$2 = "@captain1275/dsh-usage-dashboard/usage.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$2) + "]") === null) {
 			const tag = document.createElement("style");
@@ -19,47 +19,49 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var usage_module_css_default = {
-			"axisLabel": "lkZm-a_axisLabel",
-			"body": "lkZm-a_body",
-			"chart": "lkZm-a_chart",
-			"close": "lkZm-a_close",
-			"donut": "lkZm-a_donut",
-			"donutLabel": "lkZm-a_donutLabel",
-			"donutTotal": "lkZm-a_donutTotal",
-			"donutWrap": "lkZm-a_donutWrap",
-			"empty": "lkZm-a_empty",
-			"emptyHint": "lkZm-a_emptyHint",
-			"emptyTitle": "lkZm-a_emptyTitle",
-			"error": "lkZm-a_error",
-			"header": "lkZm-a_header",
-			"legend": "lkZm-a_legend",
-			"legendDot": "lkZm-a_legendDot",
-			"legendName": "lkZm-a_legendName",
-			"legendRow": "lkZm-a_legendRow",
-			"legendVal": "lkZm-a_legendVal",
-			"mask": "lkZm-a_mask",
-			"overlay": "lkZm-a_overlay",
-			"panel": "lkZm-a_panel",
-			"section": "lkZm-a_section",
-			"sectionSub": "lkZm-a_sectionSub",
-			"sectionTitle": "lkZm-a_sectionTitle",
-			"sessionBar": "lkZm-a_sessionBar",
-			"sessionBarFill": "lkZm-a_sessionBarFill",
-			"sessionCost": "lkZm-a_sessionCost",
-			"sessionInfo": "lkZm-a_sessionInfo",
-			"sessionList": "lkZm-a_sessionList",
-			"sessionMeta": "lkZm-a_sessionMeta",
-			"sessionName": "lkZm-a_sessionName",
-			"sessionRank": "lkZm-a_sessionRank",
-			"sessionRow": "lkZm-a_sessionRow",
-			"sessionTokens": "lkZm-a_sessionTokens",
-			"statCard": "lkZm-a_statCard",
-			"statGrid": "lkZm-a_statGrid",
-			"statLabel": "lkZm-a_statLabel",
-			"statSub": "lkZm-a_statSub",
-			"statValue": "lkZm-a_statValue",
-			"title": "lkZm-a_title",
-			"twoCol": "lkZm-a_twoCol"
+			"axisLabel": "dgj50q_axisLabel",
+			"axisValue": "dgj50q_axisValue",
+			"body": "dgj50q_body",
+			"chart": "dgj50q_chart",
+			"close": "dgj50q_close",
+			"donut": "dgj50q_donut",
+			"donutLabel": "dgj50q_donutLabel",
+			"donutTotal": "dgj50q_donutTotal",
+			"donutWrap": "dgj50q_donutWrap",
+			"empty": "dgj50q_empty",
+			"emptyHint": "dgj50q_emptyHint",
+			"emptyTitle": "dgj50q_emptyTitle",
+			"error": "dgj50q_error",
+			"gridLine": "dgj50q_gridLine",
+			"header": "dgj50q_header",
+			"legend": "dgj50q_legend",
+			"legendDot": "dgj50q_legendDot",
+			"legendName": "dgj50q_legendName",
+			"legendRow": "dgj50q_legendRow",
+			"legendVal": "dgj50q_legendVal",
+			"mask": "dgj50q_mask",
+			"overlay": "dgj50q_overlay",
+			"panel": "dgj50q_panel",
+			"section": "dgj50q_section",
+			"sectionSub": "dgj50q_sectionSub",
+			"sectionTitle": "dgj50q_sectionTitle",
+			"sessionBar": "dgj50q_sessionBar",
+			"sessionBarFill": "dgj50q_sessionBarFill",
+			"sessionCost": "dgj50q_sessionCost",
+			"sessionInfo": "dgj50q_sessionInfo",
+			"sessionList": "dgj50q_sessionList",
+			"sessionMeta": "dgj50q_sessionMeta",
+			"sessionName": "dgj50q_sessionName",
+			"sessionRank": "dgj50q_sessionRank",
+			"sessionRow": "dgj50q_sessionRow",
+			"sessionTokens": "dgj50q_sessionTokens",
+			"statCard": "dgj50q_statCard",
+			"statGrid": "dgj50q_statGrid",
+			"statLabel": "dgj50q_statLabel",
+			"statSub": "dgj50q_statSub",
+			"statValue": "dgj50q_statValue",
+			"title": "dgj50q_title",
+			"twoCol": "dgj50q_twoCol"
 		};
 		//#endregion
 		//#region src/client/locales.ts
@@ -86,7 +88,24 @@ window.__ModuleLoader__.load({
 			"usage.empty": "暂无用量数据",
 			"usage.noData": "使用 DSH 对话后，这里会显示详细用量统计。",
 			"usage.settingsTitle": "用量看板",
-			"usage.settingsHint": "记录每次响应的 token 用量并展示彩色统计看板。"
+			"usage.settingsHint": "记录每次响应的 token 用量并展示统计看板。",
+			"usage.cost": "估算费用",
+			"usage.costHint": "按定价快照估算",
+			"usage.daysRecorded": "{days} 天有记录",
+			"usage.cacheHit": "缓存命中",
+			"usage.pricingTitle": "定价快照",
+			"usage.pricingHint": "费用估算用的模型价目表（LiteLLM 全量，可一键更新）。",
+			"usage.pricingSource": "价目来源",
+			"usage.pricingOriginUser": "用户级覆盖（~/.dsh/usage-pricing.json）",
+			"usage.pricingOriginBuiltin": "包内置快照",
+			"usage.pricingOriginEmpty": "无（回退内置常量）",
+			"usage.pricingCoverage": "覆盖 {providers} 个 provider / {models} 个模型",
+			"usage.pricingUpdatedAt": "最后更新",
+			"usage.pricingFx": "USD 汇率",
+			"usage.pricingRefresh": "立即更新",
+			"usage.pricingRefreshing": "更新中…",
+			"usage.pricingRefreshOk": "已更新到最新价目",
+			"usage.pricingRefreshFail": "更新失败"
 		};
 		const en = {
 			"usage.entry": "Usage",
@@ -106,7 +125,24 @@ window.__ModuleLoader__.load({
 			"usage.empty": "No usage data yet",
 			"usage.noData": "Start chatting with DSH and detailed usage stats will appear here.",
 			"usage.settingsTitle": "Usage dashboard",
-			"usage.settingsHint": "Records per-response token usage and renders a colorful stats dashboard."
+			"usage.settingsHint": "Records per-response token usage and renders a stats dashboard.",
+			"usage.cost": "Estimated cost",
+			"usage.costHint": "Estimated from the pricing snapshot",
+			"usage.daysRecorded": "{days} days on record",
+			"usage.cacheHit": "Cache hits",
+			"usage.pricingTitle": "Pricing snapshot",
+			"usage.pricingHint": "Model price table used for cost estimates (full LiteLLM set, one-click refresh).",
+			"usage.pricingSource": "Source",
+			"usage.pricingOriginUser": "User override (~/.dsh/usage-pricing.json)",
+			"usage.pricingOriginBuiltin": "Bundled snapshot",
+			"usage.pricingOriginEmpty": "None (built-in constants)",
+			"usage.pricingCoverage": "Covers {providers} providers / {models} models",
+			"usage.pricingUpdatedAt": "Last updated",
+			"usage.pricingFx": "USD rate",
+			"usage.pricingRefresh": "Refresh now",
+			"usage.pricingRefreshing": "Refreshing...",
+			"usage.pricingRefreshOk": "Pricing table is up to date",
+			"usage.pricingRefreshFail": "Refresh failed"
 		};
 		/** Translate helper bound to the usage namespace (component-local). */
 		function t(key, params) {
@@ -123,16 +159,20 @@ window.__ModuleLoader__.load({
 		* library.
 		* @module @captain1275/dsh-usage-dashboard/client/DashboardPanel
 		*/
-		/** 看板彩色盘（五颜六色）。 */
-		const RAINBOW = [
-			"#f472b6",
-			"#fb923c",
-			"#facc15",
-			"#4ade80",
-			"#22d3ee",
-			"#818cf8",
-			"#c084fc",
-			"#f87171"
+		/** 一个聚合桶的总 token（输入 + 输出 + 缓存读 + 缓存写），与会话排行口径一致。 */
+		function bucketTokens(b) {
+			return b.inputTokens + b.outputTokens + b.cacheReadTokens + (b.cacheWriteTokens ?? 0);
+		}
+		/** 看板色板：Aqua 蓝系（同一色相族内区分系列，避免彩虹噪点）。 */
+		const PALETTE = [
+			"#3f76d8",
+			"#6e9be8",
+			"#4a9eda",
+			"#8fb5ef",
+			"#2f62c4",
+			"#7bc4e8",
+			"#5b8fe6",
+			"#a8ccf2"
 		];
 		/** 数值格式化：千分位 + 大数缩写。 */
 		function fmt(n) {
@@ -182,31 +222,55 @@ window.__ModuleLoader__.load({
 				]
 			});
 		}
-		/** 近 14 天柱状图（SVG）。 */
+		/** 单日 token 总量（输入 + 输出 + 缓存读 + 缓存写），与看板其它口径一致。 */
+		function dayTotal(d) {
+			return d.inputTokens + d.outputTokens + d.cacheReadTokens + (d.cacheWriteTokens ?? 0);
+		}
+		/** 近 14 天柱状图（SVG）。含右侧参考轴（0 / 半高 / 满高）。 */
 		function TrendChart(props) {
 			const W = 560;
 			const H = 160;
 			const PAD = {
 				left: 8,
-				right: 8,
+				right: 40,
 				top: 12,
 				bottom: 24
 			};
-			const max = Math.max(1, ...props.recent.map((d) => d.inputTokens + d.outputTokens));
+			const max = Math.max(1, ...props.recent.map(dayTotal));
 			const innerW = W - PAD.left - PAD.right;
 			const innerH = H - PAD.top - PAD.bottom;
 			const barW = innerW / props.recent.length;
-			return /* @__PURE__ */ (0, react_jsx_runtime.jsx)("svg", {
+			const gridValues = Array.from(/* @__PURE__ */ new Set([
+				max,
+				Math.round(max / 2),
+				0
+			]));
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("svg", {
 				className: usage_module_css_default.chart,
 				viewBox: `0 0 ${W} ${H}`,
 				role: "img",
 				"aria-label": t("usage.trend"),
-				children: props.recent.map((d, i) => {
-					const total = d.inputTokens + d.outputTokens;
+				children: [gridValues.map((v) => {
+					const y = PAD.top + innerH - v / max * innerH;
+					return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("line", {
+						x1: PAD.left,
+						y1: y,
+						x2: W - PAD.right,
+						y2: y,
+						className: usage_module_css_default.gridLine
+					}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
+						x: W - 4,
+						y: y + 3,
+						textAnchor: "end",
+						className: usage_module_css_default.axisValue,
+						children: fmt(v)
+					})] }, v);
+				}), props.recent.map((d, i) => {
+					const total = dayTotal(d);
 					const h = total === 0 ? 0 : Math.max(2, total / max * innerH);
 					const x = PAD.left + i * barW;
 					const y = PAD.top + innerH - h;
-					const color = RAINBOW[i % RAINBOW.length];
+					const color = PALETTE[i % PALETTE.length];
 					return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("g", { children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("rect", {
 						x: x + barW * .18,
 						y,
@@ -214,7 +278,7 @@ window.__ModuleLoader__.load({
 						height: h,
 						rx: 3,
 						fill: color,
-						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `${d.day}: ${fmt(total)} tokens` })
+						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `${d.day}: ${fmt(total)} tokens\n${t("usage.input")} ${fmt(d.inputTokens)} / ${t("usage.output")} ${fmt(d.outputTokens)} / ${t("usage.cache")} ${fmt(d.cacheReadTokens)}` })
 					}), props.recent.length <= 14 && i % 2 === 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
 						x: x + barW / 2,
 						y: H - 8,
@@ -222,13 +286,13 @@ window.__ModuleLoader__.load({
 						className: usage_module_css_default.axisLabel,
 						children: d.day.slice(5)
 					})] }, d.day);
-				})
+				})]
 			});
 		}
-		/** 模型分布环形图（SVG）。 */
+		/** 模型分布环形图（SVG）。口径与会话排行一致：输入 + 输出 + 缓存读 + 缓存写。 */
 		function ModelDonut(props) {
-			const entries = Object.entries(props.byModel).sort((a, b) => b[1].inputTokens + b[1].outputTokens - (a[1].inputTokens + a[1].outputTokens));
-			const total = entries.reduce((acc, [, v]) => acc + v.inputTokens + v.outputTokens, 0);
+			const entries = Object.entries(props.byModel).sort((a, b) => bucketTokens(b[1]) - bucketTokens(a[1]));
+			const total = entries.reduce((acc, [, v]) => acc + bucketTokens(v), 0);
 			const R = 56;
 			const CX = 90;
 			const CY = 90;
@@ -244,7 +308,7 @@ window.__ModuleLoader__.load({
 					"aria-label": t("usage.models"),
 					children: [
 						entries.map(([name, v], i) => {
-							const frac = total === 0 ? 0 : (v.inputTokens + v.outputTokens) / total;
+							const frac = total === 0 ? 0 : bucketTokens(v) / total;
 							const dash = frac * CIRC;
 							const offset = -(acc * CIRC);
 							acc += frac;
@@ -253,13 +317,13 @@ window.__ModuleLoader__.load({
 								cy: CY,
 								r: R,
 								fill: "none",
-								stroke: RAINBOW[i % RAINBOW.length],
+								stroke: PALETTE[i % PALETTE.length],
 								strokeWidth: STROKE,
 								strokeDasharray: `${dash} ${CIRC - dash}`,
 								strokeDashoffset: offset,
 								strokeLinecap: "butt",
 								transform: `rotate(-90 ${CX} ${CY})`,
-								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `${name}: ${fmt(v.inputTokens + v.outputTokens)} tokens` })
+								children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `${name}: ${fmt(bucketTokens(v))} tokens` })
 							}, name);
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
@@ -284,7 +348,7 @@ window.__ModuleLoader__.load({
 						children: [
 							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 								className: usage_module_css_default.legendDot,
-								style: { background: RAINBOW[i % RAINBOW.length] }
+								style: { background: PALETTE[i % PALETTE.length] }
 							}),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 								className: usage_module_css_default.legendName,
@@ -292,7 +356,7 @@ window.__ModuleLoader__.load({
 							}),
 							/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 								className: usage_module_css_default.legendVal,
-								children: fmt(v.inputTokens + v.outputTokens)
+								children: fmt(bucketTokens(v))
 							})
 						]
 					}, name))
@@ -315,7 +379,7 @@ window.__ModuleLoader__.load({
 				load();
 			}, [load]);
 			const hasData = summary !== null && summary.total.calls > 0;
-			const totalTokens = summary === null ? 0 : summary.total.inputTokens + summary.total.outputTokens + summary.total.cacheReadTokens;
+			const totalTokens = summary === null ? 0 : bucketTokens(summary.total);
 			return (0, react_dom.createPortal)(/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: usage_module_css_default.overlay,
 				role: "presentation",
@@ -376,25 +440,25 @@ window.__ModuleLoader__.load({
 											label: t("usage.total"),
 											value: fmt(totalTokens),
 											sub: `${fmt(summary.total.inputTokens)} in / ${fmt(summary.total.outputTokens)} out`,
-											color: RAINBOW[0]
+											color: PALETTE[0]
 										}),
 										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(StatCard, {
 											label: t("usage.calls"),
 											value: fmt(summary.total.calls),
-											sub: `${summary.byDayCount} 天有记录`,
-											color: RAINBOW[1]
+											sub: t("usage.daysRecorded", { days: summary.byDayCount }),
+											color: PALETTE[1]
 										}),
 										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(StatCard, {
 											label: t("usage.cache"),
 											value: fmt(summary.total.cacheReadTokens),
-											sub: "缓存命中",
-											color: RAINBOW[2]
+											sub: t("usage.cacheHit"),
+											color: PALETTE[2]
 										}),
 										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(StatCard, {
-											label: "估算费用",
+											label: t("usage.cost"),
 											value: fmtCost(summary.cost?.total ?? 0),
-											sub: "按 DeepSeek 定价估算",
-											color: RAINBOW[3]
+											sub: t("usage.costHint"),
+											color: PALETTE[3]
 										})
 									]
 								}),
@@ -430,7 +494,7 @@ window.__ModuleLoader__.load({
 											children: summary.sessions.map((s, i) => {
 												const max = summary.sessions[0]?.totalTokens ?? 1;
 												const pct = Math.max(2, Math.round(s.totalTokens / max * 100));
-												const color = RAINBOW[i % RAINBOW.length];
+												const color = PALETTE[i % PALETTE.length];
 												return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 													className: usage_module_css_default.sessionRow,
 													children: [
@@ -488,8 +552,8 @@ window.__ModuleLoader__.load({
 			}), document.body);
 		}
 		//#endregion
-		//#region \0dsh-css:D:\Desktop\DeepSeek Harness\dsh-web-ui-0.1.10\packages\dsh-usage-dashboard\src\client\usage-entry.module.css.mjs
-		const css$1 = ".oI3yBG_entry{width:100%;height:32px;color:var(--dsw-alias-label-secondary);cursor:pointer;white-space:nowrap;background:0 0;border:none;border-radius:8px;align-items:center;gap:8px;padding:0 12px;font-size:13px;transition:background-color .12s,color .12s;display:flex}.oI3yBG_entry:hover{background:var(--dsw-specific-sidebar-nav-item-hover);color:var(--dsw-alias-label-primary)}.oI3yBG_entry:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.oI3yBG_entryIcon{flex:none;justify-content:center;align-items:center;display:inline-flex}.oI3yBG_entryLabel{text-overflow:ellipsis;overflow:hidden}[data-dsh-frame][data-sidebar-collapsed] .oI3yBG_entry{justify-content:center;width:100%;padding:0}[data-dsh-frame][data-sidebar-collapsed] .oI3yBG_entryLabel{display:none}";
+		//#region \0dsh-css:C:\Users\19161\Desktop\dsh-ui-web\packages\dsh-usage-dashboard\src\client\usage-entry.module.css.mjs
+		const css$1 = ".mJiKha_entry{width:100%;height:32px;color:var(--dsw-alias-label-secondary);cursor:pointer;white-space:nowrap;background:0 0;border:none;border-radius:8px;align-items:center;gap:8px;padding:0 12px;font-size:13px;transition:background-color .12s,color .12s;display:flex}.mJiKha_entry:hover{background:var(--dsw-specific-sidebar-nav-item-hover);color:var(--dsw-alias-label-primary)}.mJiKha_entry:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.mJiKha_entryIcon{flex:none;justify-content:center;align-items:center;display:inline-flex}.mJiKha_entryLabel{text-overflow:ellipsis;overflow:hidden}[data-dsh-frame][data-sidebar-collapsed] .mJiKha_entry{justify-content:center;width:100%;padding:0}[data-dsh-frame][data-sidebar-collapsed] .mJiKha_entryLabel{display:none}";
 		const tagId$1 = "@captain1275/dsh-usage-dashboard/usage-entry.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$1) + "]") === null) {
 			const tag = document.createElement("style");
@@ -499,9 +563,9 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var usage_entry_module_css_default = {
-			"entry": "oI3yBG_entry",
-			"entryIcon": "oI3yBG_entryIcon",
-			"entryLabel": "oI3yBG_entryLabel"
+			"entry": "mJiKha_entry",
+			"entryIcon": "mJiKha_entryIcon",
+			"entryLabel": "mJiKha_entryLabel"
 		};
 		//#endregion
 		//#region src/client/UsageEntry.tsx
@@ -520,8 +584,8 @@ window.__ModuleLoader__.load({
 		* as a separate React root (see mountDashboard).
 		* @module @captain1275/dsh-usage-dashboard/client/UsageEntry
 		*/
-		/** Inline icon (matches the shell's 16px nav-icon look): three rainbow bars. */
-		const ICON = "<svg viewBox=\"0 0 16 16\" width=\"14\" height=\"14\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"2.5\" y=\"8\" width=\"3\" height=\"5\" rx=\"0.8\" fill=\"#f472b6\"/><rect x=\"7\" y=\"4.5\" width=\"3\" height=\"8.5\" rx=\"0.8\" fill=\"#fb923c\"/><rect x=\"11.5\" y=\"1.5\" width=\"3\" height=\"11.5\" rx=\"0.8\" fill=\"#4ade80\"/></svg>";
+		/** Inline icon (matches the shell's 16px nav-icon look): three Aqua-blue bars. */
+		const ICON = "<svg viewBox=\"0 0 16 16\" width=\"14\" height=\"14\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"2.5\" y=\"8\" width=\"3\" height=\"5\" rx=\"0.8\" fill=\"#a8ccf2\"/><rect x=\"7\" y=\"4.5\" width=\"3\" height=\"8.5\" rx=\"0.8\" fill=\"#6e9be8\"/><rect x=\"11.5\" y=\"1.5\" width=\"3\" height=\"11.5\" rx=\"0.8\" fill=\"#3f76d8\"/></svg>";
 		/** Find the sidebar shell root element, or undefined while not yet mounted. */
 		function sidebarRoot() {
 			const column = document.querySelector("[data-pane=\"sidebar\"], [class*=\"sidebarCol\"]");
@@ -649,6 +713,11 @@ window.__ModuleLoader__.load({
 		*    the host's calls counter tracks real response rounds.
 		*  - The host stores the LATEST snapshot per session (replace semantics);
 		*    repeated uploads overwrite instead of double counting.
+		*  - The session title rides the live `title` projection (per-session,
+		*    real-time); a title that lands AFTER the last growth flush triggers one
+		*    metadata-only re-upload (zero growth, so it never inflates calls).
+		*  - A session switch re-baselines the recorder: switching back to a larger
+		*    session is never mistaken for growth.
 		* @module @captain1275/dsh-usage-dashboard/client/UsageRecorder
 		*/
 		/** 一轮响应结束判定的静默时长（ms）。 */
@@ -668,15 +737,15 @@ window.__ModuleLoader__.load({
 		}
 		/** 当前模型（由入口从连接层更新，尽力而为）。 */
 		let currentModel = "unknown";
-		/** 当前会话标题（由入口从连接层更新，尽力而为）。 */
-		let currentTitle = "";
+		/** 当前活跃会话 id（recorder 每次渲染同步；入口的模型轮询按它查询）。 */
+		let activeSessionId;
 		/** 供入口设置当前模型（连接层回调）。 */
 		function setCurrentModel(model) {
 			if (typeof model === "string" && model.length > 0) currentModel = model;
 		}
-		/** 供入口设置当前会话标题（连接层回调）。 */
-		function setCurrentTitle(title) {
-			if (typeof title === "string" && title.length > 0) currentTitle = title;
+		/** 读当前活跃会话 id（入口的模型轮询用）。 */
+		function getActiveSessionId() {
+			return activeSessionId;
 		}
 		/**
 		* The invisible recorder seat.
@@ -686,25 +755,39 @@ window.__ModuleLoader__.load({
 		const UsageRecorder = (0, react.memo)(function UsageRecorder(props) {
 			const session = props.useSession((s) => ({ sessionId: s.sessionId }));
 			const usage = props.useProjection("tokenUsage");
+			const title = props.useProjection("title");
 			const lastTotalRef = (0, react.useRef)(-1);
+			const lastSidRef = (0, react.useRef)(void 0);
 			const settleTimerRef = (0, react.useRef)(null);
 			const lastSeenRef = (0, react.useRef)(null);
+			const titleRef = (0, react.useRef)("");
+			const uploadedTitleRef = (0, react.useRef)("");
+			activeSessionId = session.sessionId;
 			const flush = () => {
 				settleTimerRef.current = null;
 				const seen = lastSeenRef.current;
 				if (seen === null) return;
+				const snapshotTitle = titleRef.current;
+				uploadedTitleRef.current = snapshotTitle;
 				postSnapshot({
 					sessionId: seen.sessionId,
-					sessionTitle: seen.title,
+					sessionTitle: snapshotTitle,
 					model: currentModel,
 					inputTokens: seen.input,
 					outputTokens: seen.output,
-					cacheReadTokens: seen.cache
+					cacheReadTokens: seen.cache,
+					cacheWriteTokens: seen.cacheWrite
 				});
 			};
 			(0, react.useEffect)(() => {
 				const sid = session.sessionId;
 				if (sid === void 0 || usage === void 0) return;
+				if (lastSidRef.current !== sid) {
+					lastSidRef.current = sid;
+					lastTotalRef.current = -1;
+					lastSeenRef.current = null;
+					uploadedTitleRef.current = "";
+				}
 				const total = usage.uncachedInputTokens + usage.outputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
 				const prev = lastTotalRef.current;
 				if (prev === -1) {
@@ -716,14 +799,24 @@ window.__ModuleLoader__.load({
 				if (total <= prev) return;
 				lastSeenRef.current = {
 					sessionId: sid,
-					title: currentTitle,
 					input: usage.uncachedInputTokens,
 					output: usage.outputTokens,
-					cache: usage.cacheReadTokens
+					cache: usage.cacheReadTokens,
+					cacheWrite: usage.cacheWriteTokens
 				};
 				if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
 				settleTimerRef.current = window.setTimeout(flush, SETTLE_MS);
 			}, [session.sessionId, usage]);
+			(0, react.useEffect)(() => {
+				const next = typeof title === "string" ? title : "";
+				titleRef.current = next;
+				const seen = lastSeenRef.current;
+				if (next === "" || seen === null) return;
+				if (seen.sessionId !== session.sessionId) return;
+				if (next === uploadedTitleRef.current) return;
+				if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
+				settleTimerRef.current = window.setTimeout(flush, SETTLE_MS);
+			}, [title, session.sessionId]);
 			(0, react.useEffect)(() => {
 				return () => {
 					if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
@@ -732,8 +825,8 @@ window.__ModuleLoader__.load({
 			return null;
 		});
 		//#endregion
-		//#region \0dsh-css:D:\Desktop\DeepSeek Harness\dsh-web-ui-0.1.10\packages\dsh-usage-dashboard\src\client\usage-settings.module.css.mjs
-		const css = ".jgFV7q_card{border:1px solid var(--dsw-alias-border-l2,#8ca0ff38);background:var(--dsw-alias-surface-card,#12182e99);border-radius:10px;list-style:none;overflow:hidden}.jgFV7q_header{width:100%;color:inherit;font:inherit;cursor:pointer;text-align:left;background:0 0;border:none;align-items:center;gap:10px;padding:12px 16px;display:flex}.jgFV7q_headText{flex-direction:column;flex:1;gap:2px;min-width:0;display:flex}.jgFV7q_name{color:var(--dsw-alias-label-primary,#eef1ff);font-size:14px;font-weight:600}.jgFV7q_description{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px}.jgFV7q_chevron{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px;transition:transform .12s}.jgFV7q_chevronOpen{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px;transform:rotate(180deg)}.jgFV7q_body{flex-direction:column;gap:8px;padding:4px 16px 14px;display:flex}.jgFV7q_legendRow{color:var(--dsw-alias-label-secondary,#b9c2e8);align-items:center;gap:8px;font-size:12px;display:flex}.jgFV7q_dot{border-radius:50%;flex:none;width:9px;height:9px}";
+		//#region \0dsh-css:C:\Users\19161\Desktop\dsh-ui-web\packages\dsh-usage-dashboard\src\client\usage-settings.module.css.mjs
+		const css = ".dx_IMa_card{border:1px solid var(--dsw-alias-border-l2,#8ca0ff38);background:var(--dsw-alias-surface-card,#12182e99);border-radius:10px;list-style:none;overflow:hidden}.dx_IMa_header{width:100%;color:inherit;font:inherit;cursor:pointer;text-align:left;background:0 0;border:none;align-items:center;gap:10px;padding:12px 16px;display:flex}.dx_IMa_headText{flex-direction:column;flex:1;gap:2px;min-width:0;display:flex}.dx_IMa_name{color:var(--dsw-alias-label-primary,#eef1ff);font-size:14px;font-weight:600}.dx_IMa_description{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px}.dx_IMa_chevron{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px;transition:transform .12s}.dx_IMa_chevronOpen{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px;transform:rotate(180deg)}.dx_IMa_body{flex-direction:column;gap:8px;padding:4px 16px 14px;display:flex}.dx_IMa_legendRow{color:var(--dsw-alias-label-secondary,#b9c2e8);align-items:center;gap:8px;font-size:12px;display:flex}.dx_IMa_dot{border-radius:50%;flex:none;width:9px;height:9px}.dx_IMa_actionsRow{align-items:center;gap:10px;margin-top:4px;display:flex}.dx_IMa_refreshButton{border:1px solid var(--dsw-alias-border-l2,#8ca0ff38);background:var(--dsw-alias-surface-control,#8ca0ff14);color:var(--dsw-alias-label-primary,#eef1ff);cursor:pointer;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;transition:background .12s,border-color .12s}.dx_IMa_refreshButton:hover:not(:disabled){background:var(--dsw-alias-surface-control-hover,#8ca0ff29);border-color:var(--dsw-alias-border-l3,#8ca0ff66)}.dx_IMa_refreshButton:disabled{opacity:.55;cursor:default}.dx_IMa_refreshMessage{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px}";
 		const tagId = "@captain1275/dsh-usage-dashboard/usage-settings.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -743,16 +836,19 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var usage_settings_module_css_default = {
-			"body": "jgFV7q_body",
-			"card": "jgFV7q_card",
-			"chevron": "jgFV7q_chevron",
-			"chevronOpen": "jgFV7q_chevronOpen",
-			"description": "jgFV7q_description",
-			"dot": "jgFV7q_dot",
-			"headText": "jgFV7q_headText",
-			"header": "jgFV7q_header",
-			"legendRow": "jgFV7q_legendRow",
-			"name": "jgFV7q_name"
+			"actionsRow": "dx_IMa_actionsRow",
+			"body": "dx_IMa_body",
+			"card": "dx_IMa_card",
+			"chevron": "dx_IMa_chevron",
+			"chevronOpen": "dx_IMa_chevronOpen",
+			"description": "dx_IMa_description",
+			"dot": "dx_IMa_dot",
+			"headText": "dx_IMa_headText",
+			"header": "dx_IMa_header",
+			"legendRow": "dx_IMa_legendRow",
+			"name": "dx_IMa_name",
+			"refreshButton": "dx_IMa_refreshButton",
+			"refreshMessage": "dx_IMa_refreshMessage"
 		};
 		//#endregion
 		//#region src/client/UsageSettingsCard.tsx
@@ -798,22 +894,161 @@ window.__ModuleLoader__.load({
 							className: usage_settings_module_css_default.legendRow,
 							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 								className: usage_settings_module_css_default.dot,
-								style: { background: "#f472b6" }
+								style: { background: "#3f76d8" }
 							}), " 每次响应的 token 用量自动记录"]
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							className: usage_settings_module_css_default.legendRow,
 							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 								className: usage_settings_module_css_default.dot,
-								style: { background: "#fb923c" }
-							}), " 侧边栏彩色图表按钮打开看板"]
+								style: { background: "#6e9be8" }
+							}), " 侧边栏图表按钮打开看板"]
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							className: usage_settings_module_css_default.legendRow,
 							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
 								className: usage_settings_module_css_default.dot,
-								style: { background: "#4ade80" }
+								style: { background: "#a8ccf2" }
 							}), " 数据保存在 ~/.dsh/usage.json（本机）"]
+						})
+					]
+				}) : null]
+			});
+		}
+		//#endregion
+		//#region src/client/PricingCard.tsx
+		/**
+		* Pricing snapshot settings card — shows which pricing table is in effect
+		* (builtin snapshot vs user override), coverage stats and last refresh time,
+		* with a one-click refresh that pulls the latest LiteLLM table through the
+		* host route. Lives in the Web UI plugin group next to the dashboard card.
+		* @module @captain1275/dsh-usage-dashboard/client/PricingCard
+		*/
+		/** 格式化 ISO 时间为本地短格式。 */
+		function formatTime(iso) {
+			if (iso === "") return "—";
+			const d = new Date(iso);
+			if (Number.isNaN(d.getTime())) return iso;
+			const pad = (n) => String(n).padStart(2, "0");
+			return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+		}
+		/**
+		* Render the pricing snapshot card.
+		* @returns the card element.
+		*/
+		function PricingCard(_props) {
+			const [open, setOpen] = (0, react.useState)(false);
+			const [meta, setMeta] = (0, react.useState)(null);
+			const [refreshing, setRefreshing] = (0, react.useState)(false);
+			const [message, setMessage] = (0, react.useState)("");
+			const load = () => {
+				fetch("/api/usage-pricing").then(async (res) => await res.json()).then((data) => {
+					if (data.ok && data.pricing !== void 0) setMeta(data.pricing);
+				}).catch(() => {});
+			};
+			(0, react.useEffect)(() => {
+				if (open) load();
+			}, [open]);
+			const refresh = () => {
+				if (refreshing) return;
+				setRefreshing(true);
+				setMessage("");
+				fetch("/api/usage-pricing/refresh", { method: "POST" }).then(async (res) => await res.json()).then((data) => {
+					if (data.ok && data.pricing !== void 0) {
+						setMeta(data.pricing);
+						setMessage(t("usage.pricingRefreshOk"));
+					} else setMessage(`${t("usage.pricingRefreshFail")}: ${data.error ?? "unknown"}`);
+				}).catch((error) => {
+					setMessage(`${t("usage.pricingRefreshFail")}: ${error instanceof Error ? error.message : String(error)}`);
+				}).finally(() => {
+					setRefreshing(false);
+				});
+			};
+			const originText = meta === null ? "—" : meta.origin === "user" ? t("usage.pricingOriginUser") : meta.origin === "builtin" ? t("usage.pricingOriginBuiltin") : t("usage.pricingOriginEmpty");
+			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("li", {
+				className: usage_settings_module_css_default.card,
+				children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("button", {
+					type: "button",
+					className: usage_settings_module_css_default.header,
+					"aria-expanded": open,
+					"aria-label": `${open ? "收起" : "展开"}: ${t("usage.pricingTitle")}`,
+					onClick: () => {
+						setOpen(!open);
+					},
+					children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+						className: usage_settings_module_css_default.headText,
+						children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: usage_settings_module_css_default.name,
+							children: t("usage.pricingTitle")
+						}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+							className: usage_settings_module_css_default.description,
+							children: t("usage.pricingHint")
+						})]
+					}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+						className: open ? usage_settings_module_css_default.chevronOpen : usage_settings_module_css_default.chevron,
+						children: "▾"
+					})]
+				}), open ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+					className: usage_settings_module_css_default.body,
+					children: [
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: usage_settings_module_css_default.legendRow,
+							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+									className: usage_settings_module_css_default.dot,
+									style: { background: "#3f76d8" }
+								}),
+								t("usage.pricingSource"),
+								": ",
+								originText
+							]
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: usage_settings_module_css_default.legendRow,
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: usage_settings_module_css_default.dot,
+								style: { background: "#6e9be8" }
+							}), t("usage.pricingCoverage", {
+								providers: meta?.providers ?? 0,
+								models: meta?.models ?? 0
+							})]
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: usage_settings_module_css_default.legendRow,
+							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+									className: usage_settings_module_css_default.dot,
+									style: { background: "#a8ccf2" }
+								}),
+								t("usage.pricingUpdatedAt"),
+								": ",
+								meta === null ? "—" : formatTime(meta.updatedAt)
+							]
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: usage_settings_module_css_default.legendRow,
+							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+									className: usage_settings_module_css_default.dot,
+									style: { background: "#4a9eda" }
+								}),
+								t("usage.pricingFx"),
+								": ",
+								meta?.fx ?? "—"
+							]
+						}),
+						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: usage_settings_module_css_default.actionsRow,
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: usage_settings_module_css_default.refreshButton,
+								disabled: refreshing,
+								onClick: refresh,
+								children: refreshing ? t("usage.pricingRefreshing") : t("usage.pricingRefresh")
+							}), message !== "" && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: usage_settings_module_css_default.refreshMessage,
+								children: message
+							})]
 						})
 					]
 				}) : null]
@@ -847,11 +1082,9 @@ window.__ModuleLoader__.load({
 				if (connection?.api?.sessions === void 0) return () => {};
 				let cancelled = false;
 				const tick = async () => {
+					const sessionId = getActiveSessionId();
+					if (sessionId === void 0 || cancelled) return;
 					try {
-						const item = (await connection.api?.sessions?.list({ cursor: "" }))?.result?.value?.items?.[0];
-						const sessionId = item?.sessionId;
-						if (item?.title !== void 0 && !cancelled) setCurrentTitle(item.title);
-						if (sessionId === void 0 || cancelled) return;
 						const model = (await connection.api?.sessions?.models({ sessionId }))?.result?.value?.current?.model;
 						if (model !== void 0 && !cancelled) setCurrentModel(model);
 					} catch {}
@@ -876,6 +1109,12 @@ window.__ModuleLoader__.load({
 				order: 130,
 				locale: NS
 			}, UsageSettingsCard));
+			ctx.slots.inject("web-ui.plugin.item", () => ctx.slots.register({
+				name: "web-ui.plugin.item",
+				id: "usage-pricing",
+				order: 131,
+				locale: NS
+			}, PricingCard));
 		}
 		//#endregion
 		exports.apply = apply;

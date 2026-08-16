@@ -1,0 +1,6 @@
+# dsh-effort-slider bundle patch: inserts the effort slider into the web
+# profile roster. The browser half intercepts the official model menu's
+# reasoning-effort row and opens an Aqua-styled slider panel instead.
+- insert:
+    - id: ui-effort-slider
+      name: '@captain1275/dsh-effort-slider'

@@ -1,0 +1,347 @@
+/* dsh-effort-slider panel — Aqua glass styling.
+ * 深浅两套：浅色是白玻璃 + 深青蓝描边，深色是中性冷灰玻璃 + 淡蓝描边；
+ * 强调色跟随 Aqua 的品牌蓝（light #3F76D8 / dark #6E9BE8）。
+ * backdrop-filter 只挂在这张浮动卡片上（内部没有 fixed 定位的后代，
+ * 不会像设置面板那样破坏菜单锚点）。 */
+
+.panel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 280px;
+  user-select: none;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+/* 卡片外圈柔光：Aqua 蓝的浅晕，比 aurora 的紫色收敛。 */
+.glow {
+  position: absolute;
+  inset: -3px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(110, 155, 232, 0.28), rgba(63, 118, 216, 0.12), rgba(110, 155, 232, 0.18));
+  opacity: 0.55;
+  filter: blur(10px);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  border-radius: 20px;
+  padding: 14px 16px 12px;
+  border: 1px solid rgba(19, 45, 83, 0.26);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.58));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 12px 32px rgba(19, 45, 83, 0.14);
+  backdrop-filter: blur(var(--dsh-aqua-blur, 14px));
+}
+
+:global(body[data-ds-dark-theme]) .inner {
+  border-color: rgba(148, 180, 220, 0.32);
+  background: linear-gradient(180deg, rgba(42, 46, 56, 0.82), rgba(22, 25, 34, 0.82));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 12px 32px rgba(2, 6, 14, 0.5);
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.headLeft {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 500;
+  overflow: hidden;
+}
+
+.labelText {
+  color: var(--dsw-alias-label-secondary, rgba(19, 45, 83, 0.62));
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.status {
+  display: inline-block;
+  color: var(--dsw-alias-label-caption, rgba(19, 45, 83, 0.45));
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transition: color 0.25s ease, text-shadow 0.25s ease;
+  vertical-align: middle;
+}
+
+.statusGlow {
+  color: #3f76d8;
+  text-shadow: 0 0 14px rgba(63, 118, 216, 0.55);
+}
+
+:global(body[data-ds-dark-theme]) .statusGlow {
+  color: #6e9be8;
+  text-shadow: 0 0 14px rgba(110, 155, 232, 0.6);
+}
+
+/* 档位色阶：蓝系渐变（0 档最灰，MAX 档最亮）。 */
+.level0 { color: rgba(19, 45, 83, 0.4); }
+.level1 { color: rgba(63, 118, 216, 0.55); }
+.level2 { color: rgba(63, 118, 216, 0.75); }
+.level3 { color: #3f76d8; text-shadow: 0 0 10px rgba(63, 118, 216, 0.45); }
+.level4 { color: #2f62c4; text-shadow: 0 0 12px rgba(63, 118, 216, 0.6); }
+
+:global(body[data-ds-dark-theme]) .level0 { color: rgba(148, 180, 220, 0.35); }
+:global(body[data-ds-dark-theme]) .level1 { color: rgba(110, 155, 232, 0.5); }
+:global(body[data-ds-dark-theme]) .level2 { color: rgba(110, 155, 232, 0.7); }
+:global(body[data-ds-dark-theme]) .level3 { color: #6e9be8; text-shadow: 0 0 10px rgba(110, 155, 232, 0.5); }
+:global(body[data-ds-dark-theme]) .level4 { color: #9dbcf0; text-shadow: 0 0 12px rgba(110, 155, 232, 0.65); }
+
+.close {
+  border: 1px solid rgba(19, 45, 83, 0.16);
+  background: rgba(255, 255, 255, 0.35);
+  color: var(--dsw-alias-label-secondary, rgba(19, 45, 83, 0.62));
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close:hover {
+  color: var(--dsw-alias-label-primary, #132d53);
+  border-color: rgba(19, 45, 83, 0.34);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+:global(body[data-ds-dark-theme]) .close {
+  border-color: rgba(148, 180, 220, 0.2);
+  background: rgba(148, 180, 220, 0.08);
+  color: rgba(148, 180, 220, 0.75);
+}
+
+:global(body[data-ds-dark-theme]) .close:hover {
+  color: #dbe7f7;
+  border-color: rgba(148, 180, 220, 0.4);
+  background: rgba(148, 180, 220, 0.16);
+}
+
+.levelLabels {
+  position: relative;
+  height: 15px;
+  margin-bottom: 4px;
+}
+
+.levelLabel {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--dsw-alias-label-caption, rgba(19, 45, 83, 0.45));
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: color 0.15s;
+}
+
+.levelLabelActive {
+  color: #3f76d8;
+}
+
+:global(body[data-ds-dark-theme]) .levelLabelActive {
+  color: #6e9be8;
+}
+
+/* 轨道：磨砂凹槽 + 蓝色填充前缘。 */
+.trackWrapper {
+  position: relative;
+  height: 32px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(19, 45, 83, 0.12);
+  background: rgba(19, 45, 83, 0.05);
+  isolation: isolate;
+}
+
+:global(body[data-ds-dark-theme]) .trackWrapper {
+  border-color: rgba(148, 180, 220, 0.14);
+  background: rgba(10, 14, 22, 0.5);
+}
+
+.trackBg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  border-radius: 9px 0 0 9px;
+  background: linear-gradient(90deg, rgba(63, 118, 216, 0.22), rgba(63, 118, 216, 0.5));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: width 0.08s linear;
+  pointer-events: none;
+}
+
+:global(body[data-ds-dark-theme]) .fill {
+  background: linear-gradient(90deg, rgba(110, 155, 232, 0.18), rgba(110, 155, 232, 0.45));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.dotsLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.dot {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(63, 118, 216, 0.3);
+  top: 50%;
+  transform: translateY(-50%);
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.dotActive {
+  background: #3f76d8;
+  box-shadow: 0 0 8px rgba(63, 118, 216, 0.8);
+}
+
+:global(body[data-ds-dark-theme]) .dot {
+  background: rgba(110, 155, 232, 0.3);
+}
+
+:global(body[data-ds-dark-theme]) .dotActive {
+  background: #6e9be8;
+  box-shadow: 0 0 8px rgba(110, 155, 232, 0.85);
+}
+
+.range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+  z-index: 5;
+  outline: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* 玻璃珠 thumb：白玻璃渐变 + 蓝环，拖动时发光。 */
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  background: linear-gradient(145deg, #ffffff 0%, #dce7f7 55%, #c9d9f0 100%);
+  border: none;
+  box-shadow:
+    0 2px 8px rgba(19, 45, 83, 0.25),
+    0 0 0 1px rgba(63, 118, 216, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  cursor: grab;
+  transition: box-shadow 0.25s ease, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.range::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(0.92);
+}
+
+.rangeGlow::-webkit-slider-thumb {
+  box-shadow:
+    0 2px 8px rgba(19, 45, 83, 0.3),
+    0 0 0 1px rgba(63, 118, 216, 0.45),
+    0 0 18px rgba(63, 118, 216, 0.4),
+    0 0 36px rgba(63, 118, 216, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.range::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #ffffff 0%, #dce7f7 55%, #c9d9f0 100%);
+  border: none;
+  box-shadow:
+    0 2px 8px rgba(19, 45, 83, 0.25),
+    0 0 0 1px rgba(63, 118, 216, 0.28);
+  cursor: grab;
+}
+
+.range::-moz-range-thumb:active {
+  cursor: grabbing;
+  transform: scale(0.95);
+}
+
+.range::-moz-range-track {
+  background: transparent;
+  border: none;
+  height: 32px;
+}
+
+/* 拖动跟随光斑（蓝色，纯 CSS）。 */
+.pointLight {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 3;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(63, 118, 216, 0.22) 0%, rgba(63, 118, 216, 0.07) 30%, rgba(63, 118, 216, 0.02) 55%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.pointLightOn {
+  opacity: 1;
+}
+
+.emptyOverlay {
+  font-size: 13px;
+  color: var(--dsw-alias-label-caption, rgba(19, 45, 83, 0.45));
+  padding: 10px 0 2px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+/* 内联形态：嵌在官方模型菜单里，无边框卡片，只靠一条顶部分隔线融入菜单。 */
+.inlinePanel {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--dsw-alias-border-l2, rgba(19, 45, 83, 0.12));
+  user-select: none;
+}
+
+:global(body[data-ds-dark-theme]) .inlinePanel {
+  border-top-color: rgba(148, 180, 220, 0.14);
+}
+
+.inlinePanel .head {
+  margin-bottom: 4px;
+}

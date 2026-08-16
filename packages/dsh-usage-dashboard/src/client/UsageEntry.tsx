@@ -21,8 +21,8 @@ import { t } from './locales.ts'
 /** Stable data attribute identifying the injected entry row. */
 export const ENTRY_SELECTOR = '[data-dsh-usage-entry]'
 
-/** Inline icon (matches the shell's 16px nav-icon look): three rainbow bars. */
-const ICON = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="8" width="3" height="5" rx="0.8" fill="#f472b6"/><rect x="7" y="4.5" width="3" height="8.5" rx="0.8" fill="#fb923c"/><rect x="11.5" y="1.5" width="3" height="11.5" rx="0.8" fill="#4ade80"/></svg>'
+/** Inline icon (matches the shell's 16px nav-icon look): three Aqua-blue bars. */
+const ICON = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="8" width="3" height="5" rx="0.8" fill="#a8ccf2"/><rect x="7" y="4.5" width="3" height="8.5" rx="0.8" fill="#6e9be8"/><rect x="11.5" y="1.5" width="3" height="11.5" rx="0.8" fill="#3f76d8"/></svg>'
 
 /** Find the sidebar shell root element, or undefined while not yet mounted. */
 function sidebarRoot(): HTMLElement | undefined {

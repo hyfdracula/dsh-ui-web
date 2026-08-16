@@ -16,6 +16,7 @@ import {
   sessionRanking,
   type UsageRecord,
 } from './index.ts'
+import { mergeFreshSnapshot } from './pricing.ts'
 
 const base: UsageRecord = {
   sessionId: 's1',
@@ -25,6 +26,7 @@ const base: UsageRecord = {
   inputTokens: 100,
   outputTokens: 50,
   cacheReadTokens: 20,
+  cacheWriteTokens: 0,
 }
 
 describe('usage aggregation', () => {
@@ -74,6 +76,30 @@ describe('usage aggregation', () => {
     expect(store.bySession['s1']?.inputTokens).toBe(10)
   })
 
+  it('does not inflate calls on a re-uploaded identical snapshot', () => {
+    const store = emptyUsage()
+    applyRecord(store, base)
+    // Same snapshot again (baseline re-sync after a page refresh or a
+    // session round-trip): tokens unchanged, calls must not grow.
+    applyRecord(store, { ...base, ts: base.ts + 1000 })
+    expect(store.total.calls).toBe(1)
+    expect(store.bySession['s1']?.calls).toBe(1)
+    // But a title that lands later still updates the stored session row.
+    applyRecord(store, { ...base, sessionTitle: '真正的标题', ts: base.ts + 2000 })
+    expect(store.bySession['s1']?.title).toBe('真正的标题')
+    expect(store.bySession['s1']?.calls).toBe(1)
+  })
+
+  it('accumulates cache-write tokens into every bucket', () => {
+    const store = emptyUsage()
+    applyRecord(store, { ...base, cacheWriteTokens: 30 })
+    expect(store.total.cacheWriteTokens).toBe(30)
+    expect(store.byModel['deepseek/deepseek-chat']?.cacheWriteTokens).toBe(30)
+    expect(store.bySession['s1']?.cacheWriteTokens).toBe(30)
+    // Ranking total includes cache writes.
+    expect(sessionRanking(store, 10)[0]?.totalTokens).toBe(100 + 50 + 20 + 30)
+  })
+
   it('ranks sessions by total tokens descending', () => {
     const store = emptyUsage()
     applyRecord(store, base) // s1: 170 total
@@ -91,7 +117,9 @@ describe('usage aggregation', () => {
     expect(days).toHaveLength(14)
     // The recorded day has the tokens; at least one other day is zero.
     const today = dayKey(Date.now())
-    expect(days.find((d) => d.day === today)?.calls).toBe(1)
+    const todayEntry = days.find((d) => d.day === today)
+    expect(todayEntry?.calls).toBe(1)
+    expect(todayEntry?.cacheReadTokens).toBe(base.cacheReadTokens)
     expect(days.some((d) => d.calls === 0)).toBe(true)
   })
 })
@@ -99,6 +127,37 @@ describe('usage aggregation', () => {
 describe('usage helpers', () => {
   it('formats day keys in local time', () => {
     expect(dayKey(0)).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+
+  it('preserves custom pricing entries across a LiteLLM refresh', () => {
+    const existing = {
+      _source: 'user-custom', _unit: 'CNY per 1M tokens', _fx: 7.2, _fetchedAt: 'x',
+      models: {
+        'k3-256k': { i: 10.8, o: 54, c: 1.08 },
+        'deepseek/deepseek-chat': { i: 1, o: 2, c: 0.05 }, // 与官方同名：以官方价为准
+      },
+      aliases: { 'my-k3': 'k3-256k' },
+    }
+    const fresh = {
+      _source: 'litellm', _unit: 'CNY per 1M tokens', _fx: 7.2, _fetchedAt: 'y',
+      models: { 'deepseek/deepseek-chat': { i: 2.016, o: 3.024, c: 0.2016 } },
+      aliases: {},
+    }
+    const merged = mergeFreshSnapshot(existing, fresh)
+    // 官方同名列被最新价覆盖；自定义条目保留。
+    expect(merged.models['deepseek/deepseek-chat']).toEqual({ i: 2.016, o: 3.024, c: 0.2016 })
+    expect(merged.models['k3-256k']).toEqual({ i: 10.8, o: 54, c: 1.08 })
+    expect(merged.aliases['my-k3']).toBe('k3-256k')
+    expect(merged._fetchedAt).toBe('y')
+  })
+
+  it('mergeFreshSnapshot passes a fresh-only snapshot through', () => {
+    const fresh = {
+      _source: 'litellm', _unit: 'CNY per 1M tokens', _fx: 7.2, _fetchedAt: 'z',
+      models: { a: { i: 1, o: 2 } }, aliases: {},
+    }
+    expect(mergeFreshSnapshot(null, fresh)).toBe(fresh)
+    expect(mergeFreshSnapshot(fresh, fresh)).toBe(fresh)
   })
 
   it('tolerates missing usage file', () => {
