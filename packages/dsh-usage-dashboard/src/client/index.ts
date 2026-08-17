@@ -16,10 +16,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { mountUsageEntry } from './UsageEntry.tsx'
-import { UsageRecorder, getActiveSessionId, setCurrentModel } from './UsageRecorder.tsx'
+import { UsageRecorder } from './UsageRecorder.tsx'
 import { UsageSettingsCard, type UsageSettingsCardProps } from './UsageSettingsCard.tsx'
 import { PricingCard, type PricingCardProps } from './PricingCard.tsx'
 import { NS, en, zh } from './locales.ts'
+import { getActiveSessionId, setCurrentModel, setModelFetcher, setSessionChangeListener } from './model.ts'
 
 export { openDashboard, closeDashboard, mountUsageEntry } from './UsageEntry.tsx'
 export type { UsageRecorderProps } from './UsageRecorder.tsx'
@@ -71,31 +72,55 @@ export function apply(ctx: ClientContext): void {
   // newest list row — session.list items carry no title and items[0] is
   // whatever was touched last) so uploads carry a real per-session model
   // label instead of "unknown". Best-effort — failures leave the last
-  // known value. Titles ride the live `title` projection in the recorder.
+  // known value. The poll runs every 2s and PAUSES entirely while no
+  // conversation dock is mounted (X1): the recorder's session-id sync
+  // restarts it when a session appears and stops it when it unmounts.
   ctx.effect(() => {
     const connection = ctx.get('connection') as { api?: { sessions?: {
       list(request: { sessionId?: string; cursor?: string }): Promise<unknown>
       models(request: { sessionId: string }): Promise<unknown>
     } } } | undefined
     if (connection?.api?.sessions === undefined) return () => {}
-    let cancelled = false
-    const tick = async (): Promise<void> => {
-      const sessionId = getActiveSessionId()
-      if (sessionId === undefined || cancelled) return
+    const fetcher = async (sessionId: string): Promise<string | undefined> => {
       try {
         const modelsRes = await connection.api?.sessions?.models({ sessionId })
         const models = modelsRes as { result?: { value?: { current?: { provider?: string; model?: string } } } } | undefined
         const model = models?.result?.value?.current?.model
-        if (model !== undefined && !cancelled) setCurrentModel(model)
+        return typeof model === 'string' && model.length > 0 ? model : undefined
       } catch {
-        /* 轮询失败保持上次值 */
+        return undefined
       }
     }
+    setModelFetcher(fetcher)
+    let cancelled = false
+    let timer: number | null = null
+    const tick = async (): Promise<void> => {
+      if (cancelled) return
+      const sessionId = getActiveSessionId()
+      if (sessionId === undefined) {
+        // 无活跃会话：暂停轮询（X1）。
+        if (timer !== null) {
+          window.clearInterval(timer)
+          timer = null
+        }
+        return
+      }
+      const model = await fetcher(sessionId)
+      if (model !== undefined && !cancelled) setCurrentModel(model)
+    }
+    const restart = (): void => {
+      if (cancelled) return
+      if (timer !== null) window.clearInterval(timer)
+      timer = window.setInterval(() => { void tick() }, 2000)
+      void tick()
+    }
+    setSessionChangeListener(restart)
     void tick()
-    const timer = window.setInterval(() => { void tick() }, 5000)
     return () => {
       cancelled = true
-      window.clearInterval(timer)
+      if (timer !== null) window.clearInterval(timer)
+      setSessionChangeListener(undefined)
+      setModelFetcher(undefined)
     }
   }, 'usage-dashboard: model subscription')
 

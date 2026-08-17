@@ -8,8 +8,8 @@ window.__ModuleLoader__.load({
 		let react = require("react");
 		let react_dom = require("react-dom");
 		let react_jsx_runtime = require("react/jsx-runtime");
-		//#region \0dsh-css:C:\Users\19161\Desktop\dsh-ui-web\packages\dsh-usage-dashboard\src\client\usage.module.css.mjs
-		const css$2 = ".dgj50q_overlay{z-index:2147483001;justify-content:center;align-items:center;display:flex;position:fixed;inset:0}.dgj50q_mask{-webkit-backdrop-filter:blur(6px);background:#eaf2fc8c;position:absolute;inset:0}body[data-ds-dark-theme] .dgj50q_mask{background:#0409108c}.dgj50q_panel{z-index:1;box-sizing:border-box;width:880px;max-width:calc(100vw - 48px);max-height:calc(100vh - 48px);backdrop-filter:blur(var(--dsh-aqua-blur,14px));color:var(--dsw-alias-label-primary,#132d53);background:linear-gradient(#ffffffc7,#ffffffa3);border:1px solid #132d5342;border-radius:20px;flex-direction:column;padding:22px 26px;font-size:13px;display:flex;position:relative;overflow:auto;box-shadow:inset 0 1px #ffffff80,0 18px 60px #132d532e}body[data-ds-dark-theme] .dgj50q_panel{color:var(--dsw-alias-label-primary,#dbe7f7);background:linear-gradient(#2a2e38d9,#161922d9);border-color:#94b4dc52;box-shadow:inset 0 1px #ffffff12,0 18px 60px #02060e80}.dgj50q_header{justify-content:space-between;align-items:center;margin-bottom:16px;display:flex}.dgj50q_title{color:var(--dsw-alias-label-primary,#132d53);margin:0;font-size:18px;font-weight:700}body[data-ds-dark-theme] .dgj50q_title{color:var(--dsw-alias-label-primary,#dbe7f7)}.dgj50q_close{width:30px;height:30px;color:var(--dsw-alias-label-secondary,#132d539e);cursor:pointer;background:#132d5314;border:none;border-radius:8px;flex:none;justify-content:center;align-items:center;transition:background .12s,color .12s;display:inline-flex}.dgj50q_close:hover{color:var(--dsw-alias-label-primary,#132d53);background:#132d5329}body[data-ds-dark-theme] .dgj50q_close{color:#94b4dccc;background:#94b4dc1f}body[data-ds-dark-theme] .dgj50q_close:hover{color:#fff;background:#94b4dc38}.dgj50q_body{flex-direction:column;gap:18px;display:flex}.dgj50q_statGrid{grid-template-columns:repeat(4,1fr);gap:12px;display:grid}.dgj50q_statCard{border:1px solid;border-radius:14px;flex-direction:column;gap:3px;padding:14px 16px;display:flex}.dgj50q_statValue{font-variant-numeric:tabular-nums;font-size:26px;font-weight:800;line-height:1.1}.dgj50q_statLabel{color:var(--dsw-alias-label-secondary,#132d53b3);font-size:12px;font-weight:600}body[data-ds-dark-theme] .dgj50q_statLabel{color:var(--dsw-alias-label-secondary,#dbe7f7d9)}.dgj50q_statSub{color:var(--dsw-alias-label-tertiary,#132d5380);font-size:11px}body[data-ds-dark-theme] .dgj50q_statSub{color:var(--dsw-alias-label-tertiary,#dbe7f78c)}.dgj50q_section{flex-direction:column;gap:6px;display:flex}.dgj50q_sectionTitle{color:var(--dsw-alias-label-primary,#132d53);font-size:13px;font-weight:700}body[data-ds-dark-theme] .dgj50q_sectionTitle{color:var(--dsw-alias-label-primary,#dbe7f7)}.dgj50q_sectionSub{color:var(--dsw-alias-label-tertiary,#132d5380);font-size:11px}body[data-ds-dark-theme] .dgj50q_sectionSub{color:var(--dsw-alias-label-tertiary,#dbe7f780)}.dgj50q_twoCol{grid-template-columns:1fr 1.2fr;align-items:start;gap:20px;display:grid}.dgj50q_chart{width:100%;height:auto;margin-top:4px}.dgj50q_axisLabel{fill:var(--dsw-alias-label-tertiary,#132d5373);font-size:9px}body[data-ds-dark-theme] .dgj50q_axisLabel{fill:var(--dsw-alias-label-tertiary,#dbe7f773)}.dgj50q_gridLine{stroke:var(--dsw-alias-label-tertiary,#132d531f);stroke-dasharray:3 3;stroke-width:1px}body[data-ds-dark-theme] .dgj50q_gridLine{stroke:var(--dsw-alias-label-tertiary,#dbe7f71f)}.dgj50q_axisValue{fill:var(--dsw-alias-label-tertiary,#132d5380);font-size:9px}body[data-ds-dark-theme] .dgj50q_axisValue{fill:var(--dsw-alias-label-tertiary,#dbe7f780)}.dgj50q_donutWrap{align-items:center;gap:16px;display:flex}.dgj50q_donut{flex:none;width:150px;height:150px}.dgj50q_donutTotal{fill:var(--dsw-alias-label-primary,#132d53);font-size:16px;font-weight:800}body[data-ds-dark-theme] .dgj50q_donutTotal{fill:var(--dsw-alias-label-primary,#dbe7f7)}.dgj50q_donutLabel{fill:var(--dsw-alias-label-tertiary,#132d5380);font-size:9px}body[data-ds-dark-theme] .dgj50q_donutLabel{fill:var(--dsw-alias-label-tertiary,#dbe7f780)}.dgj50q_legend{flex-direction:column;gap:5px;min-width:0;display:flex}.dgj50q_legendRow{align-items:center;gap:7px;font-size:11px;display:flex}.dgj50q_legendDot{border-radius:3px;flex:none;width:9px;height:9px}.dgj50q_legendName{text-overflow:ellipsis;white-space:nowrap;min-width:0;color:var(--dsw-alias-label-secondary,#132d53b3);flex:1;overflow:hidden}body[data-ds-dark-theme] .dgj50q_legendName{color:var(--dsw-alias-label-secondary,#dbe7f7d9)}.dgj50q_legendVal{font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-tertiary,#132d538c)}body[data-ds-dark-theme] .dgj50q_legendVal{color:var(--dsw-alias-label-tertiary,#dbe7f799)}.dgj50q_sessionList{flex-direction:column;gap:9px;max-height:320px;display:flex;overflow:auto}.dgj50q_sessionRow{align-items:center;gap:10px;display:flex}.dgj50q_sessionRank{text-align:center;flex:none;width:20px;font-size:14px;font-weight:800}.dgj50q_sessionInfo{flex-direction:column;flex:1;gap:2px;min-width:0;display:flex}.dgj50q_sessionName{color:var(--dsw-alias-label-primary,#132d53);text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600;overflow:hidden}body[data-ds-dark-theme] .dgj50q_sessionName{color:var(--dsw-alias-label-primary,#dbe7f7)}.dgj50q_sessionMeta{color:var(--dsw-alias-label-tertiary,#132d5380);font-size:10px}body[data-ds-dark-theme] .dgj50q_sessionMeta{color:var(--dsw-alias-label-tertiary,#dbe7f780)}.dgj50q_sessionBar{background:#132d5314;border-radius:999px;height:4px;margin-top:2px;overflow:hidden}body[data-ds-dark-theme] .dgj50q_sessionBar{background:#94b4dc1f}.dgj50q_sessionBarFill{border-radius:999px;height:100%;transition:width .4s}.dgj50q_sessionTokens{font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-primary,#132d53);flex-direction:column;flex:none;align-items:flex-end;gap:2px;font-size:12px;font-weight:700;display:flex}body[data-ds-dark-theme] .dgj50q_sessionTokens{color:var(--dsw-alias-label-primary,#dbe7f7)}.dgj50q_sessionCost{color:var(--dsw-alias-label-tertiary,#132d538c);font-size:10px;font-weight:600}body[data-ds-dark-theme] .dgj50q_sessionCost{color:var(--dsw-alias-label-tertiary,#dbe7f78c)}.dgj50q_empty{flex-direction:column;align-items:center;gap:8px;padding:60px 0;display:flex}.dgj50q_emptyTitle{color:var(--dsw-alias-label-secondary,#132d53b3);font-size:15px;font-weight:700}body[data-ds-dark-theme] .dgj50q_emptyTitle{color:var(--dsw-alias-label-secondary,#dbe7f7bf)}.dgj50q_emptyHint{color:var(--dsw-alias-label-tertiary,#132d5373);text-align:center;font-size:12px;line-height:1.6}body[data-ds-dark-theme] .dgj50q_emptyHint{color:var(--dsw-alias-label-tertiary,#dbe7f773)}.dgj50q_error{color:#c63e3e;background:#d645451a;border:1px solid #d645454d;border-radius:10px;padding:10px 14px;font-size:12px}body[data-ds-dark-theme] .dgj50q_error{color:#fca5a5;background:#f8717124;border-color:#f8717159}@media (width<=720px){.dgj50q_panel{border-radius:0;width:100%;max-width:100vw;max-height:100vh;padding:16px}.dgj50q_statGrid,.dgj50q_twoCol{grid-template-columns:1fr}}";
+		//#region \0dsh-css:C:\Users\19161\Documents\dsh-work\dsh-ui-web\packages\dsh-usage-dashboard\src\client\usage.module.css.mjs
+		const css$2 = ".uCBljq_overlay{z-index:2147483001;justify-content:center;align-items:center;display:flex;position:fixed;inset:0}.uCBljq_mask{-webkit-backdrop-filter:blur(6px);background:#eaf2fc8c;position:absolute;inset:0}body[data-ds-dark-theme] .uCBljq_mask{background:#0409108c}.uCBljq_panel{z-index:1;box-sizing:border-box;width:880px;max-width:calc(100vw - 48px);max-height:calc(100vh - 48px);backdrop-filter:blur(var(--dsh-aqua-blur,14px));color:var(--dsw-alias-label-primary,#132d53);background:linear-gradient(#ffffffc7,#ffffffa3);border:1px solid #132d5342;border-radius:20px;flex-direction:column;padding:22px 26px;font-size:13px;display:flex;position:relative;overflow:auto;box-shadow:inset 0 1px #ffffff80,0 18px 60px #132d532e}body[data-ds-dark-theme] .uCBljq_panel{color:var(--dsw-alias-label-primary,#dbe7f7);background:linear-gradient(#2a2e38d9,#161922d9);border-color:#94b4dc52;box-shadow:inset 0 1px #ffffff12,0 18px 60px #02060e80}.uCBljq_header{justify-content:space-between;align-items:center;margin-bottom:16px;display:flex}.uCBljq_title{color:var(--dsw-alias-label-primary,#132d53);margin:0;font-size:18px;font-weight:700}body[data-ds-dark-theme] .uCBljq_title{color:var(--dsw-alias-label-primary,#dbe7f7)}.uCBljq_close{width:30px;height:30px;color:var(--dsw-alias-label-secondary,#132d539e);cursor:pointer;background:#132d5314;border:none;border-radius:8px;flex:none;justify-content:center;align-items:center;transition:background .12s,color .12s;display:inline-flex}.uCBljq_close:hover{color:var(--dsw-alias-label-primary,#132d53);background:#132d5329}body[data-ds-dark-theme] .uCBljq_close{color:#94b4dccc;background:#94b4dc1f}body[data-ds-dark-theme] .uCBljq_close:hover{color:#fff;background:#94b4dc38}.uCBljq_body{flex-direction:column;gap:18px;display:flex}.uCBljq_statGrid{grid-template-columns:repeat(4,1fr);gap:12px;display:grid}.uCBljq_statCard{border:1px solid;border-radius:14px;flex-direction:column;gap:3px;padding:14px 16px;display:flex}.uCBljq_statValue{font-variant-numeric:tabular-nums;font-size:26px;font-weight:800;line-height:1.1}.uCBljq_statLabel{color:var(--dsw-alias-label-secondary,#132d53b3);font-size:12px;font-weight:600}body[data-ds-dark-theme] .uCBljq_statLabel{color:var(--dsw-alias-label-secondary,#dbe7f7d9)}.uCBljq_statSub{color:var(--dsw-alias-label-tertiary,#132d5380);font-size:11px}body[data-ds-dark-theme] .uCBljq_statSub{color:var(--dsw-alias-label-tertiary,#dbe7f78c)}.uCBljq_section{flex-direction:column;gap:6px;display:flex}.uCBljq_sectionTitle{color:var(--dsw-alias-label-primary,#132d53);font-size:13px;font-weight:700}body[data-ds-dark-theme] .uCBljq_sectionTitle{color:var(--dsw-alias-label-primary,#dbe7f7)}.uCBljq_sectionSub{color:var(--dsw-alias-label-tertiary,#132d5380);font-size:11px}body[data-ds-dark-theme] .uCBljq_sectionSub{color:var(--dsw-alias-label-tertiary,#dbe7f780)}.uCBljq_twoCol{grid-template-columns:1fr 1.2fr;align-items:start;gap:20px;display:grid}.uCBljq_chart{width:100%;height:auto;margin-top:4px}.uCBljq_axisLabel{fill:var(--dsw-alias-label-tertiary,#132d5373);font-size:9px}body[data-ds-dark-theme] .uCBljq_axisLabel{fill:var(--dsw-alias-label-tertiary,#dbe7f773)}.uCBljq_gridLine{stroke:var(--dsw-alias-label-tertiary,#132d531f);stroke-dasharray:3 3;stroke-width:1px}body[data-ds-dark-theme] .uCBljq_gridLine{stroke:var(--dsw-alias-label-tertiary,#dbe7f71f)}.uCBljq_axisValue{fill:var(--dsw-alias-label-tertiary,#132d5380);font-size:9px}body[data-ds-dark-theme] .uCBljq_axisValue{fill:var(--dsw-alias-label-tertiary,#dbe7f780)}.uCBljq_donutWrap{align-items:center;gap:16px;display:flex}.uCBljq_donut{flex:none;width:150px;height:150px}.uCBljq_donutTotal{fill:var(--dsw-alias-label-primary,#132d53);font-size:16px;font-weight:800}body[data-ds-dark-theme] .uCBljq_donutTotal{fill:var(--dsw-alias-label-primary,#dbe7f7)}.uCBljq_donutLabel{fill:var(--dsw-alias-label-tertiary,#132d5380);font-size:9px}body[data-ds-dark-theme] .uCBljq_donutLabel{fill:var(--dsw-alias-label-tertiary,#dbe7f780)}.uCBljq_legend{flex-direction:column;gap:5px;min-width:0;display:flex}.uCBljq_legendRow{align-items:center;gap:7px;font-size:11px;display:flex}.uCBljq_legendDot{border-radius:3px;flex:none;width:9px;height:9px}.uCBljq_legendName{text-overflow:ellipsis;white-space:nowrap;min-width:0;color:var(--dsw-alias-label-secondary,#132d53b3);flex:1;overflow:hidden}body[data-ds-dark-theme] .uCBljq_legendName{color:var(--dsw-alias-label-secondary,#dbe7f7d9)}.uCBljq_legendVal{font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-tertiary,#132d538c)}body[data-ds-dark-theme] .uCBljq_legendVal{color:var(--dsw-alias-label-tertiary,#dbe7f799)}.uCBljq_sessionList{flex-direction:column;gap:9px;max-height:320px;display:flex;overflow:auto}.uCBljq_sessionRow{align-items:center;gap:10px;display:flex}.uCBljq_sessionRank{text-align:center;flex:none;width:20px;font-size:14px;font-weight:800}.uCBljq_sessionInfo{flex-direction:column;flex:1;gap:2px;min-width:0;display:flex}.uCBljq_sessionName{color:var(--dsw-alias-label-primary,#132d53);text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600;overflow:hidden}body[data-ds-dark-theme] .uCBljq_sessionName{color:var(--dsw-alias-label-primary,#dbe7f7)}.uCBljq_sessionMeta{color:var(--dsw-alias-label-tertiary,#132d5380);font-size:10px}body[data-ds-dark-theme] .uCBljq_sessionMeta{color:var(--dsw-alias-label-tertiary,#dbe7f780)}.uCBljq_sessionBar{background:#132d5314;border-radius:999px;height:4px;margin-top:2px;overflow:hidden}body[data-ds-dark-theme] .uCBljq_sessionBar{background:#94b4dc1f}.uCBljq_sessionBarFill{border-radius:999px;height:100%;transition:width .4s}.uCBljq_sessionTokens{font-variant-numeric:tabular-nums;color:var(--dsw-alias-label-primary,#132d53);flex-direction:column;flex:none;align-items:flex-end;gap:2px;font-size:12px;font-weight:700;display:flex}body[data-ds-dark-theme] .uCBljq_sessionTokens{color:var(--dsw-alias-label-primary,#dbe7f7)}.uCBljq_sessionCost{color:var(--dsw-alias-label-tertiary,#132d538c);font-size:10px;font-weight:600}body[data-ds-dark-theme] .uCBljq_sessionCost{color:var(--dsw-alias-label-tertiary,#dbe7f78c)}.uCBljq_empty{flex-direction:column;align-items:center;gap:8px;padding:60px 0;display:flex}.uCBljq_emptyTitle{color:var(--dsw-alias-label-secondary,#132d53b3);font-size:15px;font-weight:700}body[data-ds-dark-theme] .uCBljq_emptyTitle{color:var(--dsw-alias-label-secondary,#dbe7f7bf)}.uCBljq_emptyHint{color:var(--dsw-alias-label-tertiary,#132d5373);text-align:center;font-size:12px;line-height:1.6}body[data-ds-dark-theme] .uCBljq_emptyHint{color:var(--dsw-alias-label-tertiary,#dbe7f773)}.uCBljq_error{color:#c63e3e;background:#d645451a;border:1px solid #d645454d;border-radius:10px;align-items:center;gap:10px;padding:10px 14px;font-size:12px;display:flex}body[data-ds-dark-theme] .uCBljq_error{color:#fca5a5;background:#f8717124;border-color:#f8717159}.uCBljq_retry{color:inherit;font:inherit;cursor:pointer;background:#d645451f;border:1px solid #d6454559;border-radius:6px;flex:none;padding:2px 12px;font-size:12px;font-weight:600;transition:background .12s,border-color .12s}.uCBljq_retry:hover{background:#d6454538;border-color:#d645458c}@media (width<=720px){.uCBljq_panel{border-radius:0;width:100%;max-width:100vw;max-height:100vh;padding:16px}.uCBljq_statGrid,.uCBljq_twoCol{grid-template-columns:1fr}}";
 		const tagId$2 = "@captain1275/dsh-usage-dashboard/usage.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$2) + "]") === null) {
 			const tag = document.createElement("style");
@@ -19,49 +19,50 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var usage_module_css_default = {
-			"axisLabel": "dgj50q_axisLabel",
-			"axisValue": "dgj50q_axisValue",
-			"body": "dgj50q_body",
-			"chart": "dgj50q_chart",
-			"close": "dgj50q_close",
-			"donut": "dgj50q_donut",
-			"donutLabel": "dgj50q_donutLabel",
-			"donutTotal": "dgj50q_donutTotal",
-			"donutWrap": "dgj50q_donutWrap",
-			"empty": "dgj50q_empty",
-			"emptyHint": "dgj50q_emptyHint",
-			"emptyTitle": "dgj50q_emptyTitle",
-			"error": "dgj50q_error",
-			"gridLine": "dgj50q_gridLine",
-			"header": "dgj50q_header",
-			"legend": "dgj50q_legend",
-			"legendDot": "dgj50q_legendDot",
-			"legendName": "dgj50q_legendName",
-			"legendRow": "dgj50q_legendRow",
-			"legendVal": "dgj50q_legendVal",
-			"mask": "dgj50q_mask",
-			"overlay": "dgj50q_overlay",
-			"panel": "dgj50q_panel",
-			"section": "dgj50q_section",
-			"sectionSub": "dgj50q_sectionSub",
-			"sectionTitle": "dgj50q_sectionTitle",
-			"sessionBar": "dgj50q_sessionBar",
-			"sessionBarFill": "dgj50q_sessionBarFill",
-			"sessionCost": "dgj50q_sessionCost",
-			"sessionInfo": "dgj50q_sessionInfo",
-			"sessionList": "dgj50q_sessionList",
-			"sessionMeta": "dgj50q_sessionMeta",
-			"sessionName": "dgj50q_sessionName",
-			"sessionRank": "dgj50q_sessionRank",
-			"sessionRow": "dgj50q_sessionRow",
-			"sessionTokens": "dgj50q_sessionTokens",
-			"statCard": "dgj50q_statCard",
-			"statGrid": "dgj50q_statGrid",
-			"statLabel": "dgj50q_statLabel",
-			"statSub": "dgj50q_statSub",
-			"statValue": "dgj50q_statValue",
-			"title": "dgj50q_title",
-			"twoCol": "dgj50q_twoCol"
+			"axisLabel": "uCBljq_axisLabel",
+			"axisValue": "uCBljq_axisValue",
+			"body": "uCBljq_body",
+			"chart": "uCBljq_chart",
+			"close": "uCBljq_close",
+			"donut": "uCBljq_donut",
+			"donutLabel": "uCBljq_donutLabel",
+			"donutTotal": "uCBljq_donutTotal",
+			"donutWrap": "uCBljq_donutWrap",
+			"empty": "uCBljq_empty",
+			"emptyHint": "uCBljq_emptyHint",
+			"emptyTitle": "uCBljq_emptyTitle",
+			"error": "uCBljq_error",
+			"gridLine": "uCBljq_gridLine",
+			"header": "uCBljq_header",
+			"legend": "uCBljq_legend",
+			"legendDot": "uCBljq_legendDot",
+			"legendName": "uCBljq_legendName",
+			"legendRow": "uCBljq_legendRow",
+			"legendVal": "uCBljq_legendVal",
+			"mask": "uCBljq_mask",
+			"overlay": "uCBljq_overlay",
+			"panel": "uCBljq_panel",
+			"retry": "uCBljq_retry",
+			"section": "uCBljq_section",
+			"sectionSub": "uCBljq_sectionSub",
+			"sectionTitle": "uCBljq_sectionTitle",
+			"sessionBar": "uCBljq_sessionBar",
+			"sessionBarFill": "uCBljq_sessionBarFill",
+			"sessionCost": "uCBljq_sessionCost",
+			"sessionInfo": "uCBljq_sessionInfo",
+			"sessionList": "uCBljq_sessionList",
+			"sessionMeta": "uCBljq_sessionMeta",
+			"sessionName": "uCBljq_sessionName",
+			"sessionRank": "uCBljq_sessionRank",
+			"sessionRow": "uCBljq_sessionRow",
+			"sessionTokens": "uCBljq_sessionTokens",
+			"statCard": "uCBljq_statCard",
+			"statGrid": "uCBljq_statGrid",
+			"statLabel": "uCBljq_statLabel",
+			"statSub": "uCBljq_statSub",
+			"statValue": "uCBljq_statValue",
+			"title": "uCBljq_title",
+			"twoCol": "uCBljq_twoCol"
 		};
 		//#endregion
 		//#region src/client/locales.ts
@@ -87,8 +88,14 @@ window.__ModuleLoader__.load({
 			"usage.close": "关闭用量看板",
 			"usage.empty": "暂无用量数据",
 			"usage.noData": "使用 DSH 对话后，这里会显示详细用量统计。",
+			"usage.expand": "展开",
+			"usage.collapse": "收起",
+			"usage.retry": "重试",
 			"usage.settingsTitle": "用量看板",
 			"usage.settingsHint": "记录每次响应的 token 用量并展示统计看板。",
+			"usage.settingsMoreRecord": "每次响应的 token 用量自动记录",
+			"usage.settingsMoreEntry": "侧边栏图表按钮打开看板",
+			"usage.settingsMorePath": "数据保存在 ~/.dsh/usage.json（本机）",
 			"usage.cost": "估算费用",
 			"usage.costHint": "按定价快照估算",
 			"usage.daysRecorded": "{days} 天有记录",
@@ -101,7 +108,7 @@ window.__ModuleLoader__.load({
 			"usage.pricingOriginEmpty": "无（回退内置常量）",
 			"usage.pricingCoverage": "覆盖 {providers} 个 provider / {models} 个模型",
 			"usage.pricingUpdatedAt": "最后更新",
-			"usage.pricingFx": "USD 汇率",
+			"usage.pricingFx": "固定汇率",
 			"usage.pricingRefresh": "立即更新",
 			"usage.pricingRefreshing": "更新中…",
 			"usage.pricingRefreshOk": "已更新到最新价目",
@@ -124,8 +131,14 @@ window.__ModuleLoader__.load({
 			"usage.close": "Close usage dashboard",
 			"usage.empty": "No usage data yet",
 			"usage.noData": "Start chatting with DSH and detailed usage stats will appear here.",
+			"usage.expand": "Expand",
+			"usage.collapse": "Collapse",
+			"usage.retry": "Retry",
 			"usage.settingsTitle": "Usage dashboard",
 			"usage.settingsHint": "Records per-response token usage and renders a stats dashboard.",
+			"usage.settingsMoreRecord": "Per-response token usage is recorded automatically",
+			"usage.settingsMoreEntry": "Open the dashboard from the sidebar chart button",
+			"usage.settingsMorePath": "Data is stored in ~/.dsh/usage.json (local)",
 			"usage.cost": "Estimated cost",
 			"usage.costHint": "Estimated from the pricing snapshot",
 			"usage.daysRecorded": "{days} days on record",
@@ -138,17 +151,60 @@ window.__ModuleLoader__.load({
 			"usage.pricingOriginEmpty": "None (built-in constants)",
 			"usage.pricingCoverage": "Covers {providers} providers / {models} models",
 			"usage.pricingUpdatedAt": "Last updated",
-			"usage.pricingFx": "USD rate",
+			"usage.pricingFx": "Fixed FX rate",
 			"usage.pricingRefresh": "Refresh now",
 			"usage.pricingRefreshing": "Refreshing...",
 			"usage.pricingRefreshOk": "Pricing table is up to date",
 			"usage.pricingRefreshFail": "Refresh failed"
 		};
-		/** Translate helper bound to the usage namespace (component-local). */
+		/**
+		* Translate helper bound to the usage namespace (component-local).
+		* 占位符按正则一次扫描替换（每次只替换模板里的 token，参数值不会被二次
+		* 扫描）：即使某参数值本身含 `{...}` 文本也不会被后续替换改写（X2）。
+		*/
 		function t(key, params) {
 			let text = (typeof document !== "undefined" && document.documentElement.lang === "en" ? en : zh)[key] ?? key;
-			for (const [name, value] of Object.entries(params ?? {})) text = text.replaceAll(`{${name}}`, String(value));
+			if (params !== void 0) text = text.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, name) => {
+				const value = params[name];
+				return value === void 0 ? match : String(value);
+			});
 			return text;
+		}
+		//#endregion
+		//#region src/client/dashboard-format.ts
+		/**
+		* 看板的纯格式化/归一化函数（与 React 解耦，便于单元测试）。
+		* @module @captain1275/dsh-usage-dashboard/client/dashboard-format
+		*/
+		/** 数值格式化：千分位 + 大数缩写。 */
+		function fmt(n) {
+			if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+			if (n >= 1e3) return `${(n / 1e3).toFixed(1)}k`;
+			return String(n);
+		}
+		/** 费用格式化：¥X.XX，小额保留 4 位；0 显示 ¥0（D5）。 */
+		function fmtCost(n) {
+			if (n <= 0) return "¥0";
+			if (n >= 100) return `¥${Math.round(n)}`;
+			if (n >= 1) return `¥${n.toFixed(2)}`;
+			return `¥${n.toFixed(4)}`;
+		}
+		/**
+		* 把 recent 序列补齐到至少 min 天：不足时在前面补零条目，键唯一
+		* （pad-N，不会与 YYYY-MM-DD 冲突）。宿主旧版本可能返回不足 14 条
+		* 或空数组，补齐后柱状图不会再出现除零/缺柱（D2/D3）。
+		*/
+		function padRecentDays(recent, min) {
+			if (recent.length >= min) return recent;
+			const pad = min - recent.length;
+			return [...Array.from({ length: pad }, (_, i) => ({
+				day: `pad-${pad - i}`,
+				inputTokens: 0,
+				outputTokens: 0,
+				cacheReadTokens: 0,
+				cacheWriteTokens: 0,
+				calls: 0
+			})), ...recent];
 		}
 		//#endregion
 		//#region src/client/DashboardPanel.tsx
@@ -174,28 +230,51 @@ window.__ModuleLoader__.load({
 			"#5b8fe6",
 			"#a8ccf2"
 		];
-		/** 数值格式化：千分位 + 大数缩写。 */
-		function fmt(n) {
-			if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
-			if (n >= 1e3) return `${(n / 1e3).toFixed(1)}k`;
-			return String(n);
-		}
 		/** 十六进制颜色转 rgba。 */
 		function hexToRgba(hex, alpha) {
 			const v = parseInt(hex.slice(1), 16);
 			return `rgba(${v >> 16 & 255}, ${v >> 8 & 255}, ${v & 255}, ${alpha})`;
 		}
-		/** 费用格式化：¥X.XX，小额保留 4 位。 */
-		function fmtCost(n) {
-			if (n >= 100) return `¥${Math.round(n)}`;
-			if (n >= 1) return `¥${n.toFixed(2)}`;
-			return `¥${n.toFixed(4)}`;
+		/** 非负数字兜底。 */
+		function toNonNegNum(value) {
+			return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
+		}
+		/**
+		* 防御性归一化：宿主旧版本/异常载荷不白屏（D1）。
+		* total/recent/byModel/sessions 全部判空给默认值。
+		*/
+		function sanitizeSummary(raw) {
+			if (typeof raw !== "object" || raw === null) return null;
+			const s = raw;
+			if (typeof s.total !== "object" || s.total === null) return null;
+			return {
+				total: {
+					inputTokens: toNonNegNum(s.total.inputTokens),
+					outputTokens: toNonNegNum(s.total.outputTokens),
+					cacheReadTokens: toNonNegNum(s.total.cacheReadTokens),
+					cacheWriteTokens: toNonNegNum(s.total.cacheWriteTokens),
+					calls: toNonNegNum(s.total.calls)
+				},
+				byModel: typeof s.byModel === "object" && s.byModel !== null ? s.byModel : {},
+				recent: Array.isArray(s.recent) ? s.recent : [],
+				sessions: Array.isArray(s.sessions) ? s.sessions : [],
+				byDayCount: typeof s.byDayCount === "number" ? s.byDayCount : 0,
+				cost: typeof s.cost === "object" && s.cost !== null ? {
+					total: toNonNegNum(s.cost.total),
+					byModel: typeof s.cost.byModel === "object" && s.cost.byModel !== null ? s.cost.byModel : {}
+				} : {
+					total: 0,
+					byModel: {}
+				}
+			};
 		}
 		/** 拉取看板数据。 */
 		async function fetchSummary() {
 			const res = await fetch("/api/usage/summary");
 			if (!res.ok) throw new Error(`usage summary failed: ${res.status}`);
-			return await res.json();
+			const summary = sanitizeSummary(await res.json());
+			if (summary === null) throw new Error("usage summary: unexpected payload shape");
+			return summary;
 		}
 		/** 彩色统计卡片。 */
 		function StatCard(props) {
@@ -236,10 +315,11 @@ window.__ModuleLoader__.load({
 				top: 12,
 				bottom: 24
 			};
-			const max = Math.max(1, ...props.recent.map(dayTotal));
+			const data = padRecentDays(props.recent, 14);
+			const max = Math.max(1, ...data.map(dayTotal));
 			const innerW = W - PAD.left - PAD.right;
 			const innerH = H - PAD.top - PAD.bottom;
-			const barW = innerW / props.recent.length;
+			const barW = data.length === 0 ? innerW : innerW / data.length;
 			const gridValues = Array.from(/* @__PURE__ */ new Set([
 				max,
 				Math.round(max / 2),
@@ -265,7 +345,7 @@ window.__ModuleLoader__.load({
 						className: usage_module_css_default.axisValue,
 						children: fmt(v)
 					})] }, v);
-				}), props.recent.map((d, i) => {
+				}), data.map((d, i) => {
 					const total = dayTotal(d);
 					const h = total === 0 ? 0 : Math.max(2, total / max * innerH);
 					const x = PAD.left + i * barW;
@@ -279,13 +359,13 @@ window.__ModuleLoader__.load({
 						rx: 3,
 						fill: color,
 						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `${d.day}: ${fmt(total)} tokens\n${t("usage.input")} ${fmt(d.inputTokens)} / ${t("usage.output")} ${fmt(d.outputTokens)} / ${t("usage.cache")} ${fmt(d.cacheReadTokens)}` })
-					}), props.recent.length <= 14 && i % 2 === 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
+					}), data.length <= 14 && i % 2 === 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
 						x: x + barW / 2,
 						y: H - 8,
 						textAnchor: "middle",
 						className: usage_module_css_default.axisLabel,
 						children: d.day.slice(5)
-					})] }, d.day);
+					})] }, `${d.day}-${i}`);
 				})]
 			});
 		}
@@ -378,7 +458,7 @@ window.__ModuleLoader__.load({
 			(0, react.useEffect)(() => {
 				load();
 			}, [load]);
-			const hasData = summary !== null && summary.total.calls > 0;
+			const hasData = summary !== null && (summary.total?.calls ?? 0) > 0;
 			const totalTokens = summary === null ? 0 : bucketTokens(summary.total);
 			return (0, react_dom.createPortal)(/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: usage_module_css_default.overlay,
@@ -416,9 +496,14 @@ window.__ModuleLoader__.load({
 								})
 							})]
 						}),
-						error !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+						error !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							className: usage_module_css_default.error,
-							children: error
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", { children: error }), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: usage_module_css_default.retry,
+								onClick: load,
+								children: t("usage.retry")
+							})]
 						}),
 						summary !== null && !hasData && /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							className: usage_module_css_default.empty,
@@ -493,7 +578,7 @@ window.__ModuleLoader__.load({
 											className: usage_module_css_default.sessionList,
 											children: summary.sessions.map((s, i) => {
 												const max = summary.sessions[0]?.totalTokens ?? 1;
-												const pct = Math.max(2, Math.round(s.totalTokens / max * 100));
+												const pct = s.totalTokens <= 0 ? 0 : Math.max(2, Math.round(s.totalTokens / max * 100));
 												const color = PALETTE[i % PALETTE.length];
 												return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 													className: usage_module_css_default.sessionRow,
@@ -552,8 +637,8 @@ window.__ModuleLoader__.load({
 			}), document.body);
 		}
 		//#endregion
-		//#region \0dsh-css:C:\Users\19161\Desktop\dsh-ui-web\packages\dsh-usage-dashboard\src\client\usage-entry.module.css.mjs
-		const css$1 = ".mJiKha_entry{width:100%;height:32px;color:var(--dsw-alias-label-secondary);cursor:pointer;white-space:nowrap;background:0 0;border:none;border-radius:8px;align-items:center;gap:8px;padding:0 12px;font-size:13px;transition:background-color .12s,color .12s;display:flex}.mJiKha_entry:hover{background:var(--dsw-specific-sidebar-nav-item-hover);color:var(--dsw-alias-label-primary)}.mJiKha_entry:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.mJiKha_entryIcon{flex:none;justify-content:center;align-items:center;display:inline-flex}.mJiKha_entryLabel{text-overflow:ellipsis;overflow:hidden}[data-dsh-frame][data-sidebar-collapsed] .mJiKha_entry{justify-content:center;width:100%;padding:0}[data-dsh-frame][data-sidebar-collapsed] .mJiKha_entryLabel{display:none}";
+		//#region \0dsh-css:C:\Users\19161\Documents\dsh-work\dsh-ui-web\packages\dsh-usage-dashboard\src\client\usage-entry.module.css.mjs
+		const css$1 = ".nlrhlW_entry{width:100%;height:32px;color:var(--dsw-alias-label-secondary);cursor:pointer;white-space:nowrap;background:0 0;border:none;border-radius:8px;align-items:center;gap:8px;padding:0 12px;font-size:13px;transition:background-color .12s,color .12s;display:flex}.nlrhlW_entry:hover{background:var(--dsw-specific-sidebar-nav-item-hover);color:var(--dsw-alias-label-primary)}.nlrhlW_entry:focus-visible{outline:2px solid var(--dsw-alias-state-business-primary);outline-offset:2px}.nlrhlW_entryIcon{flex:none;justify-content:center;align-items:center;display:inline-flex}.nlrhlW_entryLabel{text-overflow:ellipsis;overflow:hidden}[data-dsh-frame][data-sidebar-collapsed] .nlrhlW_entry{justify-content:center;width:100%;padding:0}[data-dsh-frame][data-sidebar-collapsed] .nlrhlW_entryLabel{display:none}";
 		const tagId$1 = "@captain1275/dsh-usage-dashboard/usage-entry.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$1) + "]") === null) {
 			const tag = document.createElement("style");
@@ -563,9 +648,9 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var usage_entry_module_css_default = {
-			"entry": "mJiKha_entry",
-			"entryIcon": "mJiKha_entryIcon",
-			"entryLabel": "mJiKha_entryLabel"
+			"entry": "nlrhlW_entry",
+			"entryIcon": "nlrhlW_entryIcon",
+			"entryLabel": "nlrhlW_entryLabel"
 		};
 		//#endregion
 		//#region src/client/UsageEntry.tsx
@@ -576,26 +661,55 @@ window.__ModuleLoader__.load({
 		* (`sidebar.workspaces` / `sidebar.settings` are single-occupant and already
 		* taken), so — following the task-board / ssh precedent of DOM-level
 		* extension — the entry row is injected between the shell's New Session
-		* button and the workspace browser. The injection self-heals: a
-		* MutationObserver watches the sidebar root and re-inserts the row whenever
-		* a React re-render displaces it.
+		* button and the workspace browser. The injection self-heals: while the
+		* shell has not rendered yet a body-level MutationObserver waits for it;
+		* once the entry is placed that body observer disconnects (E1) and a
+		* subtree observer on the sidebar root re-inserts the row whenever a React
+		* re-render displaces it.
 		*
 		* The row is plain DOM; clicking it mounts the full-screen dashboard overlay
-		* as a separate React root (see mountDashboard).
+		* as a separate React root (see mountDashboard). The row text refreshes when
+		* the document language changes (E3).
 		* @module @captain1275/dsh-usage-dashboard/client/UsageEntry
 		*/
 		/** Inline icon (matches the shell's 16px nav-icon look): three Aqua-blue bars. */
 		const ICON = "<svg viewBox=\"0 0 16 16\" width=\"14\" height=\"14\" fill=\"none\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><rect x=\"2.5\" y=\"8\" width=\"3\" height=\"5\" rx=\"0.8\" fill=\"#a8ccf2\"/><rect x=\"7\" y=\"4.5\" width=\"3\" height=\"8.5\" rx=\"0.8\" fill=\"#6e9be8\"/><rect x=\"11.5\" y=\"1.5\" width=\"3\" height=\"11.5\" rx=\"0.8\" fill=\"#3f76d8\"/></svg>";
+		/** 侧栏列候选（class 子串 + data-* 属性，shell 改版时可平滑迁移，E1）。 */
+		const SIDEBAR_COLUMN_SELECTORS = [
+			"[data-pane=\"sidebar\"]",
+			"[data-sidebar-col]",
+			"[data-dsh-sidebar]",
+			"[class*=\"sidebarCol\"]"
+		];
+		/** 标识"侧栏 UI 根"的 logo 行候选。 */
+		const LOGO_ROW_SELECTORS = [
+			"[data-logo-row]",
+			"[data-dsh-logo-row]",
+			"[class*=\"logoRow\"]"
+		];
+		/** 新建会话按钮候选。 */
+		const NEW_SESSION_SELECTORS = [
+			"button[data-new-session]",
+			"button[data-dsh-new-session]",
+			"button[class*=\"newSession\"]"
+		];
+		/** 按候选顺序查第一个命中的元素。 */
+		function queryFirst(selectors, scope = document) {
+			for (const selector of selectors) {
+				const el = scope.querySelector(selector);
+				if (el !== null) return el;
+			}
+		}
 		/** Find the sidebar shell root element, or undefined while not yet mounted. */
 		function sidebarRoot() {
-			const column = document.querySelector("[data-pane=\"sidebar\"], [class*=\"sidebarCol\"]");
-			if (column === null) return void 0;
-			return column.querySelector("[class*=\"logoRow\"]")?.parentElement ?? column.firstElementChild;
+			const column = queryFirst(SIDEBAR_COLUMN_SELECTORS);
+			if (column === void 0) return void 0;
+			return queryFirst(LOGO_ROW_SELECTORS, column)?.parentElement ?? column.firstElementChild;
 		}
 		/** The New Session button: nested in the logo row on current shells, a direct child on legacy shells. */
 		function newSessionButton(root) {
-			const nested = root.querySelector("button[class*=\"newSession\"]");
-			if (nested !== null) return nested;
+			const nested = queryFirst(NEW_SESSION_SELECTORS, root);
+			if (nested !== void 0 && nested.tagName === "BUTTON") return nested;
 			for (const child of root.children) if (child.tagName === "BUTTON") return child;
 		}
 		/** The injected dashboard overlay root (single instance while open). */
@@ -623,20 +737,31 @@ window.__ModuleLoader__.load({
 			entry.type = "button";
 			entry.dataset.dshUsageEntry = "";
 			entry.className = usage_entry_module_css_default.entry;
-			entry.setAttribute("aria-label", t("usage.entry"));
-			entry.setAttribute("title", t("usage.entry"));
-			entry.innerHTML = `<span class="${usage_entry_module_css_default.entryIcon}">${ICON}</span><span class="${usage_entry_module_css_default.entryLabel}">${t("usage.entry")}</span>`;
+			applyEntryCopy(entry);
+			entry.innerHTML = `<span class="${usage_entry_module_css_default.entryIcon}">${ICON}</span>`;
 			entry.addEventListener("click", () => {
 				openDashboard();
 			});
 			return entry;
+		}
+		/** 刷新入口文案与可访问性标签（挂载时与语言切换时调用，E3）。 */
+		function applyEntryCopy(entry) {
+			entry.setAttribute("aria-label", t("usage.entry"));
+			entry.setAttribute("title", t("usage.entry"));
+			let label = entry.querySelector(`.${usage_entry_module_css_default.entryLabel}`);
+			if (label === null) {
+				label = document.createElement("span");
+				label.className = usage_entry_module_css_default.entryLabel;
+				entry.appendChild(label);
+			}
+			label.textContent = t("usage.entry");
 		}
 		/** Re-insert the entry after the New Session row (before the browser region). */
 		function placeEntry(root, entry) {
 			const button = newSessionButton(root);
 			if (button === void 0) return false;
 			if (entry.parentElement !== root) {
-				const row = button.closest("[class*=\"logoRow\"]");
+				const row = button.closest(LOGO_ROW_SELECTORS.join(", "));
 				const base = row !== null && row.parentElement === root ? row : button;
 				const family = Array.from(root.children).filter((el) => el instanceof HTMLElement && el.matches("[data-dsh-taskboard-entry], [data-dsh-ssh-entry], [data-dsh-usage-entry]"));
 				const anchor = family.length > 0 ? family[family.length - 1].nextElementSibling : base.nextElementSibling;
@@ -653,6 +778,22 @@ window.__ModuleLoader__.load({
 			const entry = createEntry();
 			let root;
 			let placed = false;
+			let bodyWatching = false;
+			const stopBodyWatch = () => {
+				if (bodyWatching) {
+					bodyWatching = false;
+					waitObserver.disconnect();
+				}
+			};
+			const ensureBodyWatch = () => {
+				if (!bodyWatching) {
+					bodyWatching = true;
+					waitObserver.observe(document.body, {
+						childList: true,
+						subtree: true
+					});
+				}
+			};
 			const tryPlace = () => {
 				if (root !== void 0 && !root.isConnected) {
 					rootObserver.disconnect();
@@ -660,25 +801,30 @@ window.__ModuleLoader__.load({
 					placed = false;
 				}
 				if (placed) {
-					if (document.body.contains(entry)) return;
+					if (document.body.contains(entry)) {
+						stopBodyWatch();
+						return;
+					}
 					rootObserver.disconnect();
 					root = void 0;
 					placed = false;
 				}
 				root ??= sidebarRoot();
-				if (root === void 0) return;
+				if (root === void 0) {
+					ensureBodyWatch();
+					return;
+				}
 				placed = placeEntry(root, entry);
-				if (placed) rootObserver.observe(root, {
-					childList: true,
-					subtree: true
-				});
+				if (placed) {
+					rootObserver.observe(root, {
+						childList: true,
+						subtree: true
+					});
+					stopBodyWatch();
+				} else ensureBodyWatch();
 			};
 			const waitObserver = new MutationObserver(() => {
 				tryPlace();
-			});
-			waitObserver.observe(document.body, {
-				childList: true,
-				subtree: true
 			});
 			const rootObserver = new MutationObserver(() => {
 				if (root === void 0 || !root.isConnected) {
@@ -686,15 +832,127 @@ window.__ModuleLoader__.load({
 					tryPlace();
 					return;
 				}
-				if (!root.contains(entry)) placed = placeEntry(root, entry);
+				if (!root.contains(entry)) {
+					placed = placeEntry(root, entry);
+					if (!placed) tryPlace();
+				}
 			});
 			tryPlace();
+			const langObserver = new MutationObserver(() => {
+				applyEntryCopy(entry);
+			});
+			if (typeof document !== "undefined" && document.documentElement !== null) langObserver.observe(document.documentElement, {
+				attributes: true,
+				attributeFilter: ["lang"]
+			});
 			return () => {
-				waitObserver.disconnect();
+				stopBodyWatch();
 				rootObserver.disconnect();
+				langObserver.disconnect();
 				entry.remove();
 				closeDashboard();
 			};
+		}
+		//#endregion
+		//#region src/client/recorder-core.ts
+		/** 一次投影观察后的状态机决策。 */
+		function decideRecorderStep(memory, sessionId, snapshot) {
+			if (sessionId === void 0 || snapshot === void 0) return {
+				next: memory,
+				action: "none",
+				staleFlush: null,
+				switched: false
+			};
+			const total = snapshot.input + snapshot.output + snapshot.cache + snapshot.cacheWrite;
+			const switched = memory.lastSid !== void 0 && memory.lastSid !== sessionId;
+			const staleFlush = switched ? memory.lastSeen : null;
+			if (switched || memory.lastTotal === -1) return {
+				next: {
+					lastSid: sessionId,
+					lastTotal: total,
+					lastSeen: snapshot
+				},
+				action: "reset",
+				staleFlush,
+				switched
+			};
+			const prev = memory.lastTotal;
+			if (total > prev) return {
+				next: {
+					lastSid: sessionId,
+					lastTotal: total,
+					lastSeen: snapshot
+				},
+				action: "arm-settle",
+				staleFlush: null,
+				switched: false
+			};
+			if (total < prev) return {
+				next: {
+					lastSid: sessionId,
+					lastTotal: total,
+					lastSeen: snapshot
+				},
+				action: "reset",
+				staleFlush: null,
+				switched: false
+			};
+			return {
+				next: memory,
+				action: "none",
+				staleFlush: null,
+				switched: false
+			};
+		}
+		//#endregion
+		//#region src/client/model.ts
+		/**
+		* 客户端模型的模块级状态：当前活跃会话 id 与当前模型名（尽力而为）。
+		* 由入口的模型轮询写入，recorder 上报时读取；
+		* 无活跃会话时轮询暂停（X1），flush 时模型未知则按需取一次（C5）。
+		* @module @captain1275/dsh-usage-dashboard/client/model
+		*/
+		/** 当前模型标识（provider/model），unknown 表示尚未取到。 */
+		let currentModel = "unknown";
+		/** 当前活跃会话 id（recorder 每次挂载/更新时同步；入口轮询按它查询）。 */
+		let activeSessionId;
+		/** 会话 id 变化监听（入口的模型轮询用它启停定时器）。 */
+		let sessionChangeListener;
+		/** 连接层模型查询器（入口注册；recorder 在 flush 时按需调用）。 */
+		let modelFetcher;
+		/** 设置当前模型（连接层回调 / 一对一查询结果）。 */
+		function setCurrentModel(model) {
+			if (typeof model === "string" && model.length > 0) currentModel = model;
+		}
+		/** 读当前模型。 */
+		function getCurrentModel() {
+			return currentModel;
+		}
+		/** 读当前活跃会话 id（入口的模型轮询用）。 */
+		function getActiveSessionId() {
+			return activeSessionId;
+		}
+		/** 设置当前活跃会话 id；变化时通知入口重启/暂停轮询。 */
+		function setActiveSessionId(sessionId) {
+			if (activeSessionId === sessionId) return;
+			activeSessionId = sessionId;
+			sessionChangeListener?.();
+		}
+		/** 注册会话 id 变化监听（入口的模型轮询用）。 */
+		function setSessionChangeListener(listener) {
+			sessionChangeListener = listener;
+		}
+		/** 注册连接层模型查询器（入口注册）。 */
+		function setModelFetcher(fetcher) {
+			modelFetcher = fetcher;
+		}
+		/** 按会话查询一次模型；结果写入 currentModel。 */
+		async function refreshCurrentModel(sessionId) {
+			if (modelFetcher === void 0) return;
+			try {
+				const model = await modelFetcher(sessionId);
+				if (typeof model === "string" && model.length > 0) currentModel = model;
+			} catch {}
 		}
 		//#endregion
 		//#region src/client/UsageRecorder.tsx
@@ -705,28 +963,45 @@ window.__ModuleLoader__.load({
 		* Semantics:
 		*  - The projection is a session-cumulative total that may already be large
 		*    when this component mounts (page refresh, session switch, HMR reload).
-		*    The FIRST sight only establishes a baseline — never uploaded, so a
-		*    mount never counts the whole history as new usage.
-		*  - While the total GROWS (a response is streaming), uploads are debounced
-		*    to one per second. When growth stops for SETTLE_MS, the recorder
-		*    flushes one final snapshot — one completed response = one upload, so
-		*    the host's calls counter tracks real response rounds.
-		*  - The host stores the LATEST snapshot per session (replace semantics);
-		*    repeated uploads overwrite instead of double counting.
+		*    The FIRST sight establishes a baseline: it is uploaded WITH `reset:
+		*    true` so the host adopts the same baseline. Later growth deltas are
+		*    then computed from that aligned baseline and can never overcount a gap
+		*    the host never saw (C1/H3 family: lost pending flushes, restored old
+		*    backups, clock skew).
+		*  - While the total GROWS (a response is streaming) the recorder arms a
+		*    settle timer; when growth stops for SETTLE_MS it flushes one final
+		*    snapshot — one completed response = one upload, so the host's calls
+		*    counter tracks real response rounds. A CHECKPOINT_MS interval re-uploads
+		*    the latest snapshot during long streams: host replace semantics make
+		*    repeats idempotent, so the loss window is capped at ~10s instead of the
+		*    whole stream.
+		*  - Unmount and session switch flush any pending snapshot instead of
+		*    dropping it (keepalive on unmount, since the page may be closing).
+		*  - A projection rollback (compression/recompute) re-sends `reset: true`
+		*    with the smaller snapshot, re-aligning client and host baselines.
 		*  - The session title rides the live `title` projection (per-session,
 		*    real-time); a title that lands AFTER the last growth flush triggers one
 		*    metadata-only re-upload (zero growth, so it never inflates calls).
 		*  - A session switch re-baselines the recorder: switching back to a larger
 		*    session is never mistaken for growth.
+		*  - Model labels are best-effort: the entry polls the active session's
+		*    model (2s, paused while no dock is mounted) and flush fetches the model
+		*    once when it is still unknown (C5). Wrong attribution only affects the
+		*    display model bucket, never the totals.
 		* @module @captain1275/dsh-usage-dashboard/client/UsageRecorder
 		*/
 		/** 一轮响应结束判定的静默时长（ms）。 */
 		const SETTLE_MS = 2e3;
-		/** 上报当前快照到宿主（replace 语义：同会话覆盖，不累加）。 */
-		async function postSnapshot(snapshot) {
+		/** 长流检查点上报间隔（ms）：把丢失窗口从"整个流"缩到 10s。 */
+		const CHECKPOINT_MS = 1e4;
+		/** 全局上报串行化链：保证同会话的快照按发起顺序到达宿主，旧快照不会晚到覆盖新快照（C4）。 */
+		let uploadChain = Promise.resolve();
+		/** 真正发往宿主的 POST（失败静默）。 */
+		async function doPost(snapshot, keepalive) {
 			try {
 				await fetch("/api/usage/record", {
 					method: "POST",
+					keepalive,
 					headers: { "content-type": "application/json" },
 					body: JSON.stringify({
 						...snapshot,
@@ -735,17 +1010,19 @@ window.__ModuleLoader__.load({
 				});
 			} catch {}
 		}
-		/** 当前模型（由入口从连接层更新，尽力而为）。 */
-		let currentModel = "unknown";
-		/** 当前活跃会话 id（recorder 每次渲染同步；入口的模型轮询按它查询）。 */
-		let activeSessionId;
-		/** 供入口设置当前模型（连接层回调）。 */
-		function setCurrentModel(model) {
-			if (typeof model === "string" && model.length > 0) currentModel = model;
-		}
-		/** 读当前活跃会话 id（入口的模型轮询用）。 */
-		function getActiveSessionId() {
-			return activeSessionId;
+		/**
+		* 上报当前快照到宿主（replace 语义：同会话覆盖，不累加）。
+		* 默认走串行链保证顺序；卸载补发（keepalive）绕过链直接发 —— 页面可能
+		* 正在关闭，排在队列后面可能永远轮不到。
+		*/
+		async function postSnapshot(snapshot, keepalive = false) {
+			if (keepalive) {
+				await doPost(snapshot, true);
+				return;
+			}
+			const task = uploadChain.then(() => doPost(snapshot, false));
+			uploadChain = task.catch(() => void 0);
+			return task;
 		}
 		/**
 		* The invisible recorder seat.
@@ -758,75 +1035,120 @@ window.__ModuleLoader__.load({
 			const title = props.useProjection("title");
 			const lastTotalRef = (0, react.useRef)(-1);
 			const lastSidRef = (0, react.useRef)(void 0);
-			const settleTimerRef = (0, react.useRef)(null);
 			const lastSeenRef = (0, react.useRef)(null);
-			const titleRef = (0, react.useRef)("");
+			const settleTimerRef = (0, react.useRef)(null);
+			const titleCacheRef = (0, react.useRef)({});
 			const uploadedTitleRef = (0, react.useRef)("");
-			activeSessionId = session.sessionId;
+			const memoryRefs = () => ({
+				lastSid: lastSidRef.current,
+				lastTotal: lastTotalRef.current,
+				lastSeen: lastSeenRef.current
+			});
+			const syncMemory = (memory) => {
+				lastSidRef.current = memory.lastSid;
+				lastTotalRef.current = memory.lastTotal;
+				lastSeenRef.current = memory.lastSeen;
+			};
+			const upload = (snap, opts) => {
+				const snapshotTitle = titleCacheRef.current[snap.sessionId] ?? "";
+				uploadedTitleRef.current = snapshotTitle;
+				return postSnapshot({
+					sessionId: snap.sessionId,
+					sessionTitle: snapshotTitle,
+					model: getCurrentModel(),
+					inputTokens: snap.input,
+					outputTokens: snap.output,
+					cacheReadTokens: snap.cache,
+					cacheWriteTokens: snap.cacheWrite,
+					reset: opts.reset === true
+				}, opts.keepalive === true);
+			};
+			const uploadWithModel = (snap, opts) => {
+				const attempt = async () => {
+					if (getCurrentModel() === "unknown") await refreshCurrentModel(snap.sessionId);
+					await upload(snap, opts);
+				};
+				return attempt();
+			};
 			const flush = () => {
 				settleTimerRef.current = null;
 				const seen = lastSeenRef.current;
 				if (seen === null) return;
-				const snapshotTitle = titleRef.current;
-				uploadedTitleRef.current = snapshotTitle;
-				postSnapshot({
-					sessionId: seen.sessionId,
-					sessionTitle: snapshotTitle,
-					model: currentModel,
-					inputTokens: seen.input,
-					outputTokens: seen.output,
-					cacheReadTokens: seen.cache,
-					cacheWriteTokens: seen.cacheWrite
-				});
+				uploadWithModel(seen, { reset: false });
 			};
 			(0, react.useEffect)(() => {
 				const sid = session.sessionId;
+				setActiveSessionId(sid);
+				return () => {
+					if (getActiveSessionId() === sid) setActiveSessionId(void 0);
+				};
+			}, [session.sessionId]);
+			(0, react.useEffect)(() => {
+				const sid = session.sessionId;
 				if (sid === void 0 || usage === void 0) return;
-				if (lastSidRef.current !== sid) {
-					lastSidRef.current = sid;
-					lastTotalRef.current = -1;
-					lastSeenRef.current = null;
-					uploadedTitleRef.current = "";
-				}
-				const total = usage.uncachedInputTokens + usage.outputTokens + usage.cacheReadTokens + usage.cacheWriteTokens;
-				const prev = lastTotalRef.current;
-				if (prev === -1) {
-					lastTotalRef.current = total;
-					return;
-				}
-				lastTotalRef.current = total;
-				if (total <= 0) return;
-				if (total <= prev) return;
-				lastSeenRef.current = {
+				const snapshot = {
 					sessionId: sid,
 					input: usage.uncachedInputTokens,
 					output: usage.outputTokens,
 					cache: usage.cacheReadTokens,
 					cacheWrite: usage.cacheWriteTokens
 				};
-				if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
-				settleTimerRef.current = window.setTimeout(flush, SETTLE_MS);
+				const decision = decideRecorderStep(memoryRefs(), sid, snapshot);
+				if (decision.staleFlush !== null) uploadWithModel(decision.staleFlush, { reset: false });
+				syncMemory(decision.next);
+				if (decision.switched) {
+					uploadedTitleRef.current = "";
+					if (settleTimerRef.current !== null) {
+						window.clearTimeout(settleTimerRef.current);
+						settleTimerRef.current = null;
+					}
+				}
+				if (decision.action === "reset") {
+					if (settleTimerRef.current !== null) {
+						window.clearTimeout(settleTimerRef.current);
+						settleTimerRef.current = null;
+					}
+					if (decision.next.lastSeen !== null) uploadWithModel(decision.next.lastSeen, { reset: true });
+				} else if (decision.action === "arm-settle") {
+					if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
+					settleTimerRef.current = window.setTimeout(flush, SETTLE_MS);
+				}
 			}, [session.sessionId, usage]);
 			(0, react.useEffect)(() => {
+				const sid = session.sessionId;
 				const next = typeof title === "string" ? title : "";
-				titleRef.current = next;
+				if (sid === void 0) return;
+				if (next !== "") titleCacheRef.current[sid] = next;
 				const seen = lastSeenRef.current;
 				if (next === "" || seen === null) return;
-				if (seen.sessionId !== session.sessionId) return;
+				if (seen.sessionId !== sid) return;
 				if (next === uploadedTitleRef.current) return;
 				if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
 				settleTimerRef.current = window.setTimeout(flush, SETTLE_MS);
 			}, [title, session.sessionId]);
 			(0, react.useEffect)(() => {
+				const timer = window.setInterval(() => {
+					const seen = lastSeenRef.current;
+					if (seen === null) return;
+					upload(seen, { reset: false });
+				}, CHECKPOINT_MS);
+				return () => window.clearInterval(timer);
+			}, []);
+			(0, react.useEffect)(() => {
 				return () => {
 					if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
+					const seen = lastSeenRef.current;
+					if (seen !== null) upload(seen, {
+						reset: false,
+						keepalive: true
+					});
 				};
 			}, []);
 			return null;
 		});
 		//#endregion
-		//#region \0dsh-css:C:\Users\19161\Desktop\dsh-ui-web\packages\dsh-usage-dashboard\src\client\usage-settings.module.css.mjs
-		const css = ".dx_IMa_card{border:1px solid var(--dsw-alias-border-l2,#8ca0ff38);background:var(--dsw-alias-surface-card,#12182e99);border-radius:10px;list-style:none;overflow:hidden}.dx_IMa_header{width:100%;color:inherit;font:inherit;cursor:pointer;text-align:left;background:0 0;border:none;align-items:center;gap:10px;padding:12px 16px;display:flex}.dx_IMa_headText{flex-direction:column;flex:1;gap:2px;min-width:0;display:flex}.dx_IMa_name{color:var(--dsw-alias-label-primary,#eef1ff);font-size:14px;font-weight:600}.dx_IMa_description{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px}.dx_IMa_chevron{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px;transition:transform .12s}.dx_IMa_chevronOpen{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px;transform:rotate(180deg)}.dx_IMa_body{flex-direction:column;gap:8px;padding:4px 16px 14px;display:flex}.dx_IMa_legendRow{color:var(--dsw-alias-label-secondary,#b9c2e8);align-items:center;gap:8px;font-size:12px;display:flex}.dx_IMa_dot{border-radius:50%;flex:none;width:9px;height:9px}.dx_IMa_actionsRow{align-items:center;gap:10px;margin-top:4px;display:flex}.dx_IMa_refreshButton{border:1px solid var(--dsw-alias-border-l2,#8ca0ff38);background:var(--dsw-alias-surface-control,#8ca0ff14);color:var(--dsw-alias-label-primary,#eef1ff);cursor:pointer;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;transition:background .12s,border-color .12s}.dx_IMa_refreshButton:hover:not(:disabled){background:var(--dsw-alias-surface-control-hover,#8ca0ff29);border-color:var(--dsw-alias-border-l3,#8ca0ff66)}.dx_IMa_refreshButton:disabled{opacity:.55;cursor:default}.dx_IMa_refreshMessage{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px}";
+		//#region \0dsh-css:C:\Users\19161\Documents\dsh-work\dsh-ui-web\packages\dsh-usage-dashboard\src\client\usage-settings.module.css.mjs
+		const css = ".TlSjOa_card{border:1px solid var(--dsw-alias-border-l2,#8ca0ff38);background:var(--dsw-alias-surface-card,#12182e99);border-radius:10px;list-style:none;overflow:hidden}.TlSjOa_header{width:100%;color:inherit;font:inherit;cursor:pointer;text-align:left;background:0 0;border:none;align-items:center;gap:10px;padding:12px 16px;display:flex}.TlSjOa_headText{flex-direction:column;flex:1;gap:2px;min-width:0;display:flex}.TlSjOa_name{color:var(--dsw-alias-label-primary,#eef1ff);font-size:14px;font-weight:600}.TlSjOa_description{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px}.TlSjOa_chevron{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px;transition:transform .12s}.TlSjOa_chevronOpen{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px;transform:rotate(180deg)}.TlSjOa_body{flex-direction:column;gap:8px;padding:4px 16px 14px;display:flex}.TlSjOa_legendRow{color:var(--dsw-alias-label-secondary,#b9c2e8);align-items:center;gap:8px;font-size:12px;display:flex}.TlSjOa_dot{border-radius:50%;flex:none;width:9px;height:9px}.TlSjOa_actionsRow{align-items:center;gap:10px;margin-top:4px;display:flex}.TlSjOa_refreshButton{border:1px solid var(--dsw-alias-border-l2,#8ca0ff38);background:var(--dsw-alias-surface-control,#8ca0ff14);color:var(--dsw-alias-label-primary,#eef1ff);cursor:pointer;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;transition:background .12s,border-color .12s}.TlSjOa_refreshButton:hover:not(:disabled){background:var(--dsw-alias-surface-control-hover,#8ca0ff29);border-color:var(--dsw-alias-border-l3,#8ca0ff66)}.TlSjOa_refreshButton:disabled{opacity:.55;cursor:default}.TlSjOa_refreshMessage{color:var(--dsw-alias-label-tertiary,#8b95c4);font-size:12px}";
 		const tagId = "@captain1275/dsh-usage-dashboard/usage-settings.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -836,19 +1158,19 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var usage_settings_module_css_default = {
-			"actionsRow": "dx_IMa_actionsRow",
-			"body": "dx_IMa_body",
-			"card": "dx_IMa_card",
-			"chevron": "dx_IMa_chevron",
-			"chevronOpen": "dx_IMa_chevronOpen",
-			"description": "dx_IMa_description",
-			"dot": "dx_IMa_dot",
-			"headText": "dx_IMa_headText",
-			"header": "dx_IMa_header",
-			"legendRow": "dx_IMa_legendRow",
-			"name": "dx_IMa_name",
-			"refreshButton": "dx_IMa_refreshButton",
-			"refreshMessage": "dx_IMa_refreshMessage"
+			"actionsRow": "TlSjOa_actionsRow",
+			"body": "TlSjOa_body",
+			"card": "TlSjOa_card",
+			"chevron": "TlSjOa_chevron",
+			"chevronOpen": "TlSjOa_chevronOpen",
+			"description": "TlSjOa_description",
+			"dot": "TlSjOa_dot",
+			"headText": "TlSjOa_headText",
+			"header": "TlSjOa_header",
+			"legendRow": "TlSjOa_legendRow",
+			"name": "TlSjOa_name",
+			"refreshButton": "TlSjOa_refreshButton",
+			"refreshMessage": "TlSjOa_refreshMessage"
 		};
 		//#endregion
 		//#region src/client/UsageSettingsCard.tsx
@@ -870,7 +1192,7 @@ window.__ModuleLoader__.load({
 					type: "button",
 					className: usage_settings_module_css_default.header,
 					"aria-expanded": open,
-					"aria-label": `${open ? "收起" : "展开"}: ${t("usage.settingsTitle")}`,
+					"aria-label": `${open ? t("usage.collapse") : t("usage.expand")}: ${t("usage.settingsTitle")}`,
 					onClick: () => {
 						setOpen(!open);
 					},
@@ -892,24 +1214,36 @@ window.__ModuleLoader__.load({
 					children: [
 						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							className: usage_settings_module_css_default.legendRow,
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-								className: usage_settings_module_css_default.dot,
-								style: { background: "#3f76d8" }
-							}), " 每次响应的 token 用量自动记录"]
+							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+									className: usage_settings_module_css_default.dot,
+									style: { background: "#3f76d8" }
+								}),
+								" ",
+								t("usage.settingsMoreRecord")
+							]
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							className: usage_settings_module_css_default.legendRow,
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-								className: usage_settings_module_css_default.dot,
-								style: { background: "#6e9be8" }
-							}), " 侧边栏图表按钮打开看板"]
+							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+									className: usage_settings_module_css_default.dot,
+									style: { background: "#6e9be8" }
+								}),
+								" ",
+								t("usage.settingsMoreEntry")
+							]
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							className: usage_settings_module_css_default.legendRow,
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-								className: usage_settings_module_css_default.dot,
-								style: { background: "#a8ccf2" }
-							}), " 数据保存在 ~/.dsh/usage.json（本机）"]
+							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+									className: usage_settings_module_css_default.dot,
+									style: { background: "#a8ccf2" }
+								}),
+								" ",
+								t("usage.settingsMorePath")
+							]
 						})
 					]
 				}) : null]
@@ -924,11 +1258,11 @@ window.__ModuleLoader__.load({
 		* host route. Lives in the Web UI plugin group next to the dashboard card.
 		* @module @captain1275/dsh-usage-dashboard/client/PricingCard
 		*/
-		/** 格式化 ISO 时间为本地短格式。 */
+		/** 格式化 ISO 时间为本地短格式；缺失/无效值显示 '—'（X3）。 */
 		function formatTime(iso) {
-			if (iso === "") return "—";
+			if (iso === void 0 || iso === null || iso === "") return "—";
 			const d = new Date(iso);
-			if (Number.isNaN(d.getTime())) return iso;
+			if (Number.isNaN(d.getTime())) return "—";
 			const pad = (n) => String(n).padStart(2, "0");
 			return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 		}
@@ -953,7 +1287,11 @@ window.__ModuleLoader__.load({
 				if (refreshing) return;
 				setRefreshing(true);
 				setMessage("");
-				fetch("/api/usage-pricing/refresh", { method: "POST" }).then(async (res) => await res.json()).then((data) => {
+				fetch("/api/usage-pricing/refresh", {
+					method: "POST",
+					headers: { "content-type": "application/json" },
+					body: "{}"
+				}).then(async (res) => await res.json()).then((data) => {
 					if (data.ok && data.pricing !== void 0) {
 						setMeta(data.pricing);
 						setMessage(t("usage.pricingRefreshOk"));
@@ -971,7 +1309,7 @@ window.__ModuleLoader__.load({
 					type: "button",
 					className: usage_settings_module_css_default.header,
 					"aria-expanded": open,
-					"aria-label": `${open ? "收起" : "展开"}: ${t("usage.pricingTitle")}`,
+					"aria-label": `${open ? t("usage.collapse") : t("usage.expand")}: ${t("usage.pricingTitle")}`,
 					onClick: () => {
 						setOpen(!open);
 					},
@@ -1022,7 +1360,7 @@ window.__ModuleLoader__.load({
 								}),
 								t("usage.pricingUpdatedAt"),
 								": ",
-								meta === null ? "—" : formatTime(meta.updatedAt)
+								formatTime(meta?.updatedAt)
 							]
 						}),
 						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
@@ -1080,22 +1418,45 @@ window.__ModuleLoader__.load({
 			ctx.effect(() => {
 				const connection = ctx.get("connection");
 				if (connection?.api?.sessions === void 0) return () => {};
-				let cancelled = false;
-				const tick = async () => {
-					const sessionId = getActiveSessionId();
-					if (sessionId === void 0 || cancelled) return;
+				const fetcher = async (sessionId) => {
 					try {
 						const model = (await connection.api?.sessions?.models({ sessionId }))?.result?.value?.current?.model;
-						if (model !== void 0 && !cancelled) setCurrentModel(model);
-					} catch {}
+						return typeof model === "string" && model.length > 0 ? model : void 0;
+					} catch {
+						return;
+					}
 				};
-				tick();
-				const timer = window.setInterval(() => {
+				setModelFetcher(fetcher);
+				let cancelled = false;
+				let timer = null;
+				const tick = async () => {
+					if (cancelled) return;
+					const sessionId = getActiveSessionId();
+					if (sessionId === void 0) {
+						if (timer !== null) {
+							window.clearInterval(timer);
+							timer = null;
+						}
+						return;
+					}
+					const model = await fetcher(sessionId);
+					if (model !== void 0 && !cancelled) setCurrentModel(model);
+				};
+				const restart = () => {
+					if (cancelled) return;
+					if (timer !== null) window.clearInterval(timer);
+					timer = window.setInterval(() => {
+						tick();
+					}, 2e3);
 					tick();
-				}, 5e3);
+				};
+				setSessionChangeListener(restart);
+				tick();
 				return () => {
 					cancelled = true;
-					window.clearInterval(timer);
+					if (timer !== null) window.clearInterval(timer);
+					setSessionChangeListener(void 0);
+					setModelFetcher(void 0);
 				};
 			}, "usage-dashboard: model subscription");
 			ctx.slots.inject("conversation.composer.dock", () => ctx.slots.register({

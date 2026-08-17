@@ -52,7 +52,10 @@ export function WebUIPluginsCard(props: WebUIPluginsCardProps): ReactNode {
         ? (
           <div className={css.body}>
             <ul className={css.subcards}>
-              {renderSlot('web-ui.plugin.item', {})}
+              {renderSlot('web-ui.plugin.item', {}, {
+                // 无子插件时渲染空态文案（renderer 对 list 槽为空时回退到 fallback）。
+                fallback: <li className={css.empty}>{t('empty')}</li>,
+              })}
             </ul>
           </div>
         )

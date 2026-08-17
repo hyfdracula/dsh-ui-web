@@ -32,11 +32,11 @@ interface PricingMetaResponse {
   error?: string
 }
 
-/** 格式化 ISO 时间为本地短格式。 */
-function formatTime(iso: string): string {
-  if (iso === '') return '—'
+/** 格式化 ISO 时间为本地短格式；缺失/无效值显示 '—'（X3）。 */
+function formatTime(iso: string | undefined | null): string {
+  if (iso === undefined || iso === null || iso === '') return '—'
   const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return iso
+  if (Number.isNaN(d.getTime())) return '—'
   const pad = (n: number): string => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
@@ -72,7 +72,13 @@ export function PricingCard(_props: PricingCardProps): ReactNode {
     if (refreshing) return
     setRefreshing(true)
     setMessage('')
-    void fetch('/api/usage-pricing/refresh', { method: 'POST' })
+    // 宿主 refresh 路由要求 application/json 载荷（H8 的 CSRF 防护），
+    // 空对象即可触发。
+    void fetch('/api/usage-pricing/refresh', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    })
       .then(async (res) => (await res.json()) as PricingMetaResponse)
       .then((data) => {
         if (data.ok && data.pricing !== undefined) {
@@ -104,7 +110,7 @@ export function PricingCard(_props: PricingCardProps): ReactNode {
         type="button"
         className={css.header}
         aria-expanded={open}
-        aria-label={`${open ? '收起' : '展开'}: ${t('usage.pricingTitle')}`}
+        aria-label={`${open ? t('usage.collapse') : t('usage.expand')}: ${t('usage.pricingTitle')}`}
         onClick={() => { setOpen(!open) }}
       >
         <span className={css.headText}>
@@ -129,7 +135,7 @@ export function PricingCard(_props: PricingCardProps): ReactNode {
             </div>
             <div className={css.legendRow}>
               <span className={css.dot} style={{ background: '#a8ccf2' }} />
-              {t('usage.pricingUpdatedAt')}: {meta === null ? '—' : formatTime(meta.updatedAt)}
+              {t('usage.pricingUpdatedAt')}: {formatTime(meta?.updatedAt)}
             </div>
             <div className={css.legendRow}>
               <span className={css.dot} style={{ background: '#4a9eda' }} />

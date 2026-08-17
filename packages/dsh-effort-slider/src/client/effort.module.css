@@ -2,7 +2,12 @@
  * 深浅两套：浅色是白玻璃 + 深青蓝描边，深色是中性冷灰玻璃 + 淡蓝描边；
  * 强调色跟随 Aqua 的品牌蓝（light #3F76D8 / dark #6E9BE8）。
  * backdrop-filter 只挂在这张浮动卡片上（内部没有 fixed 定位的后代，
- * 不会像设置面板那样破坏菜单锚点）。 */
+ * 不会像设置面板那样破坏菜单锚点）。
+ *
+ * 主题口径（条目 18）：能表达语义的都用 --dsw-alias-* 语义 token（宿主在
+ * body 内联、随暗色自动翻转），无法用 token 的品牌蓝/玻璃质感保留显式值；
+ * 深色选择器兼容 body[data-ds-dark-theme]（当前宿主宿主唯一标志）外，同时
+ * 认 html[data-ds-dark-theme] 与 [data-theme="dark"] 两种通用写法。 */
 
 .panel {
   position: absolute;
@@ -31,16 +36,22 @@
   z-index: 1;
   border-radius: 20px;
   padding: 14px 16px 12px;
-  border: 1px solid rgba(19, 45, 83, 0.26);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.58));
+  border: 1px solid var(--dsw-alias-border-l2, rgba(19, 45, 83, 0.26));
+  background: linear-gradient(
+    180deg,
+    var(--dsw-alias-bg-layer-1, rgba(255, 255, 255, 0.72)),
+    var(--dsw-alias-bg-layer-2, rgba(255, 255, 255, 0.58))
+  );
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.5),
     0 12px 32px rgba(19, 45, 83, 0.14);
   backdrop-filter: blur(var(--dsh-aqua-blur, 14px));
 }
 
-:global(body[data-ds-dark-theme]) .inner {
-  border-color: rgba(148, 180, 220, 0.32);
+:global(body[data-ds-dark-theme]) .inner,
+:global(html[data-ds-dark-theme]) .inner,
+:global([data-theme="dark"]) .inner {
+  border-color: var(--dsw-alias-border-l2, rgba(148, 180, 220, 0.32));
   background: linear-gradient(180deg, rgba(42, 46, 56, 0.82), rgba(22, 25, 34, 0.82));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.07),
@@ -79,32 +90,53 @@
   vertical-align: middle;
 }
 
+/* 写入失败 / 未知档位：状态文字的两种异常着色。 */
+.statusError {
+  color: var(--dsw-alias-state-error-primary, #c93a3a);
+}
+
+.statusUnknown {
+  color: var(--dsw-alias-label-tertiary, rgba(19, 45, 83, 0.45));
+}
+
 .statusGlow {
   color: #3f76d8;
   text-shadow: 0 0 14px rgba(63, 118, 216, 0.55);
 }
 
-:global(body[data-ds-dark-theme]) .statusGlow {
+:global(body[data-ds-dark-theme]) .statusGlow,
+:global(html[data-ds-dark-theme]) .statusGlow,
+:global([data-theme="dark"]) .statusGlow {
   color: #6e9be8;
   text-shadow: 0 0 14px rgba(110, 155, 232, 0.6);
 }
 
-/* 档位色阶：蓝系渐变（0 档最灰，MAX 档最亮）。 */
+/* 档位色阶：蓝系渐变（0 档最灰，最高档最亮）。 */
 .level0 { color: rgba(19, 45, 83, 0.4); }
 .level1 { color: rgba(63, 118, 216, 0.55); }
 .level2 { color: rgba(63, 118, 216, 0.75); }
 .level3 { color: #3f76d8; text-shadow: 0 0 10px rgba(63, 118, 216, 0.45); }
 .level4 { color: #2f62c4; text-shadow: 0 0 12px rgba(63, 118, 216, 0.6); }
 
-:global(body[data-ds-dark-theme]) .level0 { color: rgba(148, 180, 220, 0.35); }
-:global(body[data-ds-dark-theme]) .level1 { color: rgba(110, 155, 232, 0.5); }
-:global(body[data-ds-dark-theme]) .level2 { color: rgba(110, 155, 232, 0.7); }
-:global(body[data-ds-dark-theme]) .level3 { color: #6e9be8; text-shadow: 0 0 10px rgba(110, 155, 232, 0.5); }
-:global(body[data-ds-dark-theme]) .level4 { color: #9dbcf0; text-shadow: 0 0 12px rgba(110, 155, 232, 0.65); }
+:global(body[data-ds-dark-theme]) .level0,
+:global(html[data-ds-dark-theme]) .level0,
+:global([data-theme="dark"]) .level0 { color: rgba(148, 180, 220, 0.35); }
+:global(body[data-ds-dark-theme]) .level1,
+:global(html[data-ds-dark-theme]) .level1,
+:global([data-theme="dark"]) .level1 { color: rgba(110, 155, 232, 0.5); }
+:global(body[data-ds-dark-theme]) .level2,
+:global(html[data-ds-dark-theme]) .level2,
+:global([data-theme="dark"]) .level2 { color: rgba(110, 155, 232, 0.7); }
+:global(body[data-ds-dark-theme]) .level3,
+:global(html[data-ds-dark-theme]) .level3,
+:global([data-theme="dark"]) .level3 { color: #6e9be8; text-shadow: 0 0 10px rgba(110, 155, 232, 0.5); }
+:global(body[data-ds-dark-theme]) .level4,
+:global(html[data-ds-dark-theme]) .level4,
+:global([data-theme="dark"]) .level4 { color: #9dbcf0; text-shadow: 0 0 12px rgba(110, 155, 232, 0.65); }
 
 .close {
-  border: 1px solid rgba(19, 45, 83, 0.16);
-  background: rgba(255, 255, 255, 0.35);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(19, 45, 83, 0.16));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(255, 255, 255, 0.35));
   color: var(--dsw-alias-label-secondary, rgba(19, 45, 83, 0.62));
   width: 24px;
   height: 24px;
@@ -119,17 +151,21 @@
 
 .close:hover {
   color: var(--dsw-alias-label-primary, #132d53);
-  border-color: rgba(19, 45, 83, 0.34);
-  background: rgba(255, 255, 255, 0.55);
+  border-color: var(--dsw-alias-border-l3, rgba(19, 45, 83, 0.34));
+  background: var(--dsw-alias-interactive-bg-hover-accent, rgba(255, 255, 255, 0.55));
 }
 
-:global(body[data-ds-dark-theme]) .close {
-  border-color: rgba(148, 180, 220, 0.2);
+:global(body[data-ds-dark-theme]) .close,
+:global(html[data-ds-dark-theme]) .close,
+:global([data-theme="dark"]) .close {
+  border-color: var(--dsw-alias-border-l2, rgba(148, 180, 220, 0.2));
   background: rgba(148, 180, 220, 0.08);
   color: rgba(148, 180, 220, 0.75);
 }
 
-:global(body[data-ds-dark-theme]) .close:hover {
+:global(body[data-ds-dark-theme]) .close:hover,
+:global(html[data-ds-dark-theme]) .close:hover,
+:global([data-theme="dark"]) .close:hover {
   color: #dbe7f7;
   border-color: rgba(148, 180, 220, 0.4);
   background: rgba(148, 180, 220, 0.16);
@@ -157,7 +193,9 @@
   color: #3f76d8;
 }
 
-:global(body[data-ds-dark-theme]) .levelLabelActive {
+:global(body[data-ds-dark-theme]) .levelLabelActive,
+:global(html[data-ds-dark-theme]) .levelLabelActive,
+:global([data-theme="dark"]) .levelLabelActive {
   color: #6e9be8;
 }
 
@@ -167,13 +205,15 @@
   height: 32px;
   border-radius: 10px;
   overflow: hidden;
-  border: 1px solid rgba(19, 45, 83, 0.12);
-  background: rgba(19, 45, 83, 0.05);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(19, 45, 83, 0.12));
+  background: var(--dsw-alias-interactive-bg-hover, rgba(19, 45, 83, 0.05));
   isolation: isolate;
 }
 
-:global(body[data-ds-dark-theme]) .trackWrapper {
-  border-color: rgba(148, 180, 220, 0.14);
+:global(body[data-ds-dark-theme]) .trackWrapper,
+:global(html[data-ds-dark-theme]) .trackWrapper,
+:global([data-theme="dark"]) .trackWrapper {
+  border-color: var(--dsw-alias-border-l2, rgba(148, 180, 220, 0.14));
   background: rgba(10, 14, 22, 0.5);
 }
 
@@ -196,7 +236,9 @@
   pointer-events: none;
 }
 
-:global(body[data-ds-dark-theme]) .fill {
+:global(body[data-ds-dark-theme]) .fill,
+:global(html[data-ds-dark-theme]) .fill,
+:global([data-theme="dark"]) .fill {
   background: linear-gradient(90deg, rgba(110, 155, 232, 0.18), rgba(110, 155, 232, 0.45));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
@@ -215,7 +257,7 @@
   border-radius: 50%;
   background: rgba(63, 118, 216, 0.3);
   top: 50%;
-  transform: translateY(-50%);
+  transform: translate(-50%, -50%);
   transition: background 0.15s, box-shadow 0.15s;
 }
 
@@ -224,11 +266,15 @@
   box-shadow: 0 0 8px rgba(63, 118, 216, 0.8);
 }
 
-:global(body[data-ds-dark-theme]) .dot {
+:global(body[data-ds-dark-theme]) .dot,
+:global(html[data-ds-dark-theme]) .dot,
+:global([data-theme="dark"]) .dot {
   background: rgba(110, 155, 232, 0.3);
 }
 
-:global(body[data-ds-dark-theme]) .dotActive {
+:global(body[data-ds-dark-theme]) .dotActive,
+:global(html[data-ds-dark-theme]) .dotActive,
+:global([data-theme="dark"]) .dotActive {
   background: #6e9be8;
   box-shadow: 0 0 8px rgba(110, 155, 232, 0.85);
 }
@@ -328,6 +374,29 @@
   text-align: center;
 }
 
+/* 目录加载失败的覆盖层：提示文字 + 重试按钮（条目 5）。 */
+.failedBox {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.retry {
+  border: 1px solid var(--dsw-alias-border-l2, rgba(19, 45, 83, 0.2));
+  border-radius: 8px;
+  padding: 3px 12px;
+  background: var(--dsw-alias-interactive-bg-hover, rgba(19, 45, 83, 0.06));
+  color: var(--dsw-alias-label-primary, #132d53);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.retry:hover {
+  background: var(--dsw-alias-interactive-bg-hover-accent, rgba(19, 45, 83, 0.12));
+}
+
 /* 内联形态：嵌在官方模型菜单里，无边框卡片，只靠一条顶部分隔线融入菜单。 */
 .inlinePanel {
   position: relative;
@@ -338,8 +407,10 @@
   user-select: none;
 }
 
-:global(body[data-ds-dark-theme]) .inlinePanel {
-  border-top-color: rgba(148, 180, 220, 0.14);
+:global(body[data-ds-dark-theme]) .inlinePanel,
+:global(html[data-ds-dark-theme]) .inlinePanel,
+:global([data-theme="dark"]) .inlinePanel {
+  border-top-color: var(--dsw-alias-border-l2, rgba(148, 180, 220, 0.14));
 }
 
 .inlinePanel .head {

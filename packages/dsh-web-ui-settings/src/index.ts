@@ -9,8 +9,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import { homedir } from 'node:os'
 
 /** 稳定插件名（对应 cordis.patch.yml 的 insert id）。 */
@@ -202,18 +202,31 @@ export function readPersonaConfig(): PersonaConfig {
 export function writePersonaSkill(config: PersonaConfig): void {
   const dir = join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'skills', PERSONA_SKILL_DIR)
   mkdirSync(dir, { recursive: true })
-  const escaped = config.description.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
-  const frontmatter = `---\nname: ${config.name}\ndescription: "${escaped}"\n---\n`
+  // description 用 JSON.stringify 序列化：其输出是合法 YAML 双引号标量，
+  // 换行、引号、反斜杠与控制字符均被正确转义，避免 frontmatter 解析失败。
+  const frontmatter = `---\nname: ${config.name}\ndescription: ${JSON.stringify(config.description)}\n---\n`
   writeFileSync(personaSkillPath(), `${frontmatter}\n${config.content}`, 'utf8')
 }
 
 /** 更新技能文件状态：启用时生成 SKILL.md，禁用时暂存为 SKILL.md.disabled。 */
 export function applyPersonaSkill(config: PersonaConfig): void {
   if (config.enabled) {
-    if (existsSync(personaSkillDisabledPath())) renameSync(personaSkillDisabledPath(), personaSkillPath())
+    // 启用：writePersonaSkill 无条件整体覆盖 SKILL.md，无需先 rename 暂存文件
+    // （旧实现先 rename 再整体写，rename 属于冗余且有覆盖外部重建文件的窗口）。
     writePersonaSkill(config)
   } else if (existsSync(personaSkillPath())) {
+    // 禁用：目标暂存文件若已存在（上次禁用后 SKILL.md 又被外部重建）则先移除，
+    // 避免 rename 覆盖旧 stash、丢失最新内容。
+    if (existsSync(personaSkillDisabledPath())) unlinkSync(personaSkillDisabledPath())
     renameSync(personaSkillPath(), personaSkillDisabledPath())
+  }
+}
+
+/** 请求体超限错误（映射为 413，不用 400）。 */
+export class BodyTooLargeError extends Error {
+  constructor() {
+    super('body too large')
+    this.name = 'BodyTooLargeError'
   }
 }
 
@@ -225,28 +238,75 @@ function sendJson(res: ServerResponse, status: number, data: unknown): void {
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolveBody, reject) => {
     let body = ''
-    req.on('data', (chunk: Buffer) => {
-      body += chunk.toString('utf8')
+    let settled = false
+    // setEncoding('utf8')：由 string decoder 跨 chunk 缓存多字节尾部，
+    // 避免逐 chunk toString('utf8') 撕裂中文等字符。
+    req.setEncoding('utf8')
+    req.on('data', (chunk: string) => {
+      if (settled) return
+      body += chunk
       if (body.length > 2_000_000) {
-        reject(new Error('body too large'))
-        req.destroy()
+        // 只 reject 不 destroy：连接交由上层在 catch 里判断 writableEnded/destroyed
+        // 后再写 413，避免往已销毁 socket 写数据引发 unhandled rejection。
+        settled = true
+        reject(new BodyTooLargeError())
       }
     })
-    req.on('end', () => resolveBody(body))
-    req.on('error', reject)
+    req.on('end', () => {
+      if (settled) return
+      settled = true
+      resolveBody(body)
+    })
+    req.on('error', (e) => {
+      if (settled) return
+      settled = true
+      reject(e)
+    })
   })
 }
 
-/** 校验并规范化 PUT 载荷。 */
-export function normalizeConfig(raw: Partial<PersonaConfig>): PersonaConfig | undefined {
-  const enabled = typeof raw.enabled === 'boolean' ? raw.enabled : DEFAULT_PERSONA.enabled
-  const name = typeof raw.name === 'string' && raw.name.length > 0 ? raw.name : DEFAULT_PERSONA.name
-  const description = typeof raw.description === 'string' && raw.description.length > 0
-    ? raw.description
-    : DEFAULT_PERSONA.description
-  const content = typeof raw.content === 'string' && raw.content.length > 0 ? raw.content : DEFAULT_PERSONA.content
-  if (!SKILL_NAME_RE.test(name)) return undefined
-  return { enabled, name, description, content }
+/** 校验/归一化 PUT 载荷：未提供字段保留现值（与当前配置合并），空值显式报错。 */
+export type NormalizeResult =
+  | { ok: true; config: PersonaConfig }
+  | { ok: false; error: string }
+
+export function normalizeConfig(raw: Partial<PersonaConfig>, current: PersonaConfig): NormalizeResult {
+  const enabled = typeof raw.enabled === 'boolean' ? raw.enabled : current.enabled
+  const name = typeof raw.name === 'string' ? raw.name : current.name
+  const description = typeof raw.description === 'string' ? raw.description : current.description
+  const content = typeof raw.content === 'string' ? raw.content : current.content
+  if (name.length === 0) return { ok: false, error: 'persona name cannot be empty' }
+  if (description.length === 0) return { ok: false, error: 'description cannot be empty' }
+  if (content.length === 0) return { ok: false, error: 'content cannot be empty' }
+  if (!SKILL_NAME_RE.test(name)) {
+    return { ok: false, error: 'invalid persona name (use lowercase letters, digits and dashes)' }
+  }
+  return { ok: true, config: { enabled, name, description, content } }
+}
+
+/** 原子写 JSON：先写同目录临时文件再 rename 替换，崩溃/中断不会留下半截配置。 */
+export function writeJsonAtomic(file: string, value: unknown): void {
+  const dir = dirname(file)
+  mkdirSync(dir, { recursive: true })
+  const tmp = join(dir, `.${basename(file)}.${process.pid}.tmp`)
+  try {
+    writeFileSync(tmp, JSON.stringify(value, null, 2), 'utf8')
+    renameSync(tmp, file)
+  } catch (e) {
+    try { unlinkSync(tmp) } catch { /* 清理失败不掩盖原始错误 */ }
+    throw e
+  }
+}
+
+/** 持久化配置并在失败时回滚：先写 persona.json，skill 同步失败则还原 json。 */
+export function syncPersonaFiles(current: PersonaConfig, next: PersonaConfig): void {
+  writeJsonAtomic(personaConfigPath(), next)
+  try {
+    applyPersonaSkill(next)
+  } catch (e) {
+    writeJsonAtomic(personaConfigPath(), current)
+    throw e
+  }
 }
 
 /** 请求分发：GET/PUT /api/persona/config。 */
@@ -260,16 +320,23 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
     void readBody(req)
       .then((body) => {
         const parsed = JSON.parse(body) as Partial<PersonaConfig>
-        const next = normalizeConfig(parsed)
-        if (next === undefined) {
-          sendJson(res, 400, { ok: false, error: 'invalid persona name (use lowercase letters, digits and dashes)' })
+        // 与当前磁盘配置合并：未提供的字段保留现值，不再整体回退默认值。
+        const current = readPersonaConfig()
+        const result = normalizeConfig(parsed, current)
+        if (!result.ok) {
+          sendJson(res, 400, { ok: false, error: result.error })
           return
         }
-        writeFileSync(personaConfigPath(), JSON.stringify(next, null, 2), 'utf8')
-        applyPersonaSkill(next)
-        sendJson(res, 200, { ok: true, config: next })
+        syncPersonaFiles(current, result.config)
+        sendJson(res, 200, { ok: true, config: result.config })
       })
-      .catch((e) => sendJson(res, 400, { ok: false, error: e instanceof Error ? e.message : String(e) }))
+      .catch((e: unknown) => {
+        // 超限时不 destroy，连接仍可写；这里先确认响应流可用再回写，
+        // 避免往已销毁 socket 写数据触发 unhandled rejection。
+        if (res.writableEnded || res.destroyed) return
+        const status = e instanceof BodyTooLargeError ? 413 : 400
+        sendJson(res, status, { ok: false, error: e instanceof Error ? e.message : String(e) })
+      })
     return
   }
   sendJson(res, 404, { ok: false, error: 'not found' })

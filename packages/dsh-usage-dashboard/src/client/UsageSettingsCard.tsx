@@ -26,7 +26,7 @@ export function UsageSettingsCard(_props: UsageSettingsCardProps): ReactNode {
         type="button"
         className={css.header}
         aria-expanded={open}
-        aria-label={`${open ? '收起' : '展开'}: ${t('usage.settingsTitle')}`}
+        aria-label={`${open ? t('usage.collapse') : t('usage.expand')}: ${t('usage.settingsTitle')}`}
         onClick={() => { setOpen(!open) }}
       >
         <span className={css.headText}>
@@ -39,13 +39,13 @@ export function UsageSettingsCard(_props: UsageSettingsCardProps): ReactNode {
         ? (
           <div className={css.body}>
             <div className={css.legendRow}>
-              <span className={css.dot} style={{ background: '#3f76d8' }} /> 每次响应的 token 用量自动记录
+              <span className={css.dot} style={{ background: '#3f76d8' }} /> {t('usage.settingsMoreRecord')}
             </div>
             <div className={css.legendRow}>
-              <span className={css.dot} style={{ background: '#6e9be8' }} /> 侧边栏图表按钮打开看板
+              <span className={css.dot} style={{ background: '#6e9be8' }} /> {t('usage.settingsMoreEntry')}
             </div>
             <div className={css.legendRow}>
-              <span className={css.dot} style={{ background: '#a8ccf2' }} /> 数据保存在 ~/.dsh/usage.json（本机）
+              <span className={css.dot} style={{ background: '#a8ccf2' }} /> {t('usage.settingsMorePath')}
             </div>
           </div>
         )

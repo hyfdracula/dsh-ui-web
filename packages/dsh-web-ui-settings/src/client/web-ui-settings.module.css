@@ -90,6 +90,14 @@
   padding: 0;
 }
 
+.empty {
+  list-style: none;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 6px 2px;
+}
+
 /* Reduced motion: drop the header/chevron transitions (no gating animation).
    Token colors and the focus ring stay, so usable states remain visible. */
 @media (prefers-reduced-motion: reduce) {

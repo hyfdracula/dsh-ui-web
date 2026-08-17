@@ -19,6 +19,10 @@ export const LITELLM_PRICING_URLS = [
 /** 默认 USD -> CNY 汇率（换算进快照，展示层不再处理币种）。 */
 export const DEFAULT_FX = 7.2
 
+/** 元/百万 token 的合理性区间：越出区间的字段视为脏数据跳过（P5）。 */
+const PRICE_MIN_CNY_PER_M = 0.0001
+const PRICE_MAX_CNY_PER_M = 5000
+
 /** 四舍五入到 4 位小数。 */
 function round4(value) {
   return Math.round(value * 10_000) / 10_000
@@ -27,6 +31,13 @@ function round4(value) {
 /** 单模型换算：USD/token -> 元/百万 token。 */
 function toCnyPerMillion(usdPerToken, fx) {
   return round4(usdPerToken * 1_000_000 * fx)
+}
+
+/** 换算后若超出合理区间返回 null（调用方跳过该字段，防个别条目单位写错爆表）。 */
+function toCnyPerMillionClamped(usdPerToken, fx) {
+  const value = toCnyPerMillion(usdPerToken, fx)
+  if (value >= PRICE_MIN_CNY_PER_M && value <= PRICE_MAX_CNY_PER_M) return value
+  return null
 }
 
 /** 一手官方 provider：别名冲突时优先（rank 0）。 */
@@ -98,6 +109,7 @@ export function normalizeLiteLLM(rawText, fx = DEFAULT_FX) {
   const models = {}
   const aliasCandidates = new Map()
   let skipped = 0
+  let outOfRange = 0
   for (const [key, value] of Object.entries(data)) {
     if (key === 'sample_spec' || typeof value !== 'object' || value === null) continue
     const provider = typeof value.litellm_provider === 'string' ? value.litellm_provider.toLowerCase() : ''
@@ -114,12 +126,26 @@ export function normalizeLiteLLM(rawText, fx = DEFAULT_FX) {
     const bare = bareName(key)
     const canonical = `${provider}/${bare}`
     const entry = {}
-    if (typeof inputUsd === 'number' && inputUsd > 0) entry.i = toCnyPerMillion(inputUsd, fx)
-    if (typeof outputUsd === 'number' && outputUsd > 0) entry.o = toCnyPerMillion(outputUsd, fx)
-    const cacheReadUsd = value.cache_read_input_token_cost
-    if (typeof cacheReadUsd === 'number' && cacheReadUsd > 0) entry.c = toCnyPerMillion(cacheReadUsd, fx)
-    const cacheWriteUsd = value.cache_creation_input_token_cost
-    if (typeof cacheWriteUsd === 'number' && cacheWriteUsd > 0) entry.w = toCnyPerMillion(cacheWriteUsd, fx)
+    let fieldSkips = 0
+    for (const [field, usd] of [
+      ['i', inputUsd],
+      ['o', outputUsd],
+      ['c', value.cache_read_input_token_cost],
+      ['w', value.cache_creation_input_token_cost],
+    ]) {
+      if (typeof usd !== 'number' || !Number.isFinite(usd) || usd <= 0) continue
+      const cny = toCnyPerMillionClamped(usd, fx)
+      if (cny === null) {
+        fieldSkips += 1
+        continue
+      }
+      entry[field] = cny
+    }
+    if (Object.keys(entry).length === 0) {
+      skipped += 1
+      continue
+    }
+    outOfRange += fieldSkips
     // 同名不同大小写的条目后者覆盖（与 JSON.parse 的重复键语义一致）。
     models[canonical] = entry
     if (!aliasCandidates.has(bare)) aliasCandidates.set(bare, new Set())
@@ -127,10 +153,16 @@ export function normalizeLiteLLM(rawText, fx = DEFAULT_FX) {
   }
   // 裸名别名：唯一时直接用；冲突时挑偏好最高的 provider（一手优先于聚合，
   // 同档按 provider 名字长度升序、再按 canonical 字典序），保证确定性。
+  // 撞车的裸名记进 `_ambiguous`，cost.ts 命中此类别名且条目不完整时跳过
+  // 别名（P6），避免给错误模型套用通用补位价。
   const aliases = {}
+  const ambiguousNames = []
   let aliasConflicts = 0
   for (const [bare, candidates] of aliasCandidates) {
-    if (candidates.size > 1) aliasConflicts += 1
+    if (candidates.size > 1) {
+      aliasConflicts += 1
+      ambiguousNames.push(bare)
+    }
     const ranked = [...candidates].sort((a, b) => {
       const rankDiff = providerRank(a.split('/')[0]) - providerRank(b.split('/')[0])
       if (rankDiff !== 0) return rankDiff
@@ -146,6 +178,7 @@ export function normalizeLiteLLM(rawText, fx = DEFAULT_FX) {
     _fetchedAt: new Date().toISOString(),
     models,
     aliases,
+    ...(ambiguousNames.length > 0 ? { _ambiguous: ambiguousNames } : {}),
   }
   return {
     snapshot,
@@ -155,7 +188,41 @@ export function normalizeLiteLLM(rawText, fx = DEFAULT_FX) {
       aliases: Object.keys(aliases).length,
       aliasConflicts,
       skipped,
+      outOfRange,
     },
+  }
+}
+
+/**
+ * 刷新合并：LiteLLM 全量快照打底，把现有用户文件里"新快照没有的"条目
+ * （自定义模型价，如 k3-256k / kimi-for-coding-highspeed）原样保留。
+ * 否则一次 refresh 会把手工维护的条目全部冲掉、打回通用兜底价。
+ * 新快照里已有的同名条目以官方最新价为准（自定义价想压过官方价，
+ * 刷新后再改 usage-pricing.json 即可）。
+ * 宿主路由与 scripts/refresh-pricing.mjs 共用，杜绝两端行为分叉（P1）。
+ * @param {PricingSnapshot|null} existing - 现有用户级快照（缺失/损坏为 null）。
+ * @param {PricingSnapshot} fresh - 刚归一化的新快照。
+ * @returns {PricingSnapshot} 合并结果。
+ */
+export function mergeFreshSnapshot(existing, fresh) {
+  if (existing === null) return fresh
+  const existingModels = typeof existing.models === 'object' && existing.models !== null ? existing.models : {}
+  const existingAliases = typeof existing.aliases === 'object' && existing.aliases !== null ? existing.aliases : {}
+  const freshModels = typeof fresh.models === 'object' && fresh.models !== null ? fresh.models : {}
+  const freshAliases = typeof fresh.aliases === 'object' && fresh.aliases !== null ? fresh.aliases : {}
+  const customModels = {}
+  for (const [key, value] of Object.entries(existingModels)) {
+    if (!(key in freshModels)) customModels[key] = value
+  }
+  const customAliases = {}
+  for (const [key, value] of Object.entries(existingAliases)) {
+    if (!(key in freshAliases)) customAliases[key] = value
+  }
+  if (Object.keys(customModels).length === 0 && Object.keys(customAliases).length === 0) return fresh
+  return {
+    ...fresh,
+    models: { ...freshModels, ...customModels },
+    aliases: { ...freshAliases, ...customAliases },
   }
 }
 

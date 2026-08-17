@@ -420,6 +420,9 @@
 }
 
 .error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 10px 14px;
   border-radius: 10px;
   background: rgba(214, 69, 69, 0.1);
@@ -432,6 +435,26 @@
   background: rgba(248, 113, 113, 0.14);
   border-color: rgba(248, 113, 113, 0.35);
   color: #fca5a5;
+}
+
+/* 失败态的重试按钮（D4） */
+.retry {
+  flex: none;
+  padding: 2px 12px;
+  border: 1px solid rgba(214, 69, 69, 0.35);
+  border-radius: 6px;
+  background: rgba(214, 69, 69, 0.12);
+  color: inherit;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.retry:hover {
+  background: rgba(214, 69, 69, 0.22);
+  border-color: rgba(214, 69, 69, 0.55);
 }
 
 /* 窄屏 */

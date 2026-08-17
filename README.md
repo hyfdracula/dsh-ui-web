@@ -148,26 +148,26 @@ shared/              # 共享构建预设（tsdown.client.ts）
 前提：已安装 DeepSeek Harness（dsh）并至少启动过一次。
 
 ```powershell
-git clone https://github.com/CAPTAIN1275/dsh-ui-web.git
+git clone https://github.com/hyfdracula/dsh-ui-web.git
 cd dsh-ui-web
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
 脚本会：`pnpm install` → 构建全部插件包 → `link-profile.mjs` 把插件放进
-`~/.dsh/profiles/node_modules/@captain1275/` → 幂等登记 4 个开箱插件到
+`~/.dsh/profiles/node_modules/@captain1275/` → 幂等登记 3 个开箱插件到
 `~/.dsh/profiles/web/cordis.patch.yml`：
 
 - `ui-effort-slider` 推理强度滑块（默认最高档、1s 轮询同步）
 - `ui-usage-dashboard` 用量看板（token/费用/趋势/会话排行 + 定价快照）
 - `ui-web-ui-settings` 设置页插件组卡片
-- `open-path` 本地路径打开路由（配合 fork 侧路径链接化使用，见下）
 
 完成后重启 dsh web 并刷新 `http://127.0.0.1:3080`。皮肤（aurora 等）在
 设置 -> 插件 按需启用；Aqua 玻璃主题为独立插件
 （[WYH66666666/DSH-Transparent-UI-Plugin](https://github.com/WYH66666666/DSH-Transparent-UI-Plugin)）。
 
 > 注：聊天气泡里把 `C:\...` 路径渲染成可点击链接需要修改 DSH 源码
-> （ui-conversation 的 path-links），不属于本插件仓库范围，详见作者 fork。
+> （ui-conversation 的 path-links，走宿主原生 host.openPath 通道，
+> 无需额外插件），不属于本插件仓库范围，详见作者 fork。
 
 ## 版权与许可
 

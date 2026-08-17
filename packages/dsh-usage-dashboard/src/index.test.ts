@@ -1,19 +1,23 @@
 /**
  * Smoke tests for dsh-usage-dashboard: aggregation math, day keys, session
- * ranking, and the recent-days window (the CI gate requires at least one
- * test file per package).
+ * ranking, the recent-days window, the reset/baseline protocol (H3/C1),
+ * atomic persistence (H1), and timestamp sanitizing (H6).
  * @module @captain1275/dsh-usage-dashboard
  */
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { rmSync } from 'node:fs'
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import {
   applyRecord,
   dayKey,
   emptyUsage,
+  normalizeRecord,
+  readUsage,
   recentDays,
   sessionRanking,
+  usagePath,
+  writeUsage,
   type UsageRecord,
 } from './index.ts'
 import { mergeFreshSnapshot } from './pricing.ts'
@@ -121,6 +125,136 @@ describe('usage aggregation', () => {
     expect(todayEntry?.calls).toBe(1)
     expect(todayEntry?.cacheReadTokens).toBe(base.cacheReadTokens)
     expect(days.some((d) => d.calls === 0)).toBe(true)
+  })
+})
+
+describe('reset/baseline protocol (H3/C1)', () => {
+  it('reset replaces only the session bucket, leaving day/model/total/calls untouched', () => {
+    const store = emptyUsage()
+    applyRecord(store, base)
+    expect(store.total.inputTokens).toBe(100)
+    expect(store.total.calls).toBe(1)
+    // 基线对齐：客户端当前累计 300 → reset。宿主旧快照 100 不再参与差值。
+    applyRecord(store, { ...base, reset: true, inputTokens: 300, outputTokens: 150, cacheReadTokens: 60 })
+    expect(store.bySession['s1']?.inputTokens).toBe(300)
+    expect(store.bySession['s1']?.calls).toBe(1) // 保留既有轮数
+    expect(store.total.inputTokens).toBe(100) // 不累加
+    expect(store.total.calls).toBe(1)
+    const day = dayKey(base.ts)
+    expect(store.byDay[day]?.inputTokens).toBe(100)
+    // 从对齐后的基线起增长：只计差值（300 -> 350），绝不按宿主旧快照 100 超计。
+    applyRecord(store, { ...base, inputTokens: 350, outputTokens: 160 })
+    expect(store.total.inputTokens).toBe(150)
+    expect(store.total.calls).toBe(2)
+    expect(store.byDay[day]?.inputTokens).toBe(150)
+  })
+
+  it('first reset for a session starts the calls counter at zero', () => {
+    const store = emptyUsage()
+    applyRecord(store, { ...base, reset: true, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 })
+    expect(store.bySession['s1']?.calls).toBe(0)
+    expect(store.total.calls).toBe(0)
+    // 首次真实增长从 0 基线起算。
+    applyRecord(store, { ...base, inputTokens: 50 })
+    expect(store.total.inputTokens).toBe(50)
+    expect(store.total.calls).toBe(1)
+  })
+})
+
+describe('normalizeRecord (H6 + reset passthrough)', () => {
+  it('clamps client timestamps beyond a +-48h window to now', () => {
+    const now = Date.now()
+    const future = now + 48 * 3600_000 + 60_000
+    const rec = normalizeRecord({ ...base, ts: future, inputTokens: 5 })
+    expect(rec?.ts).not.toBe(future)
+    expect(Math.abs((rec?.ts ?? 0) - now)).toBeLessThan(5000)
+    const past = now - 49 * 3600_000
+    const rec2 = normalizeRecord({ ...base, ts: past, inputTokens: 5 })
+    expect(rec2?.ts).not.toBe(past)
+    // 窗口内的时间戳保留。
+    const within = now - 3600_000
+    expect(normalizeRecord({ ...base, ts: within, inputTokens: 5 })?.ts).toBe(within)
+  })
+
+  it('rejects all-zero records unless reset is set (baseline may be zero)', () => {
+    const zero = { ...base, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }
+    expect(normalizeRecord(zero)).toBeUndefined()
+    const resetZero = normalizeRecord({ ...zero, reset: true })
+    expect(resetZero?.reset).toBe(true)
+    expect(resetZero?.inputTokens).toBe(0)
+  })
+})
+
+describe('persistence (H1)', () => {
+  const freshHome = (): string => {
+    const home = join(tmpdir(), `usage-persist-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    mkdirSync(home, { recursive: true })
+    return home
+  }
+
+  it('writes atomically and leaves no tmp file behind', () => {
+    const home = freshHome()
+    process.env.DSH_HOME = home
+    try {
+      const store = emptyUsage()
+      applyRecord(store, base)
+      writeUsage(store)
+      const entries = readdirSync(home)
+      expect(entries).toContain('usage.json')
+      expect(entries.some((f) => f === 'usage.json.tmp')).toBe(false)
+      const read = readUsage()
+      expect(read.bySession['s1']?.inputTokens).toBe(100)
+    } finally {
+      delete process.env.DSH_HOME
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+
+  it('backs up a corrupt file instead of silently wiping history', () => {
+    const home = freshHome()
+    process.env.DSH_HOME = home
+    try {
+      const store = emptyUsage()
+      applyRecord(store, base)
+      writeUsage(store)
+      // 模拟崩溃留下的截断文件。
+      writeFileSync(usagePath(), '{ "bySession": {"s1": {', 'utf8')
+      const read = readUsage()
+      expect(read.total.calls).toBe(0)
+      const entries = readdirSync(home)
+      expect(entries.some((f) => f.startsWith('usage.json.corrupt-'))).toBe(true)
+      // 备份后再写入不会覆盖备份。
+      writeUsage(read)
+      const after = readdirSync(home)
+      expect(after.filter((f) => f.startsWith('usage.json.corrupt-'))).toHaveLength(1)
+    } finally {
+      delete process.env.DSH_HOME
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('recentDays (H4)', () => {
+  it('walks strictly increasing local calendar days without duplicates or gaps', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-08-15T12:00:00'))
+      const days = recentDays(emptyUsage(), 14)
+      expect(days).toHaveLength(14)
+      const keys = days.map((d) => d.day)
+      expect(new Set(keys).size).toBe(14)
+      // 用不受 DST 影响的单调日序号比较（14 天都在同一个月内）。
+      const dayIndex = (key: string): number => {
+        const [y, m, d] = key.split('-').map(Number)
+        return y * 372 + m * 31 + d
+      }
+      expect(dayIndex(keys[0])).toBe(dayIndex('2026-08-15') - 13)
+      for (let i = 1; i < keys.length; i++) {
+        expect(dayIndex(keys[i]) - dayIndex(keys[i - 1])).toBe(1)
+      }
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

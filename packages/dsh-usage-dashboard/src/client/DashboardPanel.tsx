@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState, type ReactElement } from 'react'
 import { createPortal } from 'react-dom'
 import css from './usage.module.css'
 import { t } from './locales.ts'
+import { fmt, fmtCost, padRecentDays, type RecentDay } from './dashboard-format.ts'
 
 /** 看板聚合数据（与 host /api/usage/summary 对应）。 */
 export interface UsageSummary {
@@ -28,13 +29,6 @@ function bucketTokens(b: { inputTokens: number; outputTokens: number; cacheReadT
 /** 看板色板：Aqua 蓝系（同一色相族内区分系列，避免彩虹噪点）。 */
 const PALETTE = ['#3f76d8', '#6e9be8', '#4a9eda', '#8fb5ef', '#2f62c4', '#7bc4e8', '#5b8fe6', '#a8ccf2']
 
-/** 数值格式化：千分位 + 大数缩写。 */
-function fmt(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`
-  return String(n)
-}
-
 /** 十六进制颜色转 rgba。 */
 function hexToRgba(hex: string, alpha: number): string {
   const v = parseInt(hex.slice(1), 16)
@@ -44,19 +38,45 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }
 
-/** 费用格式化：¥X.XX，小额保留 4 位。 */
-function fmtCost(n: number): string {
-  if (n >= 100) return `¥${Math.round(n)}`
-  if (n >= 1) return `¥${n.toFixed(2)}`
-  return `¥${n.toFixed(4)}`
+/** 非负数字兜底。 */
+function toNonNegNum(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, value) : 0
+}
+
+/**
+ * 防御性归一化：宿主旧版本/异常载荷不白屏（D1）。
+ * total/recent/byModel/sessions 全部判空给默认值。
+ */
+function sanitizeSummary(raw: unknown): UsageSummary | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const s = raw as Partial<UsageSummary>
+  if (typeof s.total !== 'object' || s.total === null) return null
+  return {
+    total: {
+      inputTokens: toNonNegNum(s.total.inputTokens),
+      outputTokens: toNonNegNum(s.total.outputTokens),
+      cacheReadTokens: toNonNegNum(s.total.cacheReadTokens),
+      cacheWriteTokens: toNonNegNum(s.total.cacheWriteTokens),
+      calls: toNonNegNum(s.total.calls),
+    },
+    byModel: typeof s.byModel === 'object' && s.byModel !== null ? s.byModel : {},
+    recent: Array.isArray(s.recent) ? s.recent : [],
+    sessions: Array.isArray(s.sessions) ? s.sessions : [],
+    byDayCount: typeof s.byDayCount === 'number' ? s.byDayCount : 0,
+    cost: typeof s.cost === 'object' && s.cost !== null
+      ? { total: toNonNegNum(s.cost.total), byModel: typeof s.cost.byModel === 'object' && s.cost.byModel !== null ? s.cost.byModel : {} }
+      : { total: 0, byModel: {} },
+  }
 }
 
 /** 拉取看板数据。 */
 async function fetchSummary(): Promise<UsageSummary> {
   const res = await fetch('/api/usage/summary')
   if (!res.ok) throw new Error(`usage summary failed: ${res.status}`)
-  const data = (await res.json()) as { ok: boolean } & UsageSummary
-  return data
+  const data: unknown = await res.json()
+  const summary = sanitizeSummary(data)
+  if (summary === null) throw new Error('usage summary: unexpected payload shape')
+  return summary
 }
 
 /** 彩色统计卡片。 */
@@ -80,10 +100,12 @@ function TrendChart(props: { recent: UsageSummary['recent'] }): ReactElement {
   const W = 560
   const H = 160
   const PAD = { left: 8, right: 40, top: 12, bottom: 24 }
-  const max = Math.max(1, ...props.recent.map(dayTotal))
+  // D2/D3：不足 14 条补零（键唯一），空数组不再产生 Infinity 柱宽。
+  const data: RecentDay[] = padRecentDays(props.recent, 14)
+  const max = Math.max(1, ...data.map(dayTotal))
   const innerW = W - PAD.left - PAD.right
   const innerH = H - PAD.top - PAD.bottom
-  const barW = innerW / props.recent.length
+  const barW = data.length === 0 ? innerW : innerW / data.length
   const gridValues = Array.from(new Set([max, Math.round(max / 2), 0]))
   return (
     <svg className={css.chart} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t('usage.trend')}>
@@ -109,18 +131,19 @@ function TrendChart(props: { recent: UsageSummary['recent'] }): ReactElement {
           </g>
         )
       })}
-      {props.recent.map((d, i) => {
+      {data.map((d, i) => {
         const total = dayTotal(d)
         const h = total === 0 ? 0 : Math.max(2, (total / max) * innerH)
         const x = PAD.left + i * barW
         const y = PAD.top + innerH - h
         const color = PALETTE[i % PALETTE.length]
         return (
-          <g key={d.day}>
+          // 键带索引兜底，防重复 day key 告警（D3）。
+          <g key={`${d.day}-${i}`}>
             <rect x={x + barW * 0.18} y={y} width={barW * 0.64} height={h} rx={3} fill={color}>
               <title>{`${d.day}: ${fmt(total)} tokens\n${t('usage.input')} ${fmt(d.inputTokens)} / ${t('usage.output')} ${fmt(d.outputTokens)} / ${t('usage.cache')} ${fmt(d.cacheReadTokens)}`}</title>
             </rect>
-            {props.recent.length <= 14 && (i % 2 === 0) && (
+            {data.length <= 14 && (i % 2 === 0) && (
               <text x={x + barW / 2} y={H - 8} textAnchor="middle" className={css.axisLabel}>
                 {d.day.slice(5)}
               </text>
@@ -204,7 +227,7 @@ export function DashboardPanel(props: { onClose: () => void }): ReactElement {
     load()
   }, [load])
 
-  const hasData = summary !== null && summary.total.calls > 0
+  const hasData = summary !== null && (summary.total?.calls ?? 0) > 0
   const totalTokens = summary === null ? 0 : bucketTokens(summary.total)
 
   return createPortal((
@@ -218,7 +241,12 @@ export function DashboardPanel(props: { onClose: () => void }): ReactElement {
           </button>
         </div>
 
-        {error !== null && <div className={css.error}>{error}</div>}
+        {error !== null && (
+          <div className={css.error}>
+            <span>{error}</span>
+            <button type="button" className={css.retry} onClick={load}>{t('usage.retry')}</button>
+          </div>
+        )}
 
         {summary !== null && !hasData && (
           <div className={css.empty}>
@@ -252,7 +280,8 @@ export function DashboardPanel(props: { onClose: () => void }): ReactElement {
                 <div className={css.sessionList}>
                   {summary.sessions.map((s, i) => {
                     const max = summary.sessions[0]?.totalTokens ?? 1
-                    const pct = Math.max(2, Math.round((s.totalTokens / max) * 100))
+                    // D5：0 token 会话进度条置 0，不再显示 2% 残留。
+                    const pct = s.totalTokens <= 0 ? 0 : Math.max(2, Math.round((s.totalTokens / max) * 100))
                     const color = PALETTE[i % PALETTE.length]
                     return (
                       <div key={s.id} className={css.sessionRow}>

@@ -14,7 +14,10 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import type { PricingEntry, PricingSnapshot } from './pricing-normalize.d.mts'
+import { DEFAULT_FX, mergeFreshSnapshot } from './pricing-normalize.mjs'
+import type { PricingSnapshot } from './pricing-normalize.d.mts'
+
+export { mergeFreshSnapshot } from './pricing-normalize.mjs'
 
 /** 空快照（文件缺失/损坏时的兜底）。 */
 const EMPTY_SNAPSHOT: PricingSnapshot = {
@@ -46,21 +49,51 @@ export interface PricingTable {
   snapshot: PricingSnapshot
 }
 
-/** 校验快照形状（宽松：models/aliases 是对象即可）。 */
+/**
+ * 校验快照形状（宽松：models 或 aliases 至少一个为对象即可，P2）。
+ * 只写 models 的手写覆盖（无 aliases 字段）不算损坏；
+ * 只有 JSON 解析失败（或完全非对象）才整文件回退。
+ */
 function isSnapshot(value: unknown): value is PricingSnapshot {
   if (typeof value !== 'object' || value === null) return false
   const candidate = value as Partial<PricingSnapshot>
-  return typeof candidate.models === 'object' && candidate.models !== null
-    && typeof candidate.aliases === 'object' && candidate.aliases !== null
+  const modelsOk = typeof candidate.models === 'object' && candidate.models !== null && !Array.isArray(candidate.models)
+  const aliasesOk = typeof candidate.aliases === 'object' && candidate.aliases !== null && !Array.isArray(candidate.aliases)
+  return modelsOk || aliasesOk
 }
 
+/** 读取并归一化一个快照文件；缺失/损坏返回 null（不完整但合法的形状按缺失字段补空对象）。 */
 function readSnapshot(path: string): PricingSnapshot | null {
+  let raw: string
   try {
-    const parsed: unknown = JSON.parse(readFileSync(path, 'utf8'))
-    return isSnapshot(parsed) ? parsed : null
+    raw = readFileSync(path, 'utf8')
   } catch {
     return null
   }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    // 只有 JSON 解析失败才整文件回退 —— 下一轮 refresh 会以合并结果
+    // 覆盖该文件，但读侧绝不把"不完整但合法"的文件当损坏处理（P2）。
+    return null
+  }
+  if (!isSnapshot(parsed)) return null
+  const candidate = parsed as Partial<PricingSnapshot>
+  return {
+    _source: typeof candidate._source === 'string' ? candidate._source : 'unknown',
+    _unit: typeof candidate._unit === 'string' ? candidate._unit : 'CNY per 1M tokens',
+    _fx: typeof candidate._fx === 'number' && Number.isFinite(candidate._fx) ? candidate._fx : DEFAULT_FX,
+    _fetchedAt: typeof candidate._fetchedAt === 'string' ? candidate._fetchedAt : '',
+    _url: typeof candidate._url === 'string' ? candidate._url : undefined,
+    models: typeof candidate.models === 'object' && candidate.models !== null ? candidate.models : {},
+    aliases: typeof candidate.aliases === 'object' && candidate.aliases !== null ? candidate.aliases : {},
+  }
+}
+
+/** 读取用户级覆盖文件；缺失/损坏返回 null（形状校验宽松，宿主刷新路由复用）。 */
+export function readUserPricingFile(): PricingSnapshot | null {
+  return readSnapshot(userPricingPath())
 }
 
 let cache: PricingTable | null = null
@@ -107,31 +140,6 @@ export function writeUserPricing(snapshot: PricingSnapshot): string {
   writeFileSync(path, JSON.stringify(snapshot), 'utf8')
   invalidatePricingCache()
   return path
-}
-
-/**
- * 刷新合并：LiteLLM 全量快照打底，把现有用户文件里"新快照没有的"条目
- * （自定义模型价，如 k3-256k / kimi-for-coding-highspeed）原样保留。
- * 否则一次 refresh 会把手工维护的条目全部冲掉、打回通用兜底价。
- * 新快照里已有的同名条目以官方最新价为准（自定义价想压过官方价，
- * 刷新后再改 usage-pricing.json 即可）。
- */
-export function mergeFreshSnapshot(existing: PricingSnapshot | null, fresh: PricingSnapshot): PricingSnapshot {
-  if (existing === null) return fresh
-  const customModels: Record<string, PricingEntry> = {}
-  for (const [key, value] of Object.entries(existing.models)) {
-    if (!(key in fresh.models)) customModels[key] = value
-  }
-  const customAliases: Record<string, string> = {}
-  for (const [key, value] of Object.entries(existing.aliases)) {
-    if (!(key in fresh.aliases)) customAliases[key] = value
-  }
-  if (Object.keys(customModels).length === 0 && Object.keys(customAliases).length === 0) return fresh
-  return {
-    ...fresh,
-    models: { ...fresh.models, ...customModels },
-    aliases: { ...fresh.aliases, ...customAliases },
-  }
 }
 
 /** 对外展示的元信息。 */
