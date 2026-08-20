@@ -8,6 +8,8 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
+import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import z from '@deepseek-ai/schemastery'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
@@ -15,6 +17,9 @@ import { homedir } from 'node:os'
 
 /** 稳定插件名（对应 cordis.patch.yml 的 insert id）。 */
 export const name = 'ui-web-ui-settings'
+
+/** 组卡片配对的 settings namespace（rc.8 keyed 协议：卡片按 namespace 分发）。 */
+export const WEB_UI_PLUGINS_SETTINGS_NAMESPACE = settingsNamespace('web-ui-plugins')
 
 /** 人格配置形状。 */
 export interface PersonaConfig {
@@ -342,10 +347,16 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
   sendJson(res, 404, { ok: false, error: 'not found' })
 }
 
-/** 宿主插件体：注册配置路由（无 webServer 服务时为空操作）。 */
+/** 宿主插件体：注册配置路由与组卡片配对的 settings namespace。 */
 export function apply(ctx: Context): void {
   ctx.inject(['webServer'], (httpCtx) => {
     const dispose = httpCtx.webServer.register({ kind: 'prefix', path: PERSONA_API_PREFIX, handler: handle })
     httpCtx.effect(() => dispose, 'ui-web-ui-settings: persona route')
+  })
+  // rc.8 keyed 协议：settings.plugin.item 按 namespace 分发，组卡片以
+  // web-ui-plugins 为 key，这里注册空 section 让 Host 提供该 namespace。
+  installSettingsSection(ctx, WEB_UI_PLUGINS_SETTINGS_NAMESPACE, z.object({}), {}, {
+    setSource: () => {},
+    onChange: () => {},
   })
 }

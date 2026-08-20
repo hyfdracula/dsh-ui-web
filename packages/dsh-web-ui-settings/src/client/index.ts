@@ -35,8 +35,11 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * The plugin configuration section's card seat, declared by
      * ui-plugin-config. Spelled here with the same shape so this package can
      * register its group card without depending on the sibling UI package.
+     * rc.8 keyed protocol: the tab dispatches cards by settings namespace, so
+     * the group card must register under the `web-ui-plugins` namespace
+     * (served by this package's node half) instead of a list id.
      */
-    'settings.plugin.item': { kind: 'list'; scope: 'root'; owner: SettingsPluginItemOwnerProps }
+    'settings.plugin.item': { kind: 'keyed'; scope: 'root'; owner: SettingsPluginItemOwnerProps }
   }
 }
 
@@ -58,7 +61,7 @@ export function apply(ctx: ClientContext): void {
 
   ctx.slots.inject('settings.plugin.item', () => ctx.slots.register({
     name: 'settings.plugin.item',
-    id: 'web-ui-plugins',
+    key: 'web-ui-plugins',
     order: 90,
     locale: 'web-ui-plugins',
     children: { 'web-ui.plugin.item': { kind: 'list', scope: 'root' } },
