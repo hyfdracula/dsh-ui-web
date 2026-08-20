@@ -128,25 +128,40 @@ describe('usage aggregation', () => {
   })
 })
 
-describe('reset/baseline protocol (H3/C1)', () => {
-  it('reset replaces only the session bucket, leaving day/model/total/calls untouched', () => {
+describe('reset/baseline protocol (H3/C1 + 补差)', () => {
+  it('reset replaces the session bucket AND backfills the real gap into day/model/total', () => {
     const store = emptyUsage()
     applyRecord(store, base)
     expect(store.total.inputTokens).toBe(100)
     expect(store.total.calls).toBe(1)
-    // 基线对齐：客户端当前累计 300 → reset。宿主旧快照 100 不再参与差值。
+    // 基线对齐且客户端当前累计已涨到 300（页面关闭/离屏期间宿主没看到的
+    // 200 输入等真实用量）→ reset 补差：bySession 替换为 300，差额并入汇总。
     applyRecord(store, { ...base, reset: true, inputTokens: 300, outputTokens: 150, cacheReadTokens: 60 })
     expect(store.bySession['s1']?.inputTokens).toBe(300)
-    expect(store.bySession['s1']?.calls).toBe(1) // 保留既有轮数
-    expect(store.total.inputTokens).toBe(100) // 不累加
+    expect(store.bySession['s1']?.calls).toBe(1) // 无 steps 记录沿用旧计数：reset 不加
+    expect(store.total.inputTokens).toBe(300) // 补差 200
+    expect(store.total.outputTokens).toBe(150)
+    expect(store.total.cacheReadTokens).toBe(60)
     expect(store.total.calls).toBe(1)
     const day = dayKey(base.ts)
-    expect(store.byDay[day]?.inputTokens).toBe(100)
-    // 从对齐后的基线起增长：只计差值（300 -> 350），绝不按宿主旧快照 100 超计。
+    expect(store.byDay[day]?.inputTokens).toBe(300)
+    // 从对齐后基线起的增长仍只计差值（300 -> 350），不按旧快照超计。
     applyRecord(store, { ...base, inputTokens: 350, outputTokens: 160 })
-    expect(store.total.inputTokens).toBe(150)
+    expect(store.total.inputTokens).toBe(350)
     expect(store.total.calls).toBe(2)
-    expect(store.byDay[day]?.inputTokens).toBe(150)
+    expect(store.byDay[day]?.inputTokens).toBe(350)
+  })
+
+  it('repeat reset with an equal snapshot never double-adds (idempotent)', () => {
+    const store = emptyUsage()
+    applyRecord(store, { ...base, reset: true, inputTokens: 300, outputTokens: 150, cacheReadTokens: 60 })
+    expect(store.total.inputTokens).toBe(300)
+    expect(store.total.calls).toBe(0) // reset（无 steps）不加 calls
+    // 页面刷新后同一累计再次 reset：差额为 0，什么都不加。
+    applyRecord(store, { ...base, reset: true, inputTokens: 300, outputTokens: 150, cacheReadTokens: 60 })
+    expect(store.total.inputTokens).toBe(300)
+    expect(store.total.calls).toBe(0)
+    expect(store.byDay[dayKey(base.ts)]?.inputTokens).toBe(300)
   })
 
   it('first reset for a session starts the calls counter at zero', () => {
@@ -158,6 +173,59 @@ describe('reset/baseline protocol (H3/C1)', () => {
     applyRecord(store, { ...base, inputTokens: 50 })
     expect(store.total.inputTokens).toBe(50)
     expect(store.total.calls).toBe(1)
+  })
+})
+
+describe('steps-driven calls (真实响应数)', () => {
+  const stepsBase: UsageRecord = { ...base, steps: 5 }
+
+  it('bySession.calls mirrors the latest real step count; aggregates accumulate deltas', () => {
+    const store = emptyUsage()
+    applyRecord(store, { ...stepsBase, inputTokens: 10, outputTokens: 5, steps: 5 })
+    expect(store.bySession['s1']?.calls).toBe(5)
+    expect(store.bySession['s1']?.steps).toBe(5)
+    expect(store.total.calls).toBe(5)
+    expect(store.byDay[dayKey(base.ts)]?.calls).toBe(5)
+    expect(store.byModel['deepseek/deepseek-chat']?.calls).toBe(5)
+    // 多步 agent 运行：累计快照涨到 steps=20，只计差值 15。
+    applyRecord(store, { ...stepsBase, inputTokens: 40, outputTokens: 20, steps: 20 })
+    expect(store.bySession['s1']?.calls).toBe(20)
+    expect(store.total.calls).toBe(20)
+    expect(store.total.inputTokens).toBe(40)
+  })
+
+  it('a failed request (steps grows, tokens stay) still counts as a call', () => {
+    const store = emptyUsage()
+    applyRecord(store, { ...stepsBase, inputTokens: 10, outputTokens: 5, steps: 3 })
+    expect(store.total.calls).toBe(3)
+    // 失败/取消请求：无新 token，但 step 已关闭（steps 5 -> 6）。
+    applyRecord(store, { ...stepsBase, inputTokens: 10, outputTokens: 5, steps: 6 })
+    expect(store.total.calls).toBe(6)
+    expect(store.total.inputTokens).toBe(10) // token 不变
+  })
+
+  it('reset backfill honors steps: a page-refresh reset adds the missed step count too', () => {
+    const store = emptyUsage()
+    applyRecord(store, { ...stepsBase, inputTokens: 10, outputTokens: 5, steps: 4 })
+    expect(store.total.calls).toBe(4)
+    // 离屏/关闭期间跑到 7 步再打开 → reset 补差：+3 步、+90 输入。
+    applyRecord(store, { ...stepsBase, reset: true, inputTokens: 100, outputTokens: 50, steps: 7 })
+    expect(store.bySession['s1']?.calls).toBe(7)
+    expect(store.total.calls).toBe(7)
+    expect(store.total.inputTokens).toBe(100)
+    // 等量 reset 不双计。
+    applyRecord(store, { ...stepsBase, reset: true, inputTokens: 100, outputTokens: 50, steps: 7 })
+    expect(store.total.calls).toBe(7)
+    expect(store.total.inputTokens).toBe(100)
+  })
+
+  it('normalizeRecord passes steps through and keeps zero-token-but-stepped records', () => {
+    const rec = normalizeRecord({ ...stepsBase, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, steps: 2 })
+    expect(rec?.steps).toBe(2)
+    // 全 0 且无 steps 丢弃（旧语义）；带 steps 保留（计数一次失败调用）。
+    const zero = normalizeRecord({ ...base, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 })
+    expect(zero).toBeUndefined()
+    expect(normalizeRecord({ ...stepsBase, steps: 0, inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 })).toBeUndefined()
   })
 })
 

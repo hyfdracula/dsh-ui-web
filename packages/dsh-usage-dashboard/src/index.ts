@@ -5,12 +5,18 @@
  * 持久化到 `~/.dsh/usage.json`（与 aurora/pet/full-stats 同模式，绕开
  * /api 设置桥命名空间白名单）。
  *
- * 记录协议（replace + 基线对齐）：
+ * 记录协议（replace + 基线对齐 + 补差）：
  *  - 普通上报是"会话累计快照"（replace 语义：同会话以最新快照覆盖）。
  *  - `reset: true` 由客户端在建立基线时（首次见到会话/换会话/投影回退）随
- *    快照发出：宿主只替换 bySession 桶，不碰 day/model/total 与 calls。
- *    这样之后"新快照 - 该基线"的差值就是真实新增，宿主的快照无论多旧
- *    都不会把客户端早已错过的一段重复计入（H3/C1 家族）。
+ *    快照发出：宿主替换 bySession 桶，并把"真实新增差额"（相对宿主旧快照）
+ *    一并并入 day/model/total —— 即「补差」，把页面关闭/离屏期间宿主没见到的
+ *    用量找补回来。
+ *
+ * 全会话扫描（subagent / AgentTeams / headless 子会话）：
+ *  recorder 只挂前台打开的会话，子会话从不前台 —— 本插件额外通过
+ *  `ctx.sessionPersistence` 枚举全部持久日志（listSnapshots 水位增量 +
+ *  readFrom 折日志），把子会话用量也 replace+补差 并入看板（POST
+ *  /api/usage/rescan 手动触发，插件启动后立即全量补录一次，之后 60s 增量）。
  * @module @captain1275/dsh-usage-dashboard
  */
 import type { Context } from '@deepseek-ai/cordis'
@@ -23,6 +29,7 @@ import { estimateCost } from './cost.ts'
 import { mergeFreshSnapshot, pricingMeta, readUserPricingFile, userPricingPath, writeUserPricing } from './pricing.ts'
 import type { PricingSnapshot } from './pricing-normalize.d.mts'
 import { fetchLiteLLMPricing, normalizeLiteLLM, DEFAULT_FX } from './pricing-normalize.mjs'
+import { scanAndBackfill, scanTitle, type ScanHeader, type PersistenceLike } from './scan.ts'
 
 /** 稳定插件名（对应 cordis.patch.yml 的 insert id）。 */
 export const name = 'ui-usage-dashboard'
@@ -35,6 +42,31 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 /** 客户端时间戳相对服务器时间的最大允许偏差（±48h，H6 越界回退 Date.now()）。 */
 const MAX_TS_SKEW_MS = 48 * 60 * 60 * 1000
+
+/** 全会话扫描间隔（ms）。 */
+const SCAN_INTERVAL_MS = 60_000
+
+/** 会话扫描水位文件（独立于 usage.json，避免与 record 互相写脏）。 */
+const SCAN_WATERMARK_FILENAME = 'usage-scan.json'
+
+/**
+ * 宿主侧全部「读 usage.json -> 改 -> 写 usage.json」的串行队列：record 上报
+ * 与全会话扫描共享，避免并发 read-modify-write 相互覆盖丢更新。
+ */
+let usageWriteChain: Promise<void> = Promise.resolve()
+
+/** apply 注入的 sessionPersistence 引用（handle 的 rescan 分支读取）。 */
+let scanPersistence: PersistenceLike | undefined
+
+/** 扫描进行中标志（定时与手动触发去重）。 */
+let scanning = false
+
+/** 写串行链：排队执行一次 usage.json 读改写。 */
+function withUsageWrite<T>(task: () => T): Promise<T> {
+  const run = usageWriteChain.then(() => task())
+  usageWriteChain = run.then(() => undefined, () => undefined)
+  return run
+}
 
 /** 单次记录（client 上报的一次响应 token 用量增量）。 */
 export interface UsageRecord {
@@ -54,7 +86,14 @@ export interface UsageRecord {
   cacheReadTokens: number
   /** 缓存写入 token（费用按快照 w / 输入价估算，见 cost.ts）。 */
   cacheWriteTokens: number
-  /** 基线对齐标志：true 时宿主只替换 bySession 桶（H3/C1 家族）。 */
+  /**
+   * 会话累计真实响应数：client 从 sessionStats 投影取的整个已关闭 step 数
+   * （含失败/取消，近似 API 调用次数）。携带时 host 按「新 steps - 旧
+   * bySession.steps」计 calls 增量，替换旧「每轮 flush 批次 +1」口径
+   * （后者对多步 agent 运行/离屏会话严重偏低）。缺失时回退旧语义。
+   */
+  steps?: number
+  /** 基线对齐标志：true 时宿主替换 bySession 桶，并把「真实新增差额」一并并入汇总（H3/C1 家族）。 */
   reset?: boolean
 }
 
@@ -69,6 +108,9 @@ export interface UsageStore {
     outputTokens: number
     cacheReadTokens: number
     cacheWriteTokens: number
+    /** 会话累计真实响应数（steps 语义；旧数据/未带 steps 的记录无此字段）。 */
+    steps?: number
+    /** 展示用调用数：带 steps 的记录 = 最新 steps；否则旧「观测批次」计数。 */
     calls: number
   }>
   /** 按天聚合（YYYY-MM-DD）。 */
@@ -168,53 +210,109 @@ export function writeUsage(store: UsageStore): void {
   }
 }
 
+/** 会话扫描水位文件路径（$DSH_HOME/usage-scan.json）。 */
+export function usageScanPath(): string {
+  return join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), SCAN_WATERMARK_FILENAME)
+}
+
+/** 读扫描水位（sessionId -> revision）；缺失/损坏回退空表。 */
+export function readScanWatermark(): Record<string, string> {
+  try {
+    const parsed = JSON.parse(readFileSync(usageScanPath(), 'utf8')) as unknown
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      return parsed as Record<string, string>
+    }
+  } catch {
+    /* 缺失或损坏：全量重扫 */
+  }
+  return {}
+}
+
+/** 写扫描水位（原子写）。 */
+export function writeScanWatermark(watermark: Record<string, string>): void {
+  const path = usageScanPath()
+  try {
+    writeFileSync(`${path}.tmp`, JSON.stringify(watermark), 'utf8')
+    renameSync(`${path}.tmp`, path)
+  } catch (error) {
+    console.warn('[usage-dashboard] writeScanWatermark failed:', error instanceof Error ? error.message : String(error))
+  }
+}
+
+/**
+ * 跑一次全会话扫描并补差并入 usage.json。
+ * 队列化（withUsageWrite）避免与 record 并发读改写冲突；`limit` 为单次最大
+ * 会话处理数（0 = 不限）。返回本次并入的会话数（0 = 无变化）。
+ */
+export async function runScan(persistence: PersistenceLike | undefined, limit = 0): Promise<number> {
+  if (persistence === undefined || scanning) return 0
+  scanning = true
+  try {
+    const known = readScanWatermark()
+    const res = await scanAndBackfill(persistence, known, limit)
+    if (res.outcomes.length === 0 || res.outcomes.reduce((acc, o) => acc + o.inputTokens + o.outputTokens + o.cacheReadTokens + o.cacheWriteTokens + o.steps, 0) === 0) {
+      // 没有真实新增：只推进水位（新会话数变化也要记 revision，避免反复扫）。
+      writeScanWatermark(res.revisions)
+      return 0
+    }
+    const backfilled = await withUsageWrite(() => {
+      const store = readUsage()
+      for (const o of res.outcomes) {
+        const existing = store.bySession[o.sessionId]
+        const header: ScanHeader = { id: o.sessionId, origin: o.isSubagent ? 'subagent' : undefined }
+        const record: UsageRecord = {
+          sessionId: o.sessionId,
+          // 已有标题保留，新会话用生成的（根/子会话标记）。
+          sessionTitle: existing === undefined ? scanTitle(header) : '',
+          model: o.model || 'unknown',
+          ts: Date.now(),
+          inputTokens: o.inputTokens,
+          outputTokens: o.outputTokens,
+          cacheReadTokens: o.cacheReadTokens,
+          cacheWriteTokens: o.cacheWriteTokens,
+          steps: o.steps,
+          reset: true,
+        }
+        applyRecord(store, record)
+      }
+      writeUsage(store)
+      return res.outcomes.length
+    })
+    writeScanWatermark(res.revisions)
+    return backfilled
+  } finally {
+    scanning = false
+  }
+}
+
 /** 把一条记录并入聚合（replace 语义：同会话以最新快照覆盖，避免双计）。 */
 export function applyRecord(store: UsageStore, record: UsageRecord): void {
   const sessionId = record.sessionId || 'default'
-
-  if (record.reset === true) {
-    // 基线对齐：客户端在建立基线（首次见到会话/换会话/投影回退）时发送。
-    // 只替换 bySession 桶（最新累计快照），不碰 day/model/total 与 calls；
-    // 之后该会话的增长差值严格等于真实新增，宿主旧快照再怎么落后也不会
-    // 把"上次没传上来的一段"重复计入（H3/C1）。
-    const existing = store.bySession[sessionId]
-    store.bySession[sessionId] = {
-      title: record.sessionTitle || existing?.title || `会话 ${sessionId.slice(0, 8)}`,
-      lastModel: record.model || existing?.lastModel || 'unknown',
-      lastTs: Math.max(existing?.lastTs ?? 0, record.ts),
-      inputTokens: record.inputTokens,
-      outputTokens: record.outputTokens,
-      cacheReadTokens: record.cacheReadTokens,
-      cacheWriteTokens: record.cacheWriteTokens,
-      calls: existing?.calls ?? 0,
-    }
-    return
-  }
-
   const existing = store.bySession[sessionId]
 
-  // Session bucket holds the LATEST cumulative snapshot (client uploads the
-  // current totals). Replace, never accumulate — the dashboard sums the
-  // snapshots at read time, so repeated polls cannot double count.
+  // 相对宿主已存会话快照的「真实新增 token」（无论 reset 还是普通上报都取
+  // 新快照 - 旧快照，钳零：投影回退/重放/重复上报既不会扣减也不会双计）。
   const prevInput = existing?.inputTokens ?? 0
   const prevOutput = existing?.outputTokens ?? 0
   const prevCache = existing?.cacheReadTokens ?? 0
   const prevCacheWrite = existing?.cacheWriteTokens ?? 0
-
-  // Day / model buckets: running deltas relative to the previous snapshot.
-  // The first upload for a session contributes its full snapshot; later
-  // uploads contribute only the growth (clamped at zero so a projection
-  // reset cannot subtract). With the reset protocol the host baseline is
-  // aligned with the client, so this delta is the true new usage and cannot
-  // overcount gaps the host never saw.
   const dInput = Math.max(0, record.inputTokens - prevInput)
   const dOutput = Math.max(0, record.outputTokens - prevOutput)
   const dCache = Math.max(0, record.cacheReadTokens - prevCache)
   const dCacheWrite = Math.max(0, record.cacheWriteTokens - prevCacheWrite)
-  // calls 语义是"真实响应轮数"：只有 token 实际增长的上报才算一轮。
-  // 重放同一快照（页面刷新后的基线对齐、会话来回切换）不再虚增计数。
-  const grew = dInput + dOutput + dCache + dCacheWrite > 0
-  const session: UsageStore['bySession'][string] = {
+  const grewTokens = dInput + dOutput + dCache + dCacheWrite > 0
+
+  // 「真实新增响应数」：
+  //  - 客户端带 steps → 按 steps 差值（真实已关闭 step 数，含失败/取消）。
+  //  - 不带 steps（旧客户端/投影缺失）→ 回退旧语义：普通上报有 token 增长 +1，reset 不加。
+  const dSteps = record.steps !== undefined ? Math.max(0, record.steps - (existing?.steps ?? 0)) : 0
+  const dCalls = record.steps !== undefined ? dSteps : (record.reset === true ? 0 : (grewTokens ? 1 : 0))
+
+  const progressed = grewTokens || dCalls > 0
+
+  // bySession：最新累计快照（replace 语义）。
+  const steps = record.steps !== undefined ? record.steps : existing?.steps
+  store.bySession[sessionId] = {
     title: record.sessionTitle || existing?.title || `会话 ${sessionId.slice(0, 8)}`,
     lastModel: record.model || existing?.lastModel || 'unknown',
     lastTs: Math.max(existing?.lastTs ?? 0, record.ts),
@@ -222,11 +320,21 @@ export function applyRecord(store: UsageStore, record: UsageRecord): void {
     outputTokens: record.outputTokens,
     cacheReadTokens: record.cacheReadTokens,
     cacheWriteTokens: record.cacheWriteTokens,
-    calls: (existing?.calls ?? 0) + (grew ? 1 : 0),
+    ...steps !== undefined ? { steps } : {},
+    calls: record.steps !== undefined
+      ? record.steps
+      : (existing?.calls ?? 0) + (record.reset === true ? 0 : (grewTokens ? 1 : 0)),
   }
-  store.bySession[sessionId] = session
 
-  if (!grew) return
+  // 汇总并入（day / model / total）：
+  //  - 普通上报：真实新增并入（旧 replace+delta 语义，保持）。
+  //  - reset：也并入 —— 「补差」。客户端基线对齐时，若当前累计比宿主旧快照大，
+  //    说明存在一段宿主没见到的真实用量（页面关闭/离屏期间/上次 flush 丢失），
+  //    把它补进 day/model/total。旧版本 reset 完全不碰汇总 —— 这正是系统性少记
+  //    的来源之一。差值钳零、只在有新增时并入，重复 reset（快照相等）什么都不会加；
+  //    归日按上传时间（record.ts），所以历史缺失量会落在「打开那一刻」那天 ——
+  //    这是拿不到真实消耗时刻时的最佳近似。
+  if (!progressed) return
 
   const day = dayKey(record.ts)
   const dayBucket = store.byDay[day] ?? { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 0 }
@@ -234,7 +342,7 @@ export function applyRecord(store: UsageStore, record: UsageRecord): void {
   dayBucket.outputTokens += dOutput
   dayBucket.cacheReadTokens += dCache
   dayBucket.cacheWriteTokens = (dayBucket.cacheWriteTokens ?? 0) + dCacheWrite
-  dayBucket.calls += 1
+  dayBucket.calls += dCalls
   store.byDay[day] = dayBucket
 
   const model = record.model || 'unknown'
@@ -243,14 +351,14 @@ export function applyRecord(store: UsageStore, record: UsageRecord): void {
   modelBucket.outputTokens += dOutput
   modelBucket.cacheReadTokens += dCache
   modelBucket.cacheWriteTokens = (modelBucket.cacheWriteTokens ?? 0) + dCacheWrite
-  modelBucket.calls += 1
+  modelBucket.calls += dCalls
   store.byModel[model] = modelBucket
 
   store.total.inputTokens += dInput
   store.total.outputTokens += dOutput
   store.total.cacheReadTokens += dCache
   store.total.cacheWriteTokens = (store.total.cacheWriteTokens ?? 0) + dCacheWrite
-  store.total.calls += 1
+  store.total.calls += dCalls
 }
 
 /** 最近 N 天的按天序列（缺失日补零，便于画图）。 */
@@ -334,8 +442,10 @@ export function normalizeRecord(raw: Partial<UsageRecord>): UsageRecord | undefi
   const outputTokens = typeof raw.outputTokens === 'number' && Number.isFinite(raw.outputTokens) ? Math.max(0, Math.round(raw.outputTokens)) : 0
   const cacheReadTokens = typeof raw.cacheReadTokens === 'number' && Number.isFinite(raw.cacheReadTokens) ? Math.max(0, Math.round(raw.cacheReadTokens)) : 0
   const cacheWriteTokens = typeof raw.cacheWriteTokens === 'number' && Number.isFinite(raw.cacheWriteTokens) ? Math.max(0, Math.round(raw.cacheWriteTokens)) : 0
-  // 基线对齐（reset）即使全 0 也要透传：宿主需要记下"客户端当前快照为 0"。
-  const allZero = inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens <= 0
+  const steps = typeof raw.steps === 'number' && Number.isFinite(raw.steps) ? Math.max(0, Math.round(raw.steps)) : undefined
+  // 全 0 且不带 steps 的上报直接丢弃（纯重放）；但 steps>0（如失败请求
+  // token 为 0 只贡献调用数）和 reset（基线可能为 0）要透传。
+  const allZero = inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens <= 0 && (steps ?? 0) <= 0
   if (allZero && raw.reset !== true) return undefined
   // 时间戳可信窗口 ±48h：客户端时钟跳变/未来时间不污染 byDay（H6）。
   const now = Date.now()
@@ -350,25 +460,29 @@ export function normalizeRecord(raw: Partial<UsageRecord>): UsageRecord | undefi
     outputTokens,
     cacheReadTokens,
     cacheWriteTokens,
+    ...steps !== undefined ? { steps } : {},
     reset: raw.reset === true,
   }
 }
 
-/** 请求分发：POST /api/usage/record, GET /api/usage/summary。 */
+/** 请求分发：POST /api/usage/record, GET /api/usage/summary, POST /api/usage/rescan。 */
 function handle(req: IncomingMessage, res: ServerResponse): void {
   const url = new URL(req.url ?? '/', 'http://dsh.local')
   if (url.pathname === `${USAGE_API_PREFIX}/record` && req.method === 'POST') {
     void readBody(req)
-      .then((body) => {
+      .then(async (body) => {
         const parsed = JSON.parse(body) as Partial<UsageRecord>
         const record = normalizeRecord(parsed)
         if (record === undefined) {
           sendJson(res, 200, { ok: true, skipped: true })
           return
         }
-        const store = readUsage()
-        applyRecord(store, record)
-        writeUsage(store)
+        // 走写串行链，与全会话扫描排队，避免 read-modify-write 竞态。
+        await withUsageWrite(() => {
+          const store = readUsage()
+          applyRecord(store, record)
+          writeUsage(store)
+        })
         sendJson(res, 200, { ok: true, skipped: false })
       })
       .catch((e) => {
@@ -379,6 +493,16 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
           error: tooLarge ? 'request body too large' : (e instanceof Error ? e.message : String(e)),
         })
       })
+    return
+  }
+  if (url.pathname === `${USAGE_API_PREFIX}/rescan` && req.method === 'POST') {
+    // 手动触发全会话扫描补录（含 subagent / AgentTeams / headless 子会话）。
+    void runScan(scanPersistence)
+      .then((scanned) => sendJson(res, 200, { ok: true, scanned }))
+      .catch((error: unknown) => sendJson(res, 502, {
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      }))
     return
   }
   if (url.pathname === `${USAGE_API_PREFIX}/summary` && req.method === 'GET') {
@@ -475,5 +599,22 @@ export function apply(ctx: Context): void {
     httpCtx.effect(() => dispose, 'ui-usage-dashboard: usage route')
     const disposePricing = httpCtx.webServer.register({ kind: 'prefix', path: USAGE_PRICING_API_PREFIX, handler: handlePricing })
     httpCtx.effect(() => disposePricing, 'ui-usage-dashboard: pricing route')
+
+    // 全会话扫描（subagent / AgentTeams / headless 子会话补录）：
+    // 通过 ctx.get 取 sessionPersistence（web profile 由 dsh-base 提供），拿不到就
+    // 静默降级（只保留 recorder 上报路径，不扫描）。
+    const persistence = (ctx as { get?: (name: string) => unknown }).get?.('sessionPersistence') as PersistenceLike | undefined
+    if (persistence !== undefined) {
+      scanPersistence = persistence
+      // 立即全量补录一次（把历史缺失的子会话用量一次性并入），之后按修订增量。
+      void runScan(persistence)
+      const timer = setInterval(() => { void runScan(persistence) }, SCAN_INTERVAL_MS)
+      httpCtx.effect(() => () => {
+        clearInterval(timer)
+        scanPersistence = undefined
+      }, 'ui-usage-dashboard: scan timer')
+    } else {
+      console.warn('[usage-dashboard] sessionPersistence unavailable; all-session backfill disabled (recorder path stays on)')
+    }
   })
 }

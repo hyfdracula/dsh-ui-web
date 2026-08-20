@@ -609,6 +609,125 @@ function estimateCost(model, inputTokens, outputTokens, cacheReadTokens, cacheWr
 	return input + output + cache + cacheWrite;
 }
 //#endregion
+//#region src/scan.ts
+/** 会话标题：子会话带标记，根会话用 id 前 8 位（已有标题由 host 保留）。 */
+function scanTitle(header) {
+	const bare = header.id.slice(0, 8);
+	return header.origin === "subagent" || (header.delegationDepth ?? 0) > 0 ? `子会话 ${bare}` : `会话 ${bare}`;
+}
+/** 空累计。 */
+function emptySessionUsage() {
+	return {
+		inputTokens: 0,
+		outputTokens: 0,
+		cacheReadTokens: 0,
+		cacheWriteTokens: 0,
+		steps: 0,
+		model: ""
+	};
+}
+/**
+* 纯 fold：把一段事件日志折成会话累计用量。
+* - token：`assistant/chunk{type:'usage'}` 与 `assistant/message.usage` 都记；
+*   同一 (turn,step) 的重度样本按「后者替换前者」处理，绝不双计。
+* - steps：数 `step/end` 事件（含失败/取消），与 sessionStats 投影同口径。
+* - model：取最后一条 `request/header` 的 `config.model`。
+*/
+function foldSessionUsage(events) {
+	const out = emptySessionUsage();
+	let lastKey = "";
+	let last;
+	for (const ev of events) {
+		if (ev.type === "request/header") {
+			const config = ev.data?.header?.config;
+			if (config !== void 0 && typeof config.model === "string" && config.model.length > 0) out.model = config.model;
+			continue;
+		}
+		let usage = ev.data?.chunk?.type === "usage" ? ev.data.chunk.usage : ev.type === "assistant/message" ? ev.data?.usage : void 0;
+		const stepIsEnd = ev.type === "step/end";
+		if (usage === void 0) {
+			if (stepIsEnd) out.steps += 1;
+			continue;
+		}
+		const turn = ev.data?.turn ?? -1;
+		const step = ev.data?.step ?? -1;
+		const b = {
+			i: usage.inputTokens ?? 0,
+			o: usage.outputTokens ?? 0,
+			c: usage.cacheReadTokens ?? 0,
+			w: usage.cacheWriteTokens ?? 0
+		};
+		const key = `${turn}:${step}`;
+		if (lastKey === key && last !== void 0) {
+			if (last.i === b.i && last.o === b.o && last.c === b.c && last.w === b.w) {
+				last = b;
+				continue;
+			}
+			out.inputTokens += b.i - last.i;
+			out.outputTokens += b.o - last.o;
+			out.cacheReadTokens += b.c - last.c;
+			out.cacheWriteTokens += b.w - last.w;
+		} else {
+			out.inputTokens += b.i;
+			out.outputTokens += b.o;
+			out.cacheReadTokens += b.c;
+			out.cacheWriteTokens += b.w;
+		}
+		lastKey = key;
+		last = b;
+		if (stepIsEnd) out.steps += 1;
+	}
+	return out;
+}
+/**
+* 扫描全部会话日志，重算「新增或 revision 变化」的会话累计。
+* `knownRevisions` 为上次水位；冷启动（空对象）即全量补录。
+* 单次最多处理 `limit` 个会话（0 = 不限），避免某次大扫阻塞宿主任意时长。
+*/
+async function scanAndBackfill(persistence, knownRevisions = {}, limit = 0) {
+	const outcomes = [];
+	const revisions = { ...knownRevisions };
+	let errors = 0;
+	let total = 0;
+	if (persistence.listSnapshots === void 0 || persistence.readFrom === void 0) return {
+		outcomes,
+		errors,
+		revisions,
+		total
+	};
+	const snapshots = await persistence.listSnapshots();
+	total = snapshots.length;
+	let handled = 0;
+	for (const snap of snapshots) {
+		const id = snap.header?.id;
+		if (typeof id !== "string" || id.length === 0) continue;
+		const rev = snap.revision;
+		if (limit > 0 && handled >= limit) break;
+		if (rev !== void 0 && revisions[id] === rev) continue;
+		handled += 1;
+		try {
+			const { events } = await persistence.readFrom(id, 0);
+			const usage = foldSessionUsage(events ?? []);
+			outcomes.push({
+				sessionId: id,
+				parentSession: snap.header?.parentSession,
+				isSubagent: snap.header?.origin === "subagent" || (snap.header?.delegationDepth ?? 0) > 0,
+				...usage
+			});
+		} catch (error) {
+			errors += 1;
+			console.warn(`[usage-dashboard] scan failed for ${id}:`, error instanceof Error ? error.message : String(error));
+		}
+		if (rev !== void 0) revisions[id] = rev;
+	}
+	return {
+		outcomes,
+		errors,
+		revisions,
+		total
+	};
+}
+//#endregion
 //#region src/index.ts
 /** 稳定插件名（对应 cordis.patch.yml 的 insert id）。 */
 const name = "ui-usage-dashboard";
@@ -616,6 +735,25 @@ const name = "ui-usage-dashboard";
 const USAGE_API_PREFIX = "/api/usage";
 /** 客户端时间戳相对服务器时间的最大允许偏差（±48h，H6 越界回退 Date.now()）。 */
 const MAX_TS_SKEW_MS = 2880 * 60 * 1e3;
+/** 全会话扫描间隔（ms）。 */
+const SCAN_INTERVAL_MS = 6e4;
+/** 会话扫描水位文件（独立于 usage.json，避免与 record 互相写脏）。 */
+const SCAN_WATERMARK_FILENAME = "usage-scan.json";
+/**
+* 宿主侧全部「读 usage.json -> 改 -> 写 usage.json」的串行队列：record 上报
+* 与全会话扫描共享，避免并发 read-modify-write 相互覆盖丢更新。
+*/
+let usageWriteChain = Promise.resolve();
+/** apply 注入的 sessionPersistence 引用（handle 的 rescan 分支读取）。 */
+let scanPersistence;
+/** 扫描进行中标志（定时与手动触发去重）。 */
+let scanning = false;
+/** 写串行链：排队执行一次 usage.json 读改写。 */
+function withUsageWrite(task) {
+	const run = usageWriteChain.then(() => task());
+	usageWriteChain = run.then(() => void 0, () => void 0);
+	return run;
+}
 /** 空聚合。 */
 function emptyUsage() {
 	return {
@@ -697,23 +835,75 @@ function writeUsage(store) {
 		console.warn("[usage-dashboard] writeUsage failed:", error instanceof Error ? error.message : String(error));
 	}
 }
+/** 会话扫描水位文件路径（$DSH_HOME/usage-scan.json）。 */
+function usageScanPath() {
+	return join(process.env.DSH_HOME ?? join(homedir(), ".dsh"), SCAN_WATERMARK_FILENAME);
+}
+/** 读扫描水位（sessionId -> revision）；缺失/损坏回退空表。 */
+function readScanWatermark() {
+	try {
+		const parsed = JSON.parse(readFileSync(usageScanPath(), "utf8"));
+		if (typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)) return parsed;
+	} catch {}
+	return {};
+}
+/** 写扫描水位（原子写）。 */
+function writeScanWatermark(watermark) {
+	const path = usageScanPath();
+	try {
+		writeFileSync(`${path}.tmp`, JSON.stringify(watermark), "utf8");
+		renameSync(`${path}.tmp`, path);
+	} catch (error) {
+		console.warn("[usage-dashboard] writeScanWatermark failed:", error instanceof Error ? error.message : String(error));
+	}
+}
+/**
+* 跑一次全会话扫描并补差并入 usage.json。
+* 队列化（withUsageWrite）避免与 record 并发读改写冲突；`limit` 为单次最大
+* 会话处理数（0 = 不限）。返回本次并入的会话数（0 = 无变化）。
+*/
+async function runScan(persistence, limit = 0) {
+	if (persistence === void 0 || scanning) return 0;
+	scanning = true;
+	try {
+		const res = await scanAndBackfill(persistence, readScanWatermark(), limit);
+		if (res.outcomes.length === 0 || res.outcomes.reduce((acc, o) => acc + o.inputTokens + o.outputTokens + o.cacheReadTokens + o.cacheWriteTokens + o.steps, 0) === 0) {
+			writeScanWatermark(res.revisions);
+			return 0;
+		}
+		const backfilled = await withUsageWrite(() => {
+			const store = readUsage();
+			for (const o of res.outcomes) {
+				const existing = store.bySession[o.sessionId];
+				const header = {
+					id: o.sessionId,
+					origin: o.isSubagent ? "subagent" : void 0
+				};
+				applyRecord(store, {
+					sessionId: o.sessionId,
+					sessionTitle: existing === void 0 ? scanTitle(header) : "",
+					model: o.model || "unknown",
+					ts: Date.now(),
+					inputTokens: o.inputTokens,
+					outputTokens: o.outputTokens,
+					cacheReadTokens: o.cacheReadTokens,
+					cacheWriteTokens: o.cacheWriteTokens,
+					steps: o.steps,
+					reset: true
+				});
+			}
+			writeUsage(store);
+			return res.outcomes.length;
+		});
+		writeScanWatermark(res.revisions);
+		return backfilled;
+	} finally {
+		scanning = false;
+	}
+}
 /** 把一条记录并入聚合（replace 语义：同会话以最新快照覆盖，避免双计）。 */
 function applyRecord(store, record) {
 	const sessionId = record.sessionId || "default";
-	if (record.reset === true) {
-		const existing = store.bySession[sessionId];
-		store.bySession[sessionId] = {
-			title: record.sessionTitle || existing?.title || `会话 ${sessionId.slice(0, 8)}`,
-			lastModel: record.model || existing?.lastModel || "unknown",
-			lastTs: Math.max(existing?.lastTs ?? 0, record.ts),
-			inputTokens: record.inputTokens,
-			outputTokens: record.outputTokens,
-			cacheReadTokens: record.cacheReadTokens,
-			cacheWriteTokens: record.cacheWriteTokens,
-			calls: existing?.calls ?? 0
-		};
-		return;
-	}
 	const existing = store.bySession[sessionId];
 	const prevInput = existing?.inputTokens ?? 0;
 	const prevOutput = existing?.outputTokens ?? 0;
@@ -723,8 +913,12 @@ function applyRecord(store, record) {
 	const dOutput = Math.max(0, record.outputTokens - prevOutput);
 	const dCache = Math.max(0, record.cacheReadTokens - prevCache);
 	const dCacheWrite = Math.max(0, record.cacheWriteTokens - prevCacheWrite);
-	const grew = dInput + dOutput + dCache + dCacheWrite > 0;
-	const session = {
+	const grewTokens = dInput + dOutput + dCache + dCacheWrite > 0;
+	const dSteps = record.steps !== void 0 ? Math.max(0, record.steps - (existing?.steps ?? 0)) : 0;
+	const dCalls = record.steps !== void 0 ? dSteps : record.reset === true ? 0 : grewTokens ? 1 : 0;
+	const progressed = grewTokens || dCalls > 0;
+	const steps = record.steps !== void 0 ? record.steps : existing?.steps;
+	store.bySession[sessionId] = {
 		title: record.sessionTitle || existing?.title || `会话 ${sessionId.slice(0, 8)}`,
 		lastModel: record.model || existing?.lastModel || "unknown",
 		lastTs: Math.max(existing?.lastTs ?? 0, record.ts),
@@ -732,10 +926,10 @@ function applyRecord(store, record) {
 		outputTokens: record.outputTokens,
 		cacheReadTokens: record.cacheReadTokens,
 		cacheWriteTokens: record.cacheWriteTokens,
-		calls: (existing?.calls ?? 0) + (grew ? 1 : 0)
+		...steps !== void 0 ? { steps } : {},
+		calls: record.steps !== void 0 ? record.steps : (existing?.calls ?? 0) + (record.reset === true ? 0 : grewTokens ? 1 : 0)
 	};
-	store.bySession[sessionId] = session;
-	if (!grew) return;
+	if (!progressed) return;
 	const day = dayKey(record.ts);
 	const dayBucket = store.byDay[day] ?? {
 		inputTokens: 0,
@@ -748,7 +942,7 @@ function applyRecord(store, record) {
 	dayBucket.outputTokens += dOutput;
 	dayBucket.cacheReadTokens += dCache;
 	dayBucket.cacheWriteTokens = (dayBucket.cacheWriteTokens ?? 0) + dCacheWrite;
-	dayBucket.calls += 1;
+	dayBucket.calls += dCalls;
 	store.byDay[day] = dayBucket;
 	const model = record.model || "unknown";
 	const modelBucket = store.byModel[model] ?? {
@@ -762,13 +956,13 @@ function applyRecord(store, record) {
 	modelBucket.outputTokens += dOutput;
 	modelBucket.cacheReadTokens += dCache;
 	modelBucket.cacheWriteTokens = (modelBucket.cacheWriteTokens ?? 0) + dCacheWrite;
-	modelBucket.calls += 1;
+	modelBucket.calls += dCalls;
 	store.byModel[model] = modelBucket;
 	store.total.inputTokens += dInput;
 	store.total.outputTokens += dOutput;
 	store.total.cacheReadTokens += dCache;
 	store.total.cacheWriteTokens = (store.total.cacheWriteTokens ?? 0) + dCacheWrite;
-	store.total.calls += 1;
+	store.total.calls += dCalls;
 }
 /** 最近 N 天的按天序列（缺失日补零，便于画图）。 */
 function recentDays(store, days) {
@@ -834,7 +1028,8 @@ function normalizeRecord(raw) {
 	const outputTokens = typeof raw.outputTokens === "number" && Number.isFinite(raw.outputTokens) ? Math.max(0, Math.round(raw.outputTokens)) : 0;
 	const cacheReadTokens = typeof raw.cacheReadTokens === "number" && Number.isFinite(raw.cacheReadTokens) ? Math.max(0, Math.round(raw.cacheReadTokens)) : 0;
 	const cacheWriteTokens = typeof raw.cacheWriteTokens === "number" && Number.isFinite(raw.cacheWriteTokens) ? Math.max(0, Math.round(raw.cacheWriteTokens)) : 0;
-	if (inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens <= 0 && raw.reset !== true) return void 0;
+	const steps = typeof raw.steps === "number" && Number.isFinite(raw.steps) ? Math.max(0, Math.round(raw.steps)) : void 0;
+	if (inputTokens + outputTokens + cacheReadTokens + cacheWriteTokens <= 0 && (steps ?? 0) <= 0 && raw.reset !== true) return void 0;
 	const now = Date.now();
 	const rawTs = typeof raw.ts === "number" && Number.isFinite(raw.ts) ? raw.ts : NaN;
 	const ts = Number.isFinite(rawTs) && Math.abs(rawTs - now) <= MAX_TS_SKEW_MS ? rawTs : now;
@@ -847,14 +1042,15 @@ function normalizeRecord(raw) {
 		outputTokens,
 		cacheReadTokens,
 		cacheWriteTokens,
+		...steps !== void 0 ? { steps } : {},
 		reset: raw.reset === true
 	};
 }
-/** 请求分发：POST /api/usage/record, GET /api/usage/summary。 */
+/** 请求分发：POST /api/usage/record, GET /api/usage/summary, POST /api/usage/rescan。 */
 function handle(req, res) {
 	const url = new URL(req.url ?? "/", "http://dsh.local");
 	if (url.pathname === `/api/usage/record` && req.method === "POST") {
-		readBody(req).then((body) => {
+		readBody(req).then(async (body) => {
 			const record = normalizeRecord(JSON.parse(body));
 			if (record === void 0) {
 				sendJson(res, 200, {
@@ -863,9 +1059,11 @@ function handle(req, res) {
 				});
 				return;
 			}
-			const store = readUsage();
-			applyRecord(store, record);
-			writeUsage(store);
+			await withUsageWrite(() => {
+				const store = readUsage();
+				applyRecord(store, record);
+				writeUsage(store);
+			});
 			sendJson(res, 200, {
 				ok: true,
 				skipped: false
@@ -877,6 +1075,16 @@ function handle(req, res) {
 				error: tooLarge ? "request body too large" : e instanceof Error ? e.message : String(e)
 			});
 		});
+		return;
+	}
+	if (url.pathname === `/api/usage/rescan` && req.method === "POST") {
+		runScan(scanPersistence).then((scanned) => sendJson(res, 200, {
+			ok: true,
+			scanned
+		})).catch((error) => sendJson(res, 502, {
+			ok: false,
+			error: error instanceof Error ? error.message : String(error)
+		}));
 		return;
 	}
 	if (url.pathname === `/api/usage/summary` && req.method === "GET") {
@@ -991,7 +1199,19 @@ function apply(ctx) {
 			handler: handlePricing
 		});
 		httpCtx.effect(() => disposePricing, "ui-usage-dashboard: pricing route");
+		const persistence = ctx.get?.("sessionPersistence");
+		if (persistence !== void 0) {
+			scanPersistence = persistence;
+			runScan(persistence);
+			const timer = setInterval(() => {
+				runScan(persistence);
+			}, SCAN_INTERVAL_MS);
+			httpCtx.effect(() => () => {
+				clearInterval(timer);
+				scanPersistence = void 0;
+			}, "ui-usage-dashboard: scan timer");
+		} else console.warn("[usage-dashboard] sessionPersistence unavailable; all-session backfill disabled (recorder path stays on)");
 	});
 }
 //#endregion
-export { USAGE_API_PREFIX, USAGE_PRICING_API_PREFIX, apply, applyRecord, dayKey, emptyUsage, name, normalizeRecord, readUsage, recentDays, sessionRanking, usagePath, writeUsage };
+export { USAGE_API_PREFIX, USAGE_PRICING_API_PREFIX, apply, applyRecord, dayKey, emptyUsage, name, normalizeRecord, readScanWatermark, readUsage, recentDays, runScan, sessionRanking, usagePath, usageScanPath, writeScanWatermark, writeUsage };

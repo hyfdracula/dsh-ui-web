@@ -21,20 +21,24 @@ export interface RecorderSnapshot {
   output: number
   cache: number
   cacheWrite: number
+  /** 会话累计真实响应数（sessionStats 投影的已关闭 step 数）；投影未就绪时缺失。 */
+  steps?: number
 }
 
 /** 记录器内存态。 */
 export interface RecorderMemory {
   /** 上次观察的会话 id。 */
   lastSid: string | undefined
-  /** 会话累计基线（-1 = 未建立）。 */
+  /** 会话累计 token 基线（-1 = 未建立）。 */
   lastTotal: number
+  /** 会话累计 steps 基线（-1 = 未建立 / 当前会话 steps 未知）。 */
+  lastSteps: number
   /** 最近一次观察的快照（settle flush / 检查点 / 卸载补发用）。 */
   lastSeen: RecorderSnapshot | null
 }
 
 /** 初始内存态（基线未建立）。 */
-export const EMPTY_RECORDER_MEMORY: RecorderMemory = { lastSid: undefined, lastTotal: -1, lastSeen: null }
+export const EMPTY_RECORDER_MEMORY: RecorderMemory = { lastSid: undefined, lastTotal: -1, lastSteps: -1, lastSeen: null }
 
 /** 决策后的动作。 */
 export type RecorderAction =
@@ -68,6 +72,7 @@ export function decideRecorderStep(
     return { next: memory, action: 'none', staleFlush: null, switched: false }
   }
   const total = snapshot.input + snapshot.output + snapshot.cache + snapshot.cacheWrite
+  const steps = snapshot.steps
   // 首次见到（lastSid 尚未建立）不算"切换"：没有旧会话可切，也没有 stale 可补发。
   const switched = memory.lastSid !== undefined && memory.lastSid !== sessionId
   const staleFlush = switched ? memory.lastSeen : null
@@ -75,17 +80,30 @@ export function decideRecorderStep(
     // 首次见到该会话 / 换会话：建立基线，随快照发 reset:true（C2 的
     // "0 基线"也在此覆盖：投影累计为 0 时同样发 reset，宿主记下基线 0）。
     return {
-      next: { lastSid: sessionId, lastTotal: total, lastSeen: snapshot },
+      next: {
+        lastSid: sessionId,
+        lastTotal: total,
+        // 新会话基线用其自身 steps（未知则 -1），绝不沿用上个会话的步数。
+        lastSteps: steps !== undefined ? steps : -1,
+        lastSeen: snapshot,
+      },
       action: 'reset',
       staleFlush,
       switched,
     }
   }
   const prev = memory.lastTotal
-  if (total > prev) {
-    // 真实增长：基线推进到最新（仅在增长分支更新基线，C3），armed settle flush。
+  // steps 增长也算"活动"：失败/取消的请求 token 可能为 0，但也是一次真实调用
+  // （宿主据此计 calls）；token 或 steps 任一增长都 armed settle flush。
+  const stepsGrew = steps !== undefined && memory.lastSteps !== -1 && steps > memory.lastSteps
+  if (total > prev || stepsGrew) {
     return {
-      next: { lastSid: sessionId, lastTotal: total, lastSeen: snapshot },
+      next: {
+        lastSid: sessionId,
+        lastTotal: total,
+        lastSteps: steps !== undefined ? steps : memory.lastSteps,
+        lastSeen: snapshot,
+      },
       action: 'arm-settle',
       staleFlush: null,
       switched: false,
@@ -95,7 +113,12 @@ export function decideRecorderStep(
     // 投影回退（压缩/重算/过期修正）：reset 重新对齐双方基线（C4 顺带
     // 消除"客户端认定增长、宿主认定 0 差"的两端不一致）。
     return {
-      next: { lastSid: sessionId, lastTotal: total, lastSeen: snapshot },
+      next: {
+        lastSid: sessionId,
+        lastTotal: total,
+        lastSteps: steps !== undefined ? steps : memory.lastSteps,
+        lastSeen: snapshot,
+      },
       action: 'reset',
       staleFlush: null,
       switched: false,

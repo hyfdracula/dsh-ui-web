@@ -7,8 +7,8 @@
 import { describe, expect, it } from 'vitest'
 import { decideRecorderStep, EMPTY_RECORDER_MEMORY, type RecorderSnapshot } from './recorder-core.ts'
 
-function snap(sessionId: string, input: number): RecorderSnapshot {
-  return { sessionId, input, output: 0, cache: 0, cacheWrite: 0 }
+function snap(sessionId: string, input: number, steps?: number): RecorderSnapshot {
+  return { sessionId, input, output: 0, cache: 0, cacheWrite: 0, ...steps !== undefined ? { steps } : {} }
 }
 
 describe('decideRecorderStep', () => {
@@ -77,5 +77,32 @@ describe('decideRecorderStep', () => {
     const d2 = decideRecorderStep(mem, undefined, snap('a', 100))
     expect(d2.action).toBe('none')
     expect(d2.next).toBe(mem)
+  })
+
+  it('baseline carries steps when the sessionStats projection is present', () => {
+    const d = decideRecorderStep(EMPTY_RECORDER_MEMORY, 'a', snap('a', 500, 12))
+    expect(d.action).toBe('reset')
+    expect(d.next.lastSteps).toBe(12)
+    expect(d.next.lastSeen).toEqual(snap('a', 500, 12))
+  })
+
+  it('steps growth without token growth is still activity (failed/cancelled requests count)', () => {
+    const fresh = decideRecorderStep(EMPTY_RECORDER_MEMORY, 'a', snap('a', 100, 5)).next
+    // token 不变、steps 1 -> 2：失败/取消请求也计一次调用并 armed flush。
+    const d = decideRecorderStep(fresh, 'a', snap('a', 100, 6))
+    expect(d.action).toBe('arm-settle')
+    expect(d.next.lastSteps).toBe(6)
+    expect(d.next.lastSeen).toEqual(snap('a', 100, 6))
+    // steps 也不再涨（同快照重放）→ none。
+    const replay = decideRecorderStep(d.next, 'a', snap('a', 100, 6))
+    expect(replay.action).toBe('none')
+  })
+
+  it('on switch the steps baseline is the new session’s own (never inherits the old session’s)', () => {
+    const fresh = decideRecorderStep(EMPTY_RECORDER_MEMORY, 'a', snap('a', 100, 40)).next
+    const switched = decideRecorderStep(fresh, 'b', snap('b', 0, 3))
+    expect(switched.action).toBe('reset')
+    expect(switched.next.lastSteps).toBe(3)
+    expect(switched.next.lastSid).toBe('b')
   })
 })

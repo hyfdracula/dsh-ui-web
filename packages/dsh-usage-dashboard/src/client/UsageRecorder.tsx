@@ -48,6 +48,11 @@ interface TokenUsageProjection {
   cacheWriteTokens: number
 }
 
+/** sessionStats 投影值结构（只取真实响应数用；steps = 整个日志已关闭 step 数）。 */
+interface SessionStatsLike {
+  steps?: number
+}
+
 /** Props injected by the conversation dock (framework runtime share). */
 export interface UsageRecorderProps {
   useSession: <S>(selector: (s: { sessionId?: string }) => S) => S
@@ -69,7 +74,9 @@ interface UsageUpload {
   outputTokens: number
   cacheReadTokens: number
   cacheWriteTokens: number
-  /** true = 基线对齐：宿主只替换会话桶，不累加 day/model/total。 */
+  /** 会话累计真实响应数（sessionStats steps）；宿主据此按差值计 calls。 */
+  steps?: number
+  /** true = 基线对齐：宿主替换会话桶并补差（见宿主 applyRecord）。 */
   reset?: boolean
 }
 
@@ -113,10 +120,13 @@ async function postSnapshot(snapshot: UsageUpload, keepalive = false): Promise<v
 export const UsageRecorder = memo(function UsageRecorder(props: UsageRecorderProps): null {
   const session = props.useSession((s) => ({ sessionId: s.sessionId }))
   const usage = props.useProjection('tokenUsage') as TokenUsageProjection | undefined
+  // 真实响应数走 sessionStats 投影（整个日志已关闭 step 数，含失败/取消）。
+  const stats = props.useProjection('sessionStats') as SessionStatsLike | undefined
   // 标题走会话投影：实时、按会话隔离，不轮询、不猜列表第一项。
   const title = props.useProjection('title') as string | null | undefined
   const lastTotalRef = useRef<number>(-1)
   const lastSidRef = useRef<string | undefined>(undefined)
+  const lastStepsRef = useRef<number>(-1)
   const lastSeenRef = useRef<RecorderSnapshot | null>(null)
   const settleTimerRef = useRef<number | null>(null)
   const titleCacheRef = useRef<Record<string, string>>({})
@@ -125,12 +135,14 @@ export const UsageRecorder = memo(function UsageRecorder(props: UsageRecorderPro
   const memoryRefs = (): RecorderMemory => ({
     lastSid: lastSidRef.current,
     lastTotal: lastTotalRef.current,
+    lastSteps: lastStepsRef.current,
     lastSeen: lastSeenRef.current,
   })
 
   const syncMemory = (memory: RecorderMemory): void => {
     lastSidRef.current = memory.lastSid
     lastTotalRef.current = memory.lastTotal
+    lastStepsRef.current = memory.lastSteps
     lastSeenRef.current = memory.lastSeen
   }
 
@@ -146,6 +158,7 @@ export const UsageRecorder = memo(function UsageRecorder(props: UsageRecorderPro
       outputTokens: snap.output,
       cacheReadTokens: snap.cache,
       cacheWriteTokens: snap.cacheWrite,
+      ...snap.steps !== undefined ? { steps: snap.steps } : {},
       reset: opts.reset === true,
     }, opts.keepalive === true)
   }
@@ -186,6 +199,7 @@ export const UsageRecorder = memo(function UsageRecorder(props: UsageRecorderPro
       output: usage.outputTokens,
       cache: usage.cacheReadTokens,
       cacheWrite: usage.cacheWriteTokens,
+      ...stats?.steps !== undefined ? { steps: stats.steps } : {},
     }
     const decision = decideRecorderStep(memoryRefs(), sid, snapshot)
     // 1) 切会话：先补发旧会话的未决快照（C1），避免旧会话最后一段丢失。
@@ -215,7 +229,7 @@ export const UsageRecorder = memo(function UsageRecorder(props: UsageRecorderPro
       if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current)
       settleTimerRef.current = window.setTimeout(flush, SETTLE_MS)
     }
-  }, [session.sessionId, usage])
+  }, [session.sessionId, usage, stats])
 
   // 标题投影：按会话缓存；标题晚到触发一次 metadata-only 重传。
   useEffect(() => {

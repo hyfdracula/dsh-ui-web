@@ -864,12 +864,14 @@ window.__ModuleLoader__.load({
 				switched: false
 			};
 			const total = snapshot.input + snapshot.output + snapshot.cache + snapshot.cacheWrite;
+			const steps = snapshot.steps;
 			const switched = memory.lastSid !== void 0 && memory.lastSid !== sessionId;
 			const staleFlush = switched ? memory.lastSeen : null;
 			if (switched || memory.lastTotal === -1) return {
 				next: {
 					lastSid: sessionId,
 					lastTotal: total,
+					lastSteps: steps !== void 0 ? steps : -1,
 					lastSeen: snapshot
 				},
 				action: "reset",
@@ -877,10 +879,12 @@ window.__ModuleLoader__.load({
 				switched
 			};
 			const prev = memory.lastTotal;
-			if (total > prev) return {
+			const stepsGrew = steps !== void 0 && memory.lastSteps !== -1 && steps > memory.lastSteps;
+			if (total > prev || stepsGrew) return {
 				next: {
 					lastSid: sessionId,
 					lastTotal: total,
+					lastSteps: steps !== void 0 ? steps : memory.lastSteps,
 					lastSeen: snapshot
 				},
 				action: "arm-settle",
@@ -891,6 +895,7 @@ window.__ModuleLoader__.load({
 				next: {
 					lastSid: sessionId,
 					lastTotal: total,
+					lastSteps: steps !== void 0 ? steps : memory.lastSteps,
 					lastSeen: snapshot
 				},
 				action: "reset",
@@ -1032,9 +1037,11 @@ window.__ModuleLoader__.load({
 		const UsageRecorder = (0, react.memo)(function UsageRecorder(props) {
 			const session = props.useSession((s) => ({ sessionId: s.sessionId }));
 			const usage = props.useProjection("tokenUsage");
+			const stats = props.useProjection("sessionStats");
 			const title = props.useProjection("title");
 			const lastTotalRef = (0, react.useRef)(-1);
 			const lastSidRef = (0, react.useRef)(void 0);
+			const lastStepsRef = (0, react.useRef)(-1);
 			const lastSeenRef = (0, react.useRef)(null);
 			const settleTimerRef = (0, react.useRef)(null);
 			const titleCacheRef = (0, react.useRef)({});
@@ -1042,11 +1049,13 @@ window.__ModuleLoader__.load({
 			const memoryRefs = () => ({
 				lastSid: lastSidRef.current,
 				lastTotal: lastTotalRef.current,
+				lastSteps: lastStepsRef.current,
 				lastSeen: lastSeenRef.current
 			});
 			const syncMemory = (memory) => {
 				lastSidRef.current = memory.lastSid;
 				lastTotalRef.current = memory.lastTotal;
+				lastStepsRef.current = memory.lastSteps;
 				lastSeenRef.current = memory.lastSeen;
 			};
 			const upload = (snap, opts) => {
@@ -1060,6 +1069,7 @@ window.__ModuleLoader__.load({
 					outputTokens: snap.output,
 					cacheReadTokens: snap.cache,
 					cacheWriteTokens: snap.cacheWrite,
+					...snap.steps !== void 0 ? { steps: snap.steps } : {},
 					reset: opts.reset === true
 				}, opts.keepalive === true);
 			};
@@ -1091,7 +1101,8 @@ window.__ModuleLoader__.load({
 					input: usage.uncachedInputTokens,
 					output: usage.outputTokens,
 					cache: usage.cacheReadTokens,
-					cacheWrite: usage.cacheWriteTokens
+					cacheWrite: usage.cacheWriteTokens,
+					...stats?.steps !== void 0 ? { steps: stats.steps } : {}
 				};
 				const decision = decideRecorderStep(memoryRefs(), sid, snapshot);
 				if (decision.staleFlush !== null) uploadWithModel(decision.staleFlush, { reset: false });
@@ -1113,7 +1124,11 @@ window.__ModuleLoader__.load({
 					if (settleTimerRef.current !== null) window.clearTimeout(settleTimerRef.current);
 					settleTimerRef.current = window.setTimeout(flush, SETTLE_MS);
 				}
-			}, [session.sessionId, usage]);
+			}, [
+				session.sessionId,
+				usage,
+				stats
+			]);
 			(0, react.useEffect)(() => {
 				const sid = session.sessionId;
 				const next = typeof title === "string" ? title : "";
