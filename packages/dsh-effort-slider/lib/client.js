@@ -501,7 +501,7 @@ window.__ModuleLoader__.load({
 		//#region src/client/EffortTrigger.tsx
 		/**
 		* EffortTrigger —— 独立档位入口。挂在 `conversation.input.right` 列表座位
-		* （模型选择器右边、发送按钮前），不再触碰官方菜单 DOM。
+		* （视觉上紧贴模型选择器、在其左侧），不再触碰官方菜单 DOM。
 		*
 		* 触发器显示当前推理档位名，点击弹出浮动卡片形态的 EffortPanel（复用
 		* 原有滑块 UI）。当前模型不提供多档推理时整个触发器自动退场。
@@ -696,7 +696,7 @@ window.__ModuleLoader__.load({
 		/** 需要的客户端服务：slots（插槽注册）、connection（模型目录读写）。 */
 		const inject = ["slots", "connection"];
 		/**
-		* 在 composer 工具条右侧注册档位触发器。
+		* 在 composer 工具条注册档位触发器，紧贴模型选择器（视觉上在模型按钮左侧）。
 		* @param ctx - 宿主上下文（slots/connection 服务）。
 		*/
 		function apply(ctx) {
