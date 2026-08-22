@@ -1,0 +1,588 @@
+diff --git a/packages/client/connection/src/client/fixture.ts b/packages/client/connection/src/client/fixture.ts
+index cfcae2eb1f..eb137febcb 100644
+--- a/packages/client/connection/src/client/fixture.ts
++++ b/packages/client/connection/src/client/fixture.ts
+@@ -20,7 +20,7 @@ import type {
+   ToolResultMessage,
+   UserMessage,
+ } from '@deepseek-ai/dsh-llm'
+-import type { AttachmentIdType, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
++import type { AttachmentIdType, FileAttachmentRef, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+ import type {
+   SessionEvent,
+   SessionId,
+@@ -1534,7 +1534,7 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
+     session.sessionId,
+     { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
+   ]))
+-  const attachments = new Map<string, { attachment: ImageAttachmentRef; data: string }>([[
++  const attachments = new Map<string, { attachment: ImageAttachmentRef | FileAttachmentRef; data: string }>([[
+     String(FIXTURE_IMAGE_REF.attachmentId),
+     { attachment: FIXTURE_IMAGE_REF, data: FIXTURE_IMAGE_DATA },
+   ]])
+@@ -2508,14 +2508,25 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
+         const userText = content.map(b => (b.type === 'text' ? b.text : '')).join('')
+         const durable: ContentBlock[] = content.map((block) => {
+           if (block.type === 'text') return block
++          const bytes = Math.max(
++            1,
++            Math.floor(block.data.length * 3 / 4)
++            - (block.data.endsWith('==') ? 2 : block.data.endsWith('=') ? 1 : 0),
++          )
++          if (block.type === 'file') {
++            const fileRef: FileAttachmentRef = {
++              attachmentId: `fixture:${randomUuid()}` as AttachmentIdType,
++              mediaType: block.mediaType === '' ? 'application/octet-stream' : block.mediaType,
++              bytes,
++              ...block.name === undefined ? {} : { name: block.name },
++            }
++            attachments.set(String(fileRef.attachmentId), { attachment: fileRef, data: block.data })
++            return { type: 'file', attachment: fileRef }
++          }
+           const attachment: ImageAttachmentRef = {
+             attachmentId: `fixture:${randomUuid()}` as AttachmentIdType,
+             mediaType: block.mediaType,
+-            bytes: Math.max(
+-              1,
+-              Math.floor(block.data.length * 3 / 4)
+-              - (block.data.endsWith('==') ? 2 : block.data.endsWith('=') ? 1 : 0),
+-            ),
++            bytes,
+             width: 160,
+             height: 90,
+             ...block.name === undefined ? {} : { name: block.name },
+diff --git a/packages/client/runtime/src/client/contract/session.ts b/packages/client/runtime/src/client/contract/session.ts
+index e07267d487..086923fb96 100644
+--- a/packages/client/runtime/src/client/contract/session.ts
++++ b/packages/client/runtime/src/client/contract/session.ts
+@@ -7,7 +7,7 @@
+  * must stub); runtime-internal entry points (history staging, wire-frame
+  * dispatch) stay on the class, invisible out here.
+  */
+-import type { AttachmentIdType, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
++import type { AttachmentIdType, FileAttachmentRef, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+ import type {
+   MessageId, PromptContentPart, QueueAction, RpcResult, SessionId,
+ } from '@deepseek-ai/dsh-api-remotes/client'
+@@ -44,13 +44,13 @@ export interface ISession {
+     signal?: AbortSignal,
+   ): Promise<RpcResult<{ accepted: true }>>
+   /**
+-   * Resolve one durable image referenced by this session.
++   * Resolve one durable image or generic file referenced by this session.
+    * @param attachmentId - opaque id found in the folded session log.
+    * @returns the authenticated reference and decoded bytes.
+    */
+   readAttachment(
+     attachmentId: AttachmentIdType,
+-  ): Promise<RpcResult<{ attachment: ImageAttachmentRef; data: Uint8Array }>>
++  ): Promise<RpcResult<{ attachment: ImageAttachmentRef | FileAttachmentRef; data: Uint8Array }>>
+   /**
+    * Apply one edit, remove, or strict steer action to a still-pending queue occurrence.
+    * @param itemId - agent-owned inbox occurrence identity.
+diff --git a/packages/client/runtime/src/client/sessions/session.ts b/packages/client/runtime/src/client/sessions/session.ts
+index 02939cf28f..13e8da95cf 100644
+--- a/packages/client/runtime/src/client/sessions/session.ts
++++ b/packages/client/runtime/src/client/sessions/session.ts
+@@ -1,7 +1,7 @@
+ // Sessions remain resident after creation so they continue consuming mux frames off-screen.
+ 
+ import type { Context } from '@deepseek-ai/cordis'
+-import type { AttachmentIdType, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
++import type { AttachmentIdType, FileAttachmentRef, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+ import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
+ import type {
+   HistoryEntry, IApiClient, MessageId, MuxFrame, PromptContentPart, QueueAction, RpcError,
+@@ -264,13 +264,13 @@ export class Session implements SessionFace {
+   }
+ 
+   /**
+-   * Resolve one image referenced by this session into browser-consumable bytes.
++   * Resolve one image or generic file referenced by this session into browser-consumable bytes.
+    * @param attachmentId - opaque id found in the folded session log.
+    * @returns the authenticated reference and decoded bytes.
+    */
+   async readAttachment(
+     attachmentId: AttachmentIdType,
+-  ): Promise<RpcResult<{ attachment: ImageAttachmentRef; data: Uint8Array }>> {
++  ): Promise<RpcResult<{ attachment: ImageAttachmentRef | FileAttachmentRef; data: Uint8Array }>> {
+     try {
+       const result = (await this.api.sessions.attachment({
+         sessionId: this.sessionId,
+diff --git a/packages/host/apiproxy/src/api-proxy.ts b/packages/host/apiproxy/src/api-proxy.ts
+index e708353c00..4600efd19b 100644
+--- a/packages/host/apiproxy/src/api-proxy.ts
++++ b/packages/host/apiproxy/src/api-proxy.ts
+@@ -13,7 +13,7 @@ import { installModelSelection } from '@deepseek-ai/dsh-agent'
+ import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
+ import type {} from '@deepseek-ai/dsh-agent-presets/types'
+ import { AttachmentError, admitEncodedImages } from '@deepseek-ai/dsh-attachment'
+-import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
++import type { AttachmentStore, FileAttachmentLimits, FileAttachmentRef, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+ import { contentHasImage, createUserMessage, freezeMessage, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+ import { errorChain } from '@deepseek-ai/dsh-llm'
+ import type { ContentBlock, MessageSource } from '@deepseek-ai/dsh-llm'
+@@ -94,7 +94,7 @@ import type { ApprovalOutcome, ApprovalRequestId } from '@deepseek-ai/dsh-user-a
+ // `ctx.get('approval')` without a value dependency on the seam (optional composition).
+ import type {} from '@deepseek-ai/dsh-user-approval'
+ import { approvalResponsePayloadSchema } from './api/approvals.schema.ts'
+-import { imageLimitsProjectionSchema, sessionListMetadataProjectionSchema } from './api/sessions.schema.ts'
++import { fileLimitsProjectionSchema, imageLimitsProjectionSchema, sessionListMetadataProjectionSchema } from './api/sessions.schema.ts'
+ import { questionResponsePayloadSchema } from './api/questions.schema.ts'
+ import type { ClientResponse, RpcError, RpcReceipt, RpcRequest, RpcResponse } from './api/rpc.ts'
+ import { RpcId } from './api/rpc.ts'
+@@ -128,31 +128,91 @@ export const DEFAULT_COLD_BLANK_PROBE_MAX_BYTES = 1024
+ /** Conversation message event types (the pagination counting unit). */
+ const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
+ 
+-/** Validate one prompt as a batch before publishing any durable image object. */
++/** Decode canonical base64 while rejecting non-canonical forms (batch discipline before any write). */
++function decodeFileData(data: string): Uint8Array {
++  const decoded = Buffer.from(data, 'base64')
++  if (data.length === 0 || decoded.toString('base64') !== data) {
++    throw new AttachmentError('File upload is not canonical base64.', 'INVALID_FILE_BASE64')
++  }
++  return new Uint8Array(decoded)
++}
++
++/** Validate and durably commit ordered generic-file prompt parts (admitEncodedImages' file twin). */
++async function admitEncodedFiles(
++  attachments: AttachmentStore,
++  inputs: readonly (PromptContentPart & { type: 'file' })[],
++): Promise<FileAttachmentRef[]> {
++  const limits = attachments.fileLimits as FileAttachmentLimits | undefined
++  if (limits !== undefined) {
++    if (inputs.length > limits.maxFilesPerMessage) {
++      throw new AttachmentError('Prompt exceeds the configured file-count limit.', 'TOO_MANY_FILES')
++    }
++    const totalBytes = inputs.reduce((sum, input) => sum + input.data.length, 0)
++    if (totalBytes > limits.maxMessageFileBytes) {
++      throw new AttachmentError('Prompt exceeds the configured aggregate file-byte limit.', 'FILES_TOO_LARGE')
++    }
++  }
++  const prepared = inputs.map(input => ({
++    input,
++    data: decodeFileData(input.data),
++    mediaType: input.mediaType === '' ? 'application/octet-stream' : input.mediaType,
++  }))
++  // Validate every member before writing any (no partial references on failure).
++  for (const item of prepared) {
++    await attachments.validateFile({
++      data: item.data,
++      mediaType: item.mediaType,
++      ...(item.input.name === undefined ? {} : { name: item.input.name }),
++    })
++  }
++  const refs: FileAttachmentRef[] = []
++  for (const item of prepared) {
++    refs.push(await attachments.saveFile({
++      data: item.data,
++      mediaType: item.mediaType,
++      ...(item.input.name === undefined ? {} : { name: item.input.name }),
++    }))
++  }
++  return refs
++}
++
++/** Validate one prompt as a batch before publishing any durable attachment object. */
+ async function durablePromptContent(ctx: Context, content: readonly PromptContentPart[]): Promise<ContentBlock[]> {
+   if (content.every(part => part.type === 'text')) {
+     return content.map(part => ({ type: 'text', text: part.text }))
+   }
+-  const refs = await admitEncodedImages(ctx.attachments, content.filter(part => part.type === 'image'))
+-  let next = 0
+-  return content.map(part => part.type === 'text'
+-    ? { type: 'text', text: part.text }
+-    // admitEncodedImages returns one reference per image part in order.
+-    : { type: 'image', attachment: refs[next++] as ImageAttachmentRef })
++  const imageRefs = await admitEncodedImages(ctx.attachments, content.filter(part => part.type === 'image'))
++  const fileRefs = await admitEncodedFiles(ctx.attachments, content.filter(part => part.type === 'file'))
++  let nextImage = 0
++  let nextFile = 0
++  return content.map((part) => {
++    if (part.type === 'text') return { type: 'text', text: part.text }
++    if (part.type === 'image') {
++      // admitEncodedImages returns one reference per image part in order.
++      const attachment = imageRefs[nextImage++] as ImageAttachmentRef
++      return { type: 'image', attachment }
++    }
++    const attachment = fileRefs[nextFile++] as FileAttachmentRef
++    return { type: 'file', attachment }
++  })
+ }
+ 
+-/** Search durable content for an image reference, including nested tool results. */
+-function imageBlockIn(content: unknown, match: (ref: ImageAttachmentRef) => boolean): ImageAttachmentRef | undefined {
++/** Search durable content for an image or file reference, including nested tool results. */
++function attachmentBlockIn(
++  content: unknown,
++  match: (ref: ImageAttachmentRef | FileAttachmentRef) => boolean,
++): ImageAttachmentRef | FileAttachmentRef | undefined {
+   if (!Array.isArray(content)) return undefined
+   for (const value of content) {
+     if (typeof value !== 'object' || value === null || Array.isArray(value)) continue
+     const block = value as { type?: unknown; attachment?: unknown; content?: unknown }
+-    if (block.type === 'image' && typeof block.attachment === 'object' && block.attachment !== null) {
+-      const ref = block.attachment as ImageAttachmentRef
++    if ((block.type === 'image' || block.type === 'file')
++      && typeof block.attachment === 'object' && block.attachment !== null) {
++      const ref = block.attachment as ImageAttachmentRef | FileAttachmentRef
+       if (match(ref)) return ref
+     }
+     if (block.type === 'tool-result') {
+-      const nested = imageBlockIn(block.content, match)
++      const nested = attachmentBlockIn(block.content, match)
+       if (nested !== undefined) return nested
+     }
+   }
+@@ -160,27 +220,30 @@ function imageBlockIn(content: unknown, match: (ref: ImageAttachmentRef) => bool
+ }
+ 
+ /** Search every durable event carrier that can own model-visible content. */
+-function imageInEvent(event: SessionEvent, match: (ref: ImageAttachmentRef) => boolean): ImageAttachmentRef | undefined {
++function attachmentInEvent(
++  event: SessionEvent,
++  match: (ref: ImageAttachmentRef | FileAttachmentRef) => boolean,
++): ImageAttachmentRef | FileAttachmentRef | undefined {
+   const data = event.data as {
+     content?: unknown
+     message?: { content?: unknown }
+     inserted?: Array<{ content?: unknown }>
+     chunk?: { type?: unknown; block?: unknown }
+   }
+-  const direct = imageBlockIn(data.content, match)
++  const direct = attachmentBlockIn(data.content, match)
+   if (direct !== undefined) return direct
+   if (data.message !== undefined) {
+-    const wrapped = imageBlockIn(data.message.content, match)
++    const wrapped = attachmentBlockIn(data.message.content, match)
+     if (wrapped !== undefined) return wrapped
+   }
+   if (data.inserted !== undefined) {
+     for (const message of data.inserted) {
+-      const inserted = imageBlockIn(message.content, match)
++      const inserted = attachmentBlockIn(message.content, match)
+       if (inserted !== undefined) return inserted
+     }
+   }
+   if (event.type === 'assistant/chunk' && data.chunk?.type === 'block-end') {
+-    return imageBlockIn([data.chunk.block], match)
++    return attachmentBlockIn([data.chunk.block], match)
+   }
+   return undefined
+ }
+@@ -190,10 +253,13 @@ function messagesHaveImage(messages: readonly { content: readonly ContentBlock[]
+   return messages.some(message => contentHasImage(message.content))
+ }
+ 
+-/** Resolve the first reference matching one opaque id. */
+-function referencedImage(events: readonly SessionEvent[], attachmentId: string): ImageAttachmentRef | undefined {
++/** Resolve the first image or file reference matching one opaque id. */
++function referencedAttachment(
++  events: readonly SessionEvent[],
++  attachmentId: string,
++): ImageAttachmentRef | FileAttachmentRef | undefined {
+   for (const event of events) {
+-    const found = imageInEvent(event, ref => String(ref.attachmentId) === attachmentId)
++    const found = attachmentInEvent(event, ref => String(ref.attachmentId) === attachmentId)
+     if (found !== undefined) return found
+   }
+   return undefined
+@@ -1274,6 +1340,38 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+     })
+   })
+ 
++  // The fileLimits projection unit: the generic-file attachment config this
++  // proxy enforces at prompt admission, constant per host boot (the file twin
++  // of the imageLimits unit above). Clients pre-check file-intake affordances
++  // and label file-quota copy from it, and the same boot-constant fold
++  // discipline applies. It activates only while both seams are composed AND
++  // the composed attachment store can ingest generic files: the stock base
++  // getter throws for stores that do not, so a store without file support
++  // must not blow up every history snapshot — it simply serves the fileLimits
++  // key absent, exactly like the pre-file baseline.
++  ctx.inject(['sessionProjections', 'attachments'], (projectionCtx) => {
++    let fileSupport = false
++    try { void projectionCtx.attachments.fileLimits; fileSupport = true } catch { fileSupport = false }
++    // ctx.get('attachments') 可能是真实例（绕过 inject proxy）
++    let getFileLimits: FileAttachmentLimits | undefined
++    try {
++      const direct = ctx.get('attachments') as { fileLimits?: FileAttachmentLimits }
++      getFileLimits = direct.fileLimits
++    } catch { getFileLimits = undefined }
++    if (!fileSupport && getFileLimits === undefined) return
++    const limitsSource = getFileLimits !== undefined
++      ? () => getFileLimits as FileAttachmentLimits
++      : () => projectionCtx.attachments.fileLimits
++    projectionCtx.sessionProjections.register<'fileLimits', null>({
++      key: 'fileLimits',
++      stateSchema: zod.null(),
++      init: () => null,
++      apply: state => state,
++      wire: { viewSchema: fileLimitsProjectionSchema, view: limitsSource },
++      stateVersion: 1,
++    })
++  })
++
+   /** Project both durable inbox lists, optionally including the splice currently being emitted. */
+   const queueItems = (
+     agent: Agent,
+@@ -2464,16 +2562,19 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+             details: {},
+           })
+         }
+-        const ref = referencedImage(state.events, String(attachmentId))
++        const ref = referencedAttachment(state.events, String(attachmentId))
+         if (ref === undefined) {
+           return err(request, {
+             code: 'attachment-error',
+-            message: 'Image is not referenced by this session.',
++            message: 'Attachment is not referenced by this session.',
+             details: { reason: 'ATTACHMENT_NOT_REFERENCED' },
+           })
+         }
+         try {
+-          const stored = await ctx.attachments.readImage(ref)
++          // Image refs carry raster geometry (width/height); generic files do not.
++          const stored = 'width' in ref
++            ? await ctx.attachments.readImage(ref)
++            : await ctx.attachments.readFile(ref)
+           return ok(request, {
+             attachment: stored.ref,
+             data: Buffer.from(stored.data).toString('base64'),
+@@ -2488,7 +2589,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
+           }
+           return err(request, {
+             code: 'internal',
+-            message: 'Unable to read image attachment.',
++            message: 'Unable to read attachment.',
+             details: {},
+           })
+         }
+diff --git a/packages/host/apiproxy/src/api/sessions.schema.ts b/packages/host/apiproxy/src/api/sessions.schema.ts
+index 930636915c..39e887f85f 100644
+--- a/packages/host/apiproxy/src/api/sessions.schema.ts
++++ b/packages/host/apiproxy/src/api/sessions.schema.ts
+@@ -15,7 +15,7 @@ import type {
+   ModelReasoningEffort, ModelSelection, SessionListMetadata, SessionProjectionsBlock, SessionSearchItem, SessionSummary,
+ } from './sessions.ts'
+ import type { ToolEventView } from './events.ts'
+-import type { AttachmentIdType, ImageAttachmentLimits, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
++import type { AttachmentIdType, FileAttachmentLimits, FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+ import type { WorkspaceId } from './workspace.ts'
+ import {
+   SESSION_SEARCH_RESULT_LIMIT,
+@@ -240,6 +240,16 @@ export const imageLimitsProjectionSchema = z.object({
+   mediaTypes: z.array(z.string()),
+ }) as unknown as z.ZodType<ImageAttachmentLimits>
+ 
++/**
++ * fileLimits projection unit schema (host-side view validation) — the
++ * generic-file twin of {@link imageLimitsProjectionSchema}.
++ */
++export const fileLimitsProjectionSchema = z.object({
++  maxFileBytes: z.number().int().positive(),
++  maxFilesPerMessage: z.number().int().positive(),
++  maxMessageFileBytes: z.number().int().positive(),
++}) as unknown as z.ZodType<FileAttachmentLimits>
++
+ /** session.history response value (projections rides the tail page only). */
+ export const sessionHistoryValueSchema: z.ZodType<Wire<ResponseValue<'session.history'>>> = z.object({
+   events: z.array(historyEntrySchema),
+@@ -288,6 +298,7 @@ export const imageMediaTypeSchema = z.union([
+ export const promptContentPartSchema = z.discriminatedUnion('type', [
+   z.object({ type: z.literal('text'), text: z.string() }),
+   z.object({ type: z.literal('image'), mediaType: imageMediaTypeSchema, data: z.string(), name: z.string().optional() }),
++  z.object({ type: z.literal('file'), mediaType: z.string(), data: z.string(), name: z.string().optional() }),
+ ])
+ 
+ /** session.prompt request payload, including optional browser-local request provenance. */
+@@ -320,15 +331,23 @@ export const imageAttachmentRefSchema = z.object({
+   name: z.string().optional(),
+ }) as unknown as z.ZodType<ImageAttachmentRef>
+ 
++/** Durable generic-file reference returned from the authenticated session lookup. */
++export const fileAttachmentRefSchema = z.object({
++  attachmentId: attachmentIdSchema,
++  mediaType: z.string(),
++  bytes: z.number().int().positive(),
++  name: z.string().optional(),
++}) as unknown as z.ZodType<FileAttachmentRef>
++
+ /** session.attachment request payload. */
+ export const sessionAttachmentRequestSchema = z.object({
+   sessionId: sessionIdSchema,
+   attachmentId: attachmentIdSchema,
+ }) satisfies z.ZodType<Wire<RequestPayload<'session.attachment'>>>
+ 
+-/** session.attachment response value. */
++/** session.attachment response value (image or generic-file reference). */
+ export const sessionAttachmentValueSchema = z.object({
+-  attachment: imageAttachmentRefSchema,
++  attachment: z.union([imageAttachmentRefSchema, fileAttachmentRefSchema]),
+   data: z.string(),
+ }) satisfies z.ZodType<Wire<ResponseValue<'session.attachment'>>>
+ 
+diff --git a/packages/host/apiproxy/src/api/sessions.ts b/packages/host/apiproxy/src/api/sessions.ts
+index 375d842047..1c8b97e115 100644
+--- a/packages/host/apiproxy/src/api/sessions.ts
++++ b/packages/host/apiproxy/src/api/sessions.ts
+@@ -5,7 +5,7 @@
+  */
+ 
+ import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
+-import type { AttachmentIdType, ImageAttachmentLimits, ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
++import type { AttachmentIdType, FileAttachmentLimits, FileAttachmentRef, ImageAttachmentLimits, ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
+ import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
+ import type { SessionEvent, SessionId } from '@deepseek-ai/dsh-session/types'
+ // The pure-type outlet: api/ is browser-importable, and the package root's
+@@ -19,6 +19,7 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
+   interface SessionProjectionStateMap {
+     sessionListMetadata: SessionListMetadata
+     imageLimits: null
++    fileLimits: null
+   }
+   interface SessionProjectionMap {
+     /**
+@@ -36,6 +37,14 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
+      * composed — clients skip the pre-check and let the host answer.
+      */
+     imageLimits: ImageAttachmentLimits
++    /**
++     * The deployment's generic-file-intake limits: the attachments service's
++     * file config as this proxy enforces it at prompt admission, constant per
++     * host boot (the file twin of {@link imageLimits}). Clients pre-check
++     * file count/bytes at intake and show the limits in upload affordances.
++     * Key absence means no attachment file policy is composed.
++     */
++    fileLimits: FileAttachmentLimits
+   }
+ }
+ 
+@@ -87,10 +96,11 @@ export interface SessionProjectionsBlock {
+   values: Partial<SessionProjectionMap>
+ }
+ 
+-/** Browser-submitted prompt content; the host promotes image bytes to durable references. */
++/** Browser-submitted prompt content; the host promotes image/file bytes to durable references. */
+ export type PromptContentPart =
+   | { type: 'text'; text: string }
+   | { type: 'image'; mediaType: ImageMediaType; data: string; name?: string }
++  | { type: 'file'; mediaType: string; data: string; name?: string }
+ 
+ /** Complete model selection for one session. */
+ export interface ModelSelection {
+@@ -367,9 +377,9 @@ export interface SessionsApi {
+   }>):
+   Promise<RpcResponse<{ accepted: true; command?: { kind: 'success'; text?: string } }>>
+ 
+-  /** Reads one durable image after proving that this session's log references its id. */
++  /** Reads one durable image or generic file after proving that this session's log references its id. */
+   attachment(request: RpcRequest<{ sessionId: SessionId; attachmentId: AttachmentIdType }>):
+-  Promise<RpcResponse<{ attachment: ImageAttachmentRef; data: string }>>
++  Promise<RpcResponse<{ attachment: ImageAttachmentRef | FileAttachmentRef; data: string }>>
+ 
+   /**
+    * Edits, removes, or strictly steers one pending queued occurrence on an ordinary session.
+diff --git a/packages/llm/llm-deepseek/src/adapter.ts b/packages/llm/llm-deepseek/src/adapter.ts
+index 638d555b1e..7de649f6d8 100644
+--- a/packages/llm/llm-deepseek/src/adapter.ts
++++ b/packages/llm/llm-deepseek/src/adapter.ts
+@@ -41,9 +41,18 @@ export interface DeepSeekCatalogModel {
+   /** Per-request output cap for this model; omission falls back to the profile's {@link DeepSeekConnectionOptions.maxTokens}. */
+   maxTokens?: number
+   /** Accepted request modalities; omission is text-only. */
+-  inputModalities?: ModelModality[]
++  inputModalities?: DeepSeekModality[]
+ }
+ 
++/**
++ * Modalities the DeepSeek chat-completions endpoint can actually accept.
++ * Narrowed from the harness-wide {@link ModelModality} (which now includes
++ * `file`): the DeepSeek direct-fetch adapter has no generic-file path, so its
++ * catalog must stay text/image-only even though sibling providers may emit
++ * `file` blocks.
++ */
++export type DeepSeekModality = Exclude<ModelModality, 'file'>
++
+ /**
+  * Validated connection facts for one operation. The plugin's
+  * `resolveAdapterOptions` is the one explicit resolve step producing this
+diff --git a/packages/llm/llm-deepseek/src/index.ts b/packages/llm/llm-deepseek/src/index.ts
+index 65b8aa3e3c..5b5f92873c 100644
+--- a/packages/llm/llm-deepseek/src/index.ts
++++ b/packages/llm/llm-deepseek/src/index.ts
+@@ -14,7 +14,7 @@
+ import type { Context } from '@deepseek-ai/cordis'
+ import z from '@deepseek-ai/schemastery'
+ import { assertUsableApiKey, LlmError, resolveRetryPolicy, RetryPolicySchema } from '@deepseek-ai/dsh-llm'
+-import type { ModelModality, RetryPolicyConfig } from '@deepseek-ai/dsh-llm'
++import type { RetryPolicyConfig } from '@deepseek-ai/dsh-llm'
+ import { credentialRef } from '@deepseek-ai/dsh-credentials'
+ import { launchEnvironmentOf, type LaunchEnvironmentSnapshot } from '@deepseek-ai/dsh-launch-environment'
+ import { deepEqualJson, installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+@@ -27,7 +27,7 @@ import {
+   DEFAULT_STREAM_IDLE_TIMEOUT_MS,
+   DeepSeekAdapter,
+ } from './adapter.ts'
+-import type { DeepSeekCatalogModel, DeepSeekConnectionOptions } from './adapter.ts'
++import type { DeepSeekCatalogModel, DeepSeekConnectionOptions, DeepSeekModality } from './adapter.ts'
+ 
+ export {
+   DEFAULT_CONTEXT_WINDOW,
+@@ -59,7 +59,7 @@ const DEFAULT_MODELS: DeepSeekCatalogModel[] = [
+   },
+ ]
+ 
+-const MODEL_MODALITIES = ['text', 'image'] as const satisfies readonly ModelModality[]
++const MODEL_MODALITIES = ['text', 'image'] as const satisfies readonly DeepSeekModality[]
+ 
+ /**
+  * Plugin config, validated by the same-named schemastery schema and doubling
+diff --git a/packages/llm/llm/src/types.ts b/packages/llm/llm/src/types.ts
+index 8c5be187dd..575626e2e5 100644
+--- a/packages/llm/llm/src/types.ts
++++ b/packages/llm/llm/src/types.ts
+@@ -5,7 +5,7 @@
+  */
+ 
+ import type { Branded } from '@deepseek-ai/dsh-brand'
+-import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
++import type { FileAttachmentRef, ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
+ import type { CallId, ProviderRequestId, ReasoningEffortId } from './brand.ts'
+ import type { Message } from './message.ts'
+ 
+@@ -74,6 +74,17 @@ export interface ImageBlock {
+   attachment: ImageAttachmentRef
+ }
+ 
++/**
++ * A durable generic file reference, valid in user or assistant content.
++ * Mirrors {@link ImageBlock} but for non-raster bytes: the attachment service
++ * owns display metadata and the content carries no inline raster geometry.
++ */
++export interface FileBlock {
++  type: 'file'
++  /** Immutable bytes and display metadata owned by the attachment service. */
++  attachment: FileAttachmentRef
++}
++
+ /** A tool invocation requested by the model. */
+ export interface ToolCallBlock {
+   type: 'tool-call'
+@@ -100,6 +111,7 @@ export interface ContentBlockMap {
+   'text': TextBlock
+   'reasoning': ReasoningBlock
+   'image': ImageBlock
++  'file': FileBlock
+   'tool-call': ToolCallBlock
+   'tool-result': ToolResultBlock
+ }
+@@ -152,6 +164,7 @@ export interface LlmProviderInfo {
+ export interface ModelModalityMap {
+   text: 'text'
+   image: 'image'
++  file: 'file'
+ }
+ 
+ /** Any declared provider model modality. */

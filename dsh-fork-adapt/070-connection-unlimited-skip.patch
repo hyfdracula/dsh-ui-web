@@ -1,0 +1,16 @@
+diff --git a/packages/client/connection/src/index.ts b/packages/client/connection/src/index.ts
+index 35084918e8..a81fa94491 100644
+--- a/packages/client/connection/src/index.ts
++++ b/packages/client/connection/src/index.ts
+@@ -32,6 +32,11 @@ const REQUEST_ENVELOPE_HEADROOM_BYTES = 1024 * 1024
+ function assertImageBodyCapacity(ctx: Context, maxRequestBodyBytes: number): void {
+   const attachments = ctx.get('attachments')
+   if (attachments === undefined) return
++  // A deployment-pinned "unlimited" aggregate (the Number.MAX_SAFE_INTEGER
++  // sentinel shared by @deepseek-ai/dsh-attachment-local UNLIMITED_ATTACHMENT)
++  // has no finite bound, so no finite request-body ceiling can cover its 4/3;
++  // the capacity check is meaningful only for finite configured limits.
++  if (attachments.imageLimits.maxMessageImageBytes >= Number.MAX_SAFE_INTEGER) return
+   const requiredImageBodyBytes = Math.ceil(
+     attachments.imageLimits.maxMessageImageBytes * 4 / 3,
+   ) + REQUEST_ENVELOPE_HEADROOM_BYTES

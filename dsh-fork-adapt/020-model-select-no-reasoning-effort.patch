@@ -1,0 +1,484 @@
+diff --git a/packages/client/ui-model-selection/src/client/ModelSelect.tsx b/packages/client/ui-model-selection/src/client/ModelSelect.tsx
+index e53001da89..a243354814 100644
+--- a/packages/client/ui-model-selection/src/client/ModelSelect.tsx
++++ b/packages/client/ui-model-selection/src/client/ModelSelect.tsx
+@@ -1,10 +1,11 @@
+ /**
+  * ModelSelect: the composer's named model seat (`conversation.input.model`).
+- * Two-level selection per figma 496:26454's MenuDropdown: the root menu is
+- * the Model / Effort row pair (label + current value + a right chevron),
+- * each drilling into its own list — the provider-grouped model list over
+- * the shared directory, and the effort levels. The trigger (313:14108's
+- * ToggleButton) shows both: model name + effort in the caption tone.
++ * Opens directly to the provider-grouped model list over the shared
++ * directory; selecting a model still carries the adapter's default reasoning
++ * effort as part of the session selection, but no reasoning-effort UI is
++ * surfaced (per the fork requirement: the model button and its menu must not
++ * show or let the user pick thinking effort).
++ *
+  * Data and submission ride the SAME per-session ModelDirectory as the
+  * /model popup; exact-model reasoning metadata and the selected effort come
+  * from the Host rather than a client-owned vocabulary. A rejected selection
+@@ -16,31 +17,20 @@ import {
+   type KeyboardEvent, type FocusEvent,
+ } from 'react'
+ import clsx from 'clsx'
+-import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
++import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
+ import {
+-  IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
++  IconCheckOutline16, IconChevronDownOutline14,
+   IconWarningOutline16, Toast,
+ } from '@deepseek-ai/dsh-client-ui-primitives'
+ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+ import type { ModelSelectInjected } from './slots.ts'
+ import css from './ModelSelect.module.css'
+ 
+-/** Which pane the dropdown shows: the two-row root or one drilled-in list. */
+-type Pane = 'root' | 'model' | 'effort'
+-
+-/** One dynamic effort row; undefined means preserve the provider default. */
+-interface EffortChoice {
+-  key: string
+-  effort: string | undefined
+-  label: string
+-  description?: string
+-}
+-
+ /**
+  * Render the composer model seat.
+  * @param props - owner share (locked) + injected face (shared directory
+  * store/verbs) + the standard locale seat.
+- * @returns the trigger and, while open, the two-level menu.
++ * @returns the trigger and, while open, the model-list menu.
+  */
+ export function ModelSelect(
+   { locked, available, directory, load, select, t }:
+@@ -51,7 +41,6 @@ export function ModelSelect(
+     () => directory.getSnapshot(),
+   )
+   const [open, setOpen] = useState(false)
+-  const [pane, setPane] = useState<Pane>('root')
+   // The in-menu error strip serves catalog loads (its Retry re-runs the
+   // load); a rejected SELECTION announces through the transient toast
+   // instead, so the strip renders only while the latest failure-capable
+@@ -80,26 +69,6 @@ export function ModelSelect(
+     ? -1
+     : choices.findIndex(c => c.selection.provider === state.current?.provider && c.selection.model === state.current.model)
+   const currentChoice = choices[selectedIndex]
+-  const reasoning = currentChoice?.model.reasoning
+-  const effectiveEffort = state.current?.reasoningEffort ?? reasoning?.defaultEffort
+-  const effortLabel = reasoning === undefined
+-    ? undefined
+-    : effectiveEffort === undefined
+-      ? t('effort.providerDefault')
+-      : reasoning.efforts.find(level => level.id === effectiveEffort)?.name ?? effectiveEffort
+-  const effortChoices = useMemo<readonly EffortChoice[]>(() => reasoning === undefined
+-    ? []
+-    : [
+-      ...reasoning.defaultEffort === undefined
+-        ? [{ key: 'provider-default', effort: undefined, label: t('effort.providerDefault') }]
+-        : [],
+-      ...reasoning.efforts.map((effort: ModelReasoningEffort) => ({
+-        key: `effort:${effort.id}`,
+-        effort: effort.id,
+-        label: effort.name,
+-        ...effort.description === undefined ? {} : { description: effort.description },
+-      })),
+-    ], [reasoning, t])
+   const busy = state.status === 'selecting'
+ 
+   const reload = (): void => {
+@@ -127,14 +96,12 @@ export function ModelSelect(
+   if (!available) return null
+ 
+   const show = (): void => {
+-    setPane('root')
+     setOpen(true)
+     reload()
+   }
+ 
+   const close = (restoreFocus = false): void => {
+     setOpen(false)
+-    setPane('root')
+     if (restoreFocus) queueMicrotask(() => { triggerRef.current?.focus() })
+   }
+ 
+@@ -149,9 +116,7 @@ export function ModelSelect(
+   const onRootKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+     if (event.key === 'Escape' && open) {
+       event.preventDefault()
+-      // Escape backs out of a drilled pane first, then closes.
+-      if (pane !== 'root') setPane('root')
+-      else close(true)
++      close(true)
+       return
+     }
+     if (!open) return
+@@ -187,28 +152,10 @@ export function ModelSelect(
+     void select(selection).then(settleSelection)
+   }
+ 
+-  const chooseEffort = (effort: string | undefined): void => {
+-    if (state.current === null) return
+-    if (effectiveEffort === effort) {
+-      close(true)
+-      return
+-    }
+-    const selection: ModelSelection = {
+-      provider: state.current.provider,
+-      model: state.current.model,
+-      ...effort === undefined ? {} : { reasoningEffort: effort },
+-    }
+-    lastActionRef.current = 'select'
+-    void select(selection).then(settleSelection)
+-  }
+-
+   const modelLabel = currentChoice?.model.name ?? t('trigger.fallback')
+-  const triggerLabel = effortLabel === undefined ? modelLabel : `${modelLabel} · ${effortLabel}`
+   const triggerAria = currentChoice === undefined
+     ? t('trigger.selectAria')
+-    : effortLabel === undefined
+-      ? t('trigger.aria', { model: modelLabel })
+-      : t('trigger.ariaEffort', { model: modelLabel, effort: effortLabel })
++    : t('trigger.aria', { model: modelLabel })
+   itemRefs.current = []
+   let itemIndex = 0
+   const itemRef = () => {
+@@ -226,7 +173,7 @@ export function ModelSelect(
+         aria-haspopup="menu"
+         aria-expanded={open}
+         aria-controls={open ? `${id}-menu` : undefined}
+-        title={triggerLabel}
++        title={modelLabel}
+         disabled={locked}
+         onClick={() => {
+           if (open) {
+@@ -237,7 +184,6 @@ export function ModelSelect(
+         }}
+       >
+         <span className={css.triggerLabel}>{modelLabel}</span>
+-        {effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
+         <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
+       </button>
+ 
+@@ -249,115 +195,59 @@ export function ModelSelect(
+           aria-label={t('menu.aria')}
+           aria-busy={state.status === 'loading' || busy}
+         >
+-          {pane === 'root' && (
+-            <>
+-              <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { setPane('model') }}>
+-                <span className={css.cellLabel}>{t('menu.model')}</span>
+-                <span className={css.cellValue}>{modelLabel}</span>
+-                <IconChevronRightOutline14 className={css.cellChevron} />
+-              </button>
+-              {reasoning !== undefined && (
+-                <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { setPane('effort') }}>
+-                  <span className={css.cellLabel}>{t('menu.effort')}</span>
+-                  <span className={css.cellValue}>{effortLabel}</span>
+-                  <IconChevronRightOutline14 className={css.cellChevron} />
+-                </button>
+-              )}
+-            </>
++          {state.status === 'loading' && (
++            <div className={css.status}>{t('status.loading')}</div>
+           )}
+-
+-          {pane === 'model' && (
+-            <>
+-              {state.status === 'loading' && (
+-                <div className={css.status}>{t('status.loading')}</div>
+-              )}
+-              {state.error !== null && lastActionRef.current === 'load' && (
+-                <div className={css.error}>
+-                  <span>{t('error.action', { message: state.error })}</span>
+-                  <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
+-                </div>
+-              )}
+-              {state.failures.map(failure => (
+-                <div className={css.warning} key={failure.id}>
+-                  <span>{t('warning.groupLoad', { name: failure.name, message: failure.message })}</span>
+-                  <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
+-                </div>
+-              ))}
+-              <div className={clsx(css.groups, 'scrollable')}>
+-                {state.groups.map((group) => {
+-                  const headingId = `${id}-${group.id}`
+-                  return (
+-                    <section role="group" aria-labelledby={headingId} className={css.group} key={group.id}>
+-                      <div className={css.groupTitle} id={headingId}>{group.name}</div>
+-                      {group.models.map((model) => {
+-                        const selected = state.current?.provider === group.id && state.current.model === model.id
+-                        return (
+-                          <button
+-                            ref={itemRef()}
+-                            type="button"
+-                            role="menuitemradio"
+-                            aria-checked={selected}
+-                            className={clsx(css.option, selected && css.selected)}
+-                            key={model.id}
+-                            title={model.name}
+-                            disabled={busy}
+-                            onClick={() => { choose({ provider: group.id, model: model.id }) }}
+-                          >
+-                            <span className={css.optionCopy}>
+-                              <span className={css.modelName}>{model.name}</span>
+-                              {model.description !== undefined && (
+-                                <span className={css.description}>{model.description}</span>
+-                              )}
+-                            </span>
+-                            <span className={css.check}>
+-                              {selected ? <IconCheckOutline16 /> : null}
+-                            </span>
+-                          </button>
+-                        )
+-                      })}
+-                    </section>
+-                  )
+-                })}
+-              </div>
+-              {state.status === 'ready' && choices.length === 0 && (
+-                <div className={css.empty}>{t('empty.models')}</div>
+-              )}
+-            </>
++          {state.error !== null && lastActionRef.current === 'load' && (
++            <div className={css.error}>
++              <span>{t('error.action', { message: state.error })}</span>
++              <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
++            </div>
+           )}
+-
+-          {pane === 'effort' && (
+-            <>
+-              {state.error !== null && lastActionRef.current === 'load' && (
+-                <div className={css.error}>
+-                  <span>{t('error.action', { message: state.error })}</span>
+-                  <button type="button" className={css.retry} onClick={reload}>{t('action.reload')}</button>
+-                </div>
+-              )}
+-              {effortChoices.length === 0
+-                ? <div className={css.empty}>{t('empty.efforts')}</div>
+-                : effortChoices.map(level => (
+-                  <button
+-                    ref={itemRef()}
+-                    type="button"
+-                    role="menuitemradio"
+-                    aria-checked={effectiveEffort === level.effort}
+-                    className={clsx(css.option, effectiveEffort === level.effort && css.selected)}
+-                    key={level.key}
+-                    disabled={busy}
+-                    onClick={() => { chooseEffort(level.effort) }}
+-                  >
+-                    <span className={css.optionCopy}>
+-                      <span className={css.modelName}>{level.label}</span>
+-                      {level.description !== undefined && (
+-                        <span className={css.description}>{level.description}</span>
+-                      )}
+-                    </span>
+-                    <span className={css.check}>
+-                      {effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}
+-                    </span>
+-                  </button>
+-                ))}
+-            </>
++          {state.failures.map(failure => (
++            <div className={css.warning} key={failure.id}>
++              <span>{t('warning.groupLoad', { name: failure.name, message: failure.message })}</span>
++              <button type="button" className={css.retry} onClick={reload}>{t('retry')}</button>
++            </div>
++          ))}
++          <div className={clsx(css.groups, 'scrollable')}>
++            {state.groups.map((group) => {
++              const headingId = `${id}-${group.id}`
++              return (
++                <section role="group" aria-labelledby={headingId} className={css.group} key={group.id}>
++                  <div className={css.groupTitle} id={headingId}>{group.name}</div>
++                  {group.models.map((model) => {
++                    const selected = state.current?.provider === group.id && state.current.model === model.id
++                    return (
++                      <button
++                        ref={itemRef()}
++                        type="button"
++                        role="menuitemradio"
++                        aria-checked={selected}
++                        className={clsx(css.option, selected && css.selected)}
++                        key={model.id}
++                        title={model.name}
++                        disabled={busy}
++                        onClick={() => { choose({ provider: group.id, model: model.id }) }}
++                      >
++                        <span className={css.optionCopy}>
++                          <span className={css.modelName}>{model.name}</span>
++                          {model.description !== undefined && (
++                            <span className={css.description}>{model.description}</span>
++                          )}
++                        </span>
++                        <span className={css.check}>
++                          {selected ? <IconCheckOutline16 /> : null}
++                        </span>
++                      </button>
++                    )
++                  })}
++                </section>
++              )
++            })}
++          </div>
++          {state.status === 'ready' && choices.length === 0 && (
++            <div className={css.empty}>{t('empty.models')}</div>
+           )}
+         </div>
+       )}
+diff --git a/packages/client/ui-model-selection/src/client/locales.ts b/packages/client/ui-model-selection/src/client/locales.ts
+index 2200eee56b..6a9b4d4f29 100644
+--- a/packages/client/ui-model-selection/src/client/locales.ts
++++ b/packages/client/ui-model-selection/src/client/locales.ts
+@@ -16,7 +16,7 @@ export const zh = {
+   'trigger.selectAria': '选择模型',
+   'trigger.aria': '选择模型，当前 {model}',
+   'trigger.ariaEffort': '选择模型，当前 {model}，推理等级 {effort}',
+-  'menu.aria': '模型与推理等级',
++  'menu.aria': '选择模型',
+   'menu.model': '模型',
+   'menu.effort': '推理等级',
+   'effort.providerDefault': 'Default',
+@@ -40,7 +40,7 @@ export const en = {
+   'trigger.selectAria': 'Select model',
+   'trigger.aria': 'Select model, current {model}',
+   'trigger.ariaEffort': 'Select model, current {model}, reasoning effort {effort}',
+-  'menu.aria': 'Model and reasoning effort',
++  'menu.aria': 'Select model',
+   'menu.model': 'Model',
+   'menu.effort': 'Effort',
+   'effort.providerDefault': 'Default',
+diff --git a/packages/client/ui-model-selection/tests/model-select.client.spec.tsx b/packages/client/ui-model-selection/tests/model-select.client.spec.tsx
+index ea9c2f7abb..c85352d7b8 100644
+--- a/packages/client/ui-model-selection/tests/model-select.client.spec.tsx
++++ b/packages/client/ui-model-selection/tests/model-select.client.spec.tsx
+@@ -1,7 +1,6 @@
+ // @vitest-environment jsdom
+ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+ import { afterEach, describe, expect, it, vi } from 'vitest'
+-import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
+ import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+ import type { ComponentProps } from 'react'
+ import type { ModelDirectoryState } from '../src/client/directory.ts'
+@@ -47,69 +46,58 @@ function state(overrides: Partial<ModelDirectoryState> = {}): ModelDirectoryStat
+ 
+ afterEach(cleanup)
+ 
+-describe('ModelSelect reasoning effort', () => {
+-  it('renders adapter metadata and submits the effort as part of the session selection', async () => {
+-    const directory = createSnapshotStore<ModelDirectoryState>(state())
+-    const select = vi.fn(async (selection: ModelSelection) => {
+-      directory.set(state({ current: selection }))
+-      return true
+-    })
++describe('ModelSelect', () => {
++  it('does not surface reasoning effort anywhere: trigger and menu carry no effort', () => {
++    const directory = createSnapshotStore(state())
+     render(<ModelSelect
+       locked={false}
+       available
+       directory={directory}
+       load={vi.fn()}
+-      select={select}
++      select={vi.fn().mockResolvedValue(true)}
+       t={t}
+     />)
+ 
+-    const trigger = screen.getByRole('button', {
+-      name: '选择模型，当前 DeepSeek-V4-Flash，推理等级 High',
+-    })
++    // The trigger names only the current model — no effort annotation.
++    const trigger = screen.getByRole('button', { name: '选择模型，当前 DeepSeek-V4-Flash' })
++    expect(trigger.textContent).not.toContain('High')
++    expect(trigger.textContent).not.toContain('推理等级')
++
+     fireEvent.click(trigger)
+-    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
++    // Opening goes straight to the model list with no effort row or pane.
++    expect(screen.queryByRole('menuitem', { name: /推理等级/ })).toBeNull()
++    expect(screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })).toBeTruthy()
+     expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
+-      .toEqual(['Off', 'High', 'MaxLargest budget'])
+-
+-    fireEvent.click(screen.getByRole('menuitemradio', { name: /Max/ }))
+-    await waitFor(() => {
+-      expect(select).toHaveBeenCalledWith({
+-        provider: 'deepseek-official',
+-        model: 'deepseek-v4-flash',
+-        reasoningEffort: 'max',
+-      })
+-      expect(trigger.getAttribute('aria-label')).toBe('选择模型，当前 DeepSeek-V4-Flash，推理等级 Max')
+-    })
++      .toEqual(['DeepSeek-V4-Flash'])
+   })
+ 
+-  it('offers provider default only when the adapter does not configure a model default', () => {
+-    const directory = createSnapshotStore(state({
+-      groups: [{
+-        id: 'provider',
+-        name: 'Provider',
+-        models: [{
+-          id: 'model',
+-          name: 'Model',
+-          reasoning: { efforts: [{ id: 'standard', name: 'Standard' }] },
+-        }],
+-      }],
+-      current: { provider: 'provider', model: 'model' },
++  it('submits the provider/model selection when picking a model, without any effort payload', async () => {
++    const models = [
++      { id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', reasoning },
++      { id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro', reasoning },
++    ]
++    const directory = createSnapshotStore<ModelDirectoryState>(state({
++      groups: [{ id: 'deepseek-official', name: 'DeepSeek', models }],
+     }))
++    const select = vi.fn().mockResolvedValue(true)
+     render(<ModelSelect
+       locked={false}
+       available
+       directory={directory}
+       load={vi.fn()}
+-      select={vi.fn().mockResolvedValue(true)}
++      select={select}
+       t={t}
+     />)
+ 
+-    fireEvent.click(screen.getByRole('button', {
+-      name: '选择模型，当前 Model，推理等级 Default',
+-    }))
+-    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
+-    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
+-      .toEqual(['Default', 'Standard'])
++    fireEvent.click(screen.getByRole('button', { name: /当前 DeepSeek-V4-Flash/ }))
++    // Straight to the model list.
++    fireEvent.click(screen.getByRole('menuitemradio', { name: /DeepSeek-V4-Pro/ }))
++    await waitFor(() => {
++      expect(select).toHaveBeenCalledWith({
++        provider: 'deepseek-official',
++        model: 'deepseek-v4-pro',
++      })
++    })
+   })
+ 
+   it('prompts for a selection when the current model is no longer advertised', () => {
+@@ -129,8 +117,8 @@ describe('ModelSelect reasoning effort', () => {
+     const trigger = screen.getByRole('button', { name: '选择模型' })
+     expect(trigger.textContent).toContain('选择模型')
+     fireEvent.click(trigger)
++    // No effort row; the menu is the model list directly.
+     expect(screen.queryByRole('menuitem', { name: /推理等级/ })).toBeNull()
+-    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+     expect(screen.queryByText('removed-model')).toBeNull()
+     expect(screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })).toBeTruthy()
+   })
+@@ -159,7 +147,6 @@ describe('ModelSelect reasoning effort', () => {
+     />)
+ 
+     fireEvent.click(screen.getByRole('button', { name: /选择模型|当前/ }))
+-    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+     fireEvent.click(screen.getByRole('menuitemradio', { name: /DeepSeek-V4-Pro/ }))
+     const toast = await screen.findByRole('alert')
+     expect(toast.textContent).toContain('模型操作失败：model-unavailable: session already contains images')

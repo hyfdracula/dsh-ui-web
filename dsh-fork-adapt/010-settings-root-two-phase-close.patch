@@ -1,0 +1,145 @@
+diff --git a/packages/client/ui-settings-general/src/client/SettingsRoot.module.css b/packages/client/ui-settings-general/src/client/SettingsRoot.module.css
+index 03e0f6372c..5361b30e48 100644
+--- a/packages/client/ui-settings-general/src/client/SettingsRoot.module.css
++++ b/packages/client/ui-settings-general/src/client/SettingsRoot.module.css
+@@ -1,19 +1,19 @@
+ /* Settings shell (figma 501:29904 mask context / 501:29947 panel): sidebar
+    foot trigger row + centered 1080x700 modal panel. The trigger uses the
+-   sidebar foot's 42px row / 36px rail circle rhythm; the
++   sidebar's 34px compact row / 36px rail circle rhythm; the
+    panel is a two-column layout — 188px nav rail + content column with a
+    54px header and the 24px-padded options area. */
+ 
+-/* Trigger row: the 42px foot-row box shared with the Cordis footer action. */
++/* Trigger row: match the other wide sidebar controls' compact vertical rhythm. */
+ .trigger {
+   flex: none;
+   display: flex;
+   align-items: center;
+   gap: 8px;
+-  width: calc(100% + 4px);
+-  height: 42px;
+-  margin: 4px -2px;
+-  padding: 0 10px 0 8px;
++  width: calc(100% + 8px);
++  height: 34px;
++  margin: 4px -4px 4px;
++  padding: 6px 2px 6px 10px;
+   box-sizing: border-box;
+   border: none;
+   border-radius: 12px;
+@@ -57,6 +57,13 @@
+   justify-content: center;
+ }
+ 
++/* Exit lifecycle: while the overlay carries data-closing, the panel stays
++   mounted for an optional layer-provided exit animation; freeze interaction
++   so a mask re-click or stray nav tap cannot retrigger close mid-flight. */
++.overlay[data-closing] {
++  pointer-events: none;
++}
++
+ .mask {
+   position: absolute;
+   inset: 0;
+diff --git a/packages/client/ui-settings-general/src/client/SettingsRoot.tsx b/packages/client/ui-settings-general/src/client/SettingsRoot.tsx
+index 762747500d..7268279bc6 100644
+--- a/packages/client/ui-settings-general/src/client/SettingsRoot.tsx
++++ b/packages/client/ui-settings-general/src/client/SettingsRoot.tsx
+@@ -33,6 +33,10 @@ type PanelProps = {
+   activeId: string | undefined
+   onSelect: (id: string) => void
+   onClose: () => void
++  /** Two-phase close: the panel stays mounted while an exit animation plays. */
++  closing: boolean
++  /** Called by the panel once the exit beat ends (or immediately when no exit animation is declared). */
++  onClosed: () => void
+ }
+ 
+ /**
+@@ -40,7 +44,7 @@ type PanelProps = {
+  * header button, a mask click, and document-level Escape (mounted only while
+  * open, so the listener lifetime is the panel's).
+  */
+-function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelProps) {
++function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose, closing, onClosed }: PanelProps) {
+   // Entries can unmount underneath the requested id, so the render-time
+   // projection falls back to the first row when the id is gone.
+   const active = rows.find(r => r.id === activeId)?.id ?? rows[0]?.id
+@@ -58,10 +62,37 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
+   const closeButton = useRef<HTMLButtonElement | null>(null)
+   useEffect(() => { closeButton.current?.focus() }, [])
+ 
++  // Exit lifecycle: while closing, the overlay keeps the panel mounted and
++  // carries data-closing so a style layer can play a reverse animation on the
++  // LIVE dialog (no DOM-clone ghost, so scroll position and layout survive).
++  // When nothing declares an exit animation for the dialog (stock UI, reduced
++  // motion) the panel unmounts immediately — the stock close path must not
++  // gain a delay.
++  const overlay = useRef<HTMLDivElement | null>(null)
++  useEffect(() => {
++    if (!closing) return
++    const root = overlay.current
++    const dialog = root?.querySelector<HTMLElement>('[role="dialog"]')
++    if (root === null || root === undefined || dialog === null || dialog === undefined) { onClosed(); return }
++    const animationName = getComputedStyle(dialog).animationName
++    if (animationName === '' || animationName === 'none') { onClosed(); return }
++    const onEnd = (e: AnimationEvent): void => {
++      // Descendant animations bubble; only the dialog's own exit ends the beat.
++      if (e.target === dialog) onClosed()
++    }
++    dialog.addEventListener('animationend', onEnd)
++    // Fallback: a stalled or cancelled animation must not strand the panel.
++    const timer = setTimeout(onClosed, 600)
++    return () => {
++      dialog.removeEventListener('animationend', onEnd)
++      clearTimeout(timer)
++    }
++  }, [closing, onClosed])
++
+   return (
+-    <div className={css.overlay} role="presentation">
++    <div ref={overlay} className={css.overlay} role="presentation" data-closing={closing ? '' : undefined}>
+       <div className={css.mask} aria-hidden="true" onClick={onClose} />
+-      <div className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId}>
++      <div className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId} data-dsh-aqua-settings>
+         <nav className={css.nav}>
+           <div className={css.navTitle} id={titleId}>{renderSlot('settings.header', {})}</div>
+           <div className={css.navList}>
+@@ -104,10 +135,18 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
+ export function SettingsRoot(props: SettingsRootComponentProps) {
+   const { wide, useSections, useOnboardingSteps, useSessions, renderSlot } = props
+   const [open, setOpen] = useState(false)
++  const [closing, setClosing] = useState(false)
+   const [activeId, setActiveId] = useState<string | undefined>(undefined)
+   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
++  // Two-phase close: closing keeps the panel mounted for an optional exit
++  // animation; the section reset rides the real unmount, so mid-exit the
++  // content never snaps back to the first section.
+   const close = useCallback(() => {
++    setClosing(true)
++  }, [])
++  const finishClose = useCallback(() => {
+     setOpen(false)
++    setClosing(false)
+     setActiveId(undefined)
+   }, [])
+   const openSection = useCallback((id: string) => {
+@@ -146,7 +185,7 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
+         className={clsx(css.trigger, !wide && css.rail)}
+         aria-haspopup="dialog"
+         aria-expanded={open}
+-        onClick={() => { setOpen(true) }}
++        onClick={() => { setClosing(false); setOpen(true) }}
+       >
+         {renderSlot('settings.trigger', { wide })}
+       </button>
+@@ -157,6 +196,8 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
+           activeId={activeId}
+           onSelect={setActiveId}
+           onClose={close}
++          closing={closing}
++          onClosed={finishClose}
+         />
+       )}
+       {/* Dialog chrome and `#root` inert ownership live inside each step's

@@ -1,0 +1,113 @@
+diff --git a/packages/client/ui-attachment/tests/message-image.client.spec.tsx b/packages/client/ui-attachment/tests/message-image.client.spec.tsx
+index 62f4887cdd..a3ad0d2137 100644
+--- a/packages/client/ui-attachment/tests/message-image.client.spec.tsx
++++ b/packages/client/ui-attachment/tests/message-image.client.spec.tsx
+@@ -198,6 +198,9 @@ describe('ImageGallery', () => {
+         addImages: vi.fn(() => true),
+         removeImage: vi.fn(),
+         pruneImages: vi.fn(),
++        addFiles: vi.fn(() => true),
++        removeFile: vi.fn(),
++        pruneFiles: vi.fn(),
+         submit: vi.fn(),
+       },
+       images: [{ attachment }],
+diff --git a/packages/client/ui-tool/tests/diff-card.client.spec.tsx b/packages/client/ui-tool/tests/diff-card.client.spec.tsx
+index 6ca46e0243..0bcd14e11c 100644
+--- a/packages/client/ui-tool/tests/diff-card.client.spec.tsx
++++ b/packages/client/ui-tool/tests/diff-card.client.spec.tsx
+@@ -338,6 +338,9 @@ describe('DetailsPanel diff Output section', () => {
+           addImages: () => true,
+           removeImage: () => {},
+           pruneImages: () => {},
++          addFiles: () => true,
++          removeFile: () => {},
++          pruneFiles: () => {},
+           submit: () => {},
+         }}
+         useProjection={(() => undefined)}
+diff --git a/packages/client/ui-tool/tests/read-card.client.spec.tsx b/packages/client/ui-tool/tests/read-card.client.spec.tsx
+index 8ae0b21cfc..5f6d52e8c8 100644
+--- a/packages/client/ui-tool/tests/read-card.client.spec.tsx
++++ b/packages/client/ui-tool/tests/read-card.client.spec.tsx
+@@ -299,6 +299,9 @@ describe('DetailsPanel Output section (read)', () => {
+           addImages: () => true,
+           removeImage: () => {},
+           pruneImages: () => {},
++          addFiles: () => true,
++          removeFile: () => {},
++          pruneFiles: () => {},
+           submit: () => {},
+         }}
+         useProjection={(() => undefined)}
+diff --git a/packages/client/ui-tool/tests/search-card.client.spec.tsx b/packages/client/ui-tool/tests/search-card.client.spec.tsx
+index 24c6d331d2..0b7e8e686d 100644
+--- a/packages/client/ui-tool/tests/search-card.client.spec.tsx
++++ b/packages/client/ui-tool/tests/search-card.client.spec.tsx
+@@ -403,6 +403,9 @@ describe('DetailsPanel Output section (search)', () => {
+           addImages: () => true,
+           removeImage: () => {},
+           pruneImages: () => {},
++          addFiles: () => true,
++          removeFile: () => {},
++          pruneFiles: () => {},
+           submit: () => {},
+         }}
+         useProjection={(() => undefined)}
+diff --git a/packages/client/ui-tool/tests/terminal-card.client.spec.tsx b/packages/client/ui-tool/tests/terminal-card.client.spec.tsx
+index 261e3a4066..04865ec68c 100644
+--- a/packages/client/ui-tool/tests/terminal-card.client.spec.tsx
++++ b/packages/client/ui-tool/tests/terminal-card.client.spec.tsx
+@@ -470,7 +470,7 @@ describe('DetailsPanel Output section', () => {
+         useSessions={bindSnapshotSelector(sessions)}
+         useWorkspaces={bindSnapshotSelector(workspaces)}
+         useInput={(() => { throw new Error('unused') })}
+-        inputActions={{ setDraft: () => {}, addImages: () => true, removeImage: () => {}, pruneImages: () => {}, submit: () => {} }}
++        inputActions={{ setDraft: () => {}, addImages: () => true, removeImage: () => {}, pruneImages: () => {}, addFiles: () => true, removeFile: () => {}, pruneFiles: () => {}, submit: () => {} }}
+         useProjection={(() => undefined)}
+         useStore={bindSnapshotSelector(chat)}
+         actions={chat.actions}
+@@ -656,7 +656,7 @@ describe('DetailsPanel Output section', () => {
+           baselinesReady: true, recentWorkspaceId: undefined,
+         }))}
+         useInput={(() => { throw new Error('unused') })}
+-        inputActions={{ setDraft: () => {}, addImages: () => true, removeImage: () => {}, pruneImages: () => {}, submit: () => {} }}
++        inputActions={{ setDraft: () => {}, addImages: () => true, removeImage: () => {}, pruneImages: () => {}, addFiles: () => true, removeFile: () => {}, pruneFiles: () => {}, submit: () => {} }}
+         useProjection={(() => undefined)}
+         useStore={bindSnapshotSelector(chat)}
+         actions={chat.actions}
+diff --git a/packages/client/ui-tool/tests/web-card.client.spec.tsx b/packages/client/ui-tool/tests/web-card.client.spec.tsx
+index ffcab58353..783e742249 100644
+--- a/packages/client/ui-tool/tests/web-card.client.spec.tsx
++++ b/packages/client/ui-tool/tests/web-card.client.spec.tsx
+@@ -233,6 +233,9 @@ describe('DetailsPanel web Output section', () => {
+           addImages: () => true,
+           removeImage: () => {},
+           pruneImages: () => {},
++          addFiles: () => true,
++          removeFile: () => {},
++          pruneFiles: () => {},
+           submit: () => {},
+         }}
+         useProjection={(() => undefined)}
+diff --git a/packages/client/ui-trajectory/tests/views.client.spec.tsx b/packages/client/ui-trajectory/tests/views.client.spec.tsx
+index 3df145b757..a9fc3e4bc5 100644
+--- a/packages/client/ui-trajectory/tests/views.client.spec.tsx
++++ b/packages/client/ui-trajectory/tests/views.client.spec.tsx
+@@ -228,7 +228,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
+     draft: '', imageIds: [], draftRev: 0, phase: 'plain', occurrences: [], queue: [],
+   })) as never
+   const inputActions = {
+-    setDraft: vi.fn(), addImages: vi.fn(), removeImage: vi.fn(), pruneImages: vi.fn(), submit: vi.fn(),
++    setDraft: vi.fn(), addImages: vi.fn(), removeImage: vi.fn(), pruneImages: vi.fn(), addFiles: vi.fn(() => true), removeFile: vi.fn(), pruneFiles: vi.fn(), submit: vi.fn(),
+   }
+   // Minimal outlet twin: resolve the ring entry by the `only` filter and
+   // render it with the session standard kit (what SlotOutlet does for a
+@@ -290,6 +290,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
+         renderSlot={renderSlot}
+         views={views}
+         releaseSessionImages={vi.fn()}
++        releaseSessionFiles={vi.fn()}
+         useInput={useInput}
+         inputActions={inputActions}
+         bindDraftMirror={() => () => {}}

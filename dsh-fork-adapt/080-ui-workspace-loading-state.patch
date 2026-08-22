@@ -1,0 +1,75 @@
+diff --git a/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx b/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx
+index 08f22ed400..436aabc307 100644
+--- a/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx
++++ b/packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx
+@@ -390,7 +390,10 @@ function SessionTree({
+         role="tree"
+         aria-label={t('section.sessions')}
+       >
+-        {groups.length === 0 && (
++        {list.phase !== 'ready' && (
++          <div className={css.empty}>{t('empty.loading')}</div>
++        )}
++        {list.phase === 'ready' && groups.length === 0 && (
+           <div className={css.empty}>{t('empty.none')}</div>
+         )}
+         {groups.map((group) => {
+@@ -620,7 +623,10 @@ function FlatList({
+   return (
+     <div className={clsx(css.treeBody, css.wide)}>
+       <div className={clsx(css.list, css.flatList)} role="tree" aria-label={t('section.sessions')}>
+-        {rows.length === 0 && (
++        {list.phase !== 'ready' && (
++          <div className={css.empty}>{t('empty.loading')}</div>
++        )}
++        {list.phase === 'ready' && rows.length === 0 && (
+           <div className={css.empty}>{t('empty.none')}</div>
+         )}
+         {rows.map((node) => {
+diff --git a/packages/client/ui-workspace/src/client/locales.ts b/packages/client/ui-workspace/src/client/locales.ts
+index c08fd931de..9d9b936e29 100644
+--- a/packages/client/ui-workspace/src/client/locales.ts
++++ b/packages/client/ui-workspace/src/client/locales.ts
+@@ -20,6 +20,7 @@ export const zh = {
+   'sessions.expand': '展开其余 {n} 个会话',
+   'sessions.collapse': '收起',
+   'empty.none': '暂无会话',
++  'empty.loading': '正在加载会话…',
+   'empty.noMatches': '无匹配结果',
+   'workspace.add': '添加工作区',
+   'search.sessions.aria': '搜索会话',
+@@ -89,6 +90,7 @@ export const en = {
+   'sessions.expand': 'Show {n} more sessions',
+   'sessions.collapse': 'Show less',
+   'empty.none': 'No sessions yet',
++  'empty.loading': 'Loading sessions…',
+   'empty.noMatches': 'No matches',
+   'workspace.add': 'Add workspace',
+   'search.sessions.aria': 'Search sessions',
+diff --git a/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx b/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
+index 820d2bd66b..4cb3143103 100644
+--- a/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
++++ b/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
+@@ -767,6 +767,22 @@ describe('WorkspaceBrowser', () => {
+     }
+   })
+ 
++  it('shows the loading label while pending and 暂无会话 only once ready, in both modes', () => {
++    const pending = sessionState([], { phase: 'pending' })
++    const b = mount({ useSessions: hook(pending) })
++    expect(screen.getByText('正在加载会话…')).toBeTruthy()
++    expect(screen.queryByText('暂无会话')).toBeNull()
++
++    b.store.actions.setGroupBy('flat')
++    expect(screen.getByText('正在加载会话…')).toBeTruthy()
++    expect(screen.queryByText('暂无会话')).toBeNull()
++    rerender(b, {})
++
++    rerender(b, { useSessions: hook(sessionState([])) })
++    expect(screen.getByText('暂无会话')).toBeTruthy()
++    expect(screen.queryByText('正在加载会话…')).toBeNull()
++  })
++
+   it('rail state renders icon controls that request expansion', () => {
+     vi.useFakeTimers()
+     try {

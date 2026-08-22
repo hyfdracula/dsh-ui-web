@@ -1,0 +1,1792 @@
+diff --git a/packages/client/ui-conversation/src/client/apply.ts b/packages/client/ui-conversation/src/client/apply.ts
+index 7920104d68..0a305af132 100644
+--- a/packages/client/ui-conversation/src/client/apply.ts
++++ b/packages/client/ui-conversation/src/client/apply.ts
+@@ -218,8 +218,10 @@ export function apply(ctx: Context): void {
+           const from = inputHub.shell(sessionId)
+           const draft = from.snapshot.draft
+           const imageIds = from.snapshot.imageIds
++          const fileIds = from.snapshot.fileIds
+           const next = inputHub.shell(nextId)
+-          if (imageIds.length === 0 || next.addImages(imageIds)) {
++          if ((imageIds.length === 0 || next.addImages(imageIds))
++            && (fileIds.length === 0 || next.addFiles(fileIds))) {
+             if (draft !== '') {
+               next.setDraft(draft)
+               from.setDraft('')
+@@ -227,6 +229,9 @@ export function apply(ctx: Context): void {
+             if (imageIds.length > 0) {
+               for (const id of imageIds) from.removeImage(id)
+             }
++            if (fileIds.length > 0) {
++              for (const id of fileIds) from.removeFile(id)
++            }
+           }
+         }
+         sessions.open(nextId)
+@@ -248,6 +253,7 @@ export function apply(ctx: Context): void {
+       return {
+         views,
+         releaseSessionImages: (id) => { conversation.releaseSessionImages(id) },
++        releaseSessionFiles: (id) => { conversation.releaseSessionFiles(id) },
+         bindDraftMirror: write => inputHub.shell(sessionId).bindMirror(write),
+       }
+     },
+@@ -295,6 +301,9 @@ export function apply(ctx: Context): void {
+           addImages: undefined,
+           removeImage: undefined,
+           draftImages: undefined,
++          addFiles: undefined,
++          removeFile: undefined,
++          draftFiles: undefined,
+           resolveSubmitMode: (running, gesture, steeringAvailable) =>
+             submissionPolicy.resolve(running, gesture, steeringAvailable),
+           toggleCommandMenu: undefined,
+@@ -329,6 +338,18 @@ export function apply(ctx: Context): void {
+           shell.removeImage(id)
+         },
+         draftImages: ids => conversation.draftImages(ids),
++        addFiles: (files) => {
++          const drafts = conversation.createDraftFiles(files)
++          if (!shell.addFiles(drafts.map(draft => draft.id))) {
++            conversation.releaseDraftFiles(drafts)
++          }
++          return null
++        },
++        removeFile: (id) => {
++          conversation.releaseDraftFile(id)
++          shell.removeFile(id)
++        },
++        draftFiles: ids => conversation.draftFiles(ids),
+         resolveSubmitMode: (running, gesture, steeringAvailable) =>
+           submissionPolicy.resolve(running, gesture, steeringAvailable),
+         toggleCommandMenu: inputTriggers === undefined
+diff --git a/packages/client/ui-conversation/src/client/chat/MessageItem.module.css b/packages/client/ui-conversation/src/client/chat/MessageItem.module.css
+index 54e5f6f98d..786c97b18c 100644
+--- a/packages/client/ui-conversation/src/client/chat/MessageItem.module.css
++++ b/packages/client/ui-conversation/src/client/chat/MessageItem.module.css
+@@ -289,3 +289,31 @@
+ .refIcon {
+   flex: none;
+ }
++
++/* ---- Generic-file attachment row (durable message) ---- */
++.fileRow {
++  display: flex;
++  align-items: center;
++  gap: 6px;
++  max-width: 100%;
++  padding: 2px 4px;
++  font-size: 13px;
++}
++.fileIcon { flex: none; opacity: 0.8; }
++.fileName { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++.fileSize { flex: none; font-size: 12px; opacity: 0.7; }
++
++/* ---- Windows absolute path link (user bubble) ---- */
++.pathLink {
++  display: inline;
++  padding: 0;
++  border: none;
++  background: transparent;
++  font: inherit;
++  color: var(--dsw-link, inherit);
++  text-decoration: underline;
++  text-underline-offset: 2px;
++  cursor: pointer;
++}
++.pathLink:hover { text-decoration-thickness: 2px; }
++.pathLink[data-interactive="false"] { cursor: default; color: inherit; }
+diff --git a/packages/client/ui-conversation/src/client/chat/MessageItem.tsx b/packages/client/ui-conversation/src/client/chat/MessageItem.tsx
+index 8a882a70c5..27237af153 100644
+--- a/packages/client/ui-conversation/src/client/chat/MessageItem.tsx
++++ b/packages/client/ui-conversation/src/client/chat/MessageItem.tsx
+@@ -3,13 +3,16 @@
+ // assistant answers), pending steering (copy only), context injection,
+ // compaction marker, retry disclosure, and unknown-surface JSON rows.
+ 
+-import { memo, useEffect, useMemo, useState } from 'react'
++import { Fragment, memo, useEffect, useMemo, useState } from 'react'
+ import type { ReactNode } from 'react'
+ import type {
+   ModelRetryNode, TurnErrorNode, UserMessageNode,
+ } from '@deepseek-ai/dsh-client-runtime/client'
+-import { JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
++import type { FileAttachmentRef } from '@deepseek-ai/dsh-attachment'
++import { IconPaperclipOutline16, JsonBlock, MessageText, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+ import type { ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps } from '../contract/slots.ts'
++import { imageSizeText } from '../image-labels.ts'
++import { splitPathTokens } from '../path-links.ts'
+ import { ReferenceIcon } from '../reference/ReferenceIcon.tsx'
+ import { CompactionItem } from './CompactionItem.tsx'
+ import { ContextInjectionRow } from './ContextInjectionRow.tsx'
+@@ -17,14 +20,17 @@ import { MessageIconActions } from './MessageIconActions.tsx'
+ import css from './MessageItem.module.css'
+ 
+ type UserImage = Extract<UserMessageNode['content'][number], { type: 'image' }>
++type UserFile = Extract<UserMessageNode['content'][number], { type: 'file' }>
+ 
+ function contentParts(content: readonly unknown[]): {
+   text: string
+   images: { attachment: UserImage['attachment'] }[]
++  files: { attachment: FileAttachmentRef }[]
+   rest: unknown[]
+ } {
+   const texts: string[] = []
+   const images: { attachment: UserImage['attachment'] }[] = []
++  const files: { attachment: FileAttachmentRef }[] = []
+   const rest: unknown[] = []
+   for (const block of content) {
+     const b = block as { type?: string; text?: string; attachment?: unknown }
+@@ -32,9 +38,12 @@ function contentParts(content: readonly unknown[]): {
+     else if (b.type === 'image' && b.attachment !== undefined) {
+       images.push({ attachment: (b as UserImage).attachment })
+     }
++    else if (b.type === 'file' && b.attachment !== undefined) {
++      files.push({ attachment: (b as UserFile).attachment })
++    }
+     else rest.push(block)
+   }
+-  return { text: texts.join(''), images, rest }
++  return { text: texts.join(''), images, files, rest }
+ }
+ 
+ function retrySeconds(milliseconds: number): number {
+@@ -153,7 +162,12 @@ function TurnMaxTokensItem({ t }: {
+  * scan as the composer, minus the lexicon: sent tokens were validated at
+  * compose time, so shape alone decorates).
+  */
+-function projectUserText(text: string, sessionLabels: readonly string[]): ReactNode {
++/**
++ * Decorate one plain-text segment with session/chip tokens (the non-path
++ * remainder of a user bubble). Windows absolute paths are extracted before
++ * this runs, so this is chip-only.
++ */
++function projectTextSegment(text: string, sessionLabels: readonly string[], keyPrefix: string | number): ReactNode {
+   const ranges: { start: number; end: number; label: string; kind: 'session' | 'plain' }[] = []
+   for (const rawLabel of [...new Set(sessionLabels)].sort((a, b) => b.length - a.length)) {
+     const label = `@${rawLabel}`
+@@ -181,7 +195,7 @@ function projectUserText(text: string, sessionLabels: readonly string[]): ReactN
+   for (const range of ranges) {
+     if (range.start < cursor) continue
+     const { start: tokenStart, end, label, kind } = range
+-    if (tokenStart > cursor) parts.push(<MessageText key={cursor} text={text.slice(cursor, tokenStart)} />)
++    if (tokenStart > cursor) parts.push(<MessageText key={`${keyPrefix}:${cursor}`} text={text.slice(cursor, tokenStart)} />)
+     const referenceKind = kind === 'session'
+       ? 'session'
+       : label.startsWith('@')
+@@ -194,7 +208,7 @@ function projectUserText(text: string, sessionLabels: readonly string[]): ReactN
+         : label.slice(1).replace(/^"|"$/gu, '').split(/[\\/]/u).filter(Boolean).at(-1) ?? label.slice(1)
+     parts.push(
+       <span
+-        key={tokenStart}
++        key={`${keyPrefix}:${tokenStart}`}
+         className={css.refChip}
+         data-ref-chip={referenceKind ?? 'skill'}
+         title={label}
+@@ -208,13 +222,55 @@ function projectUserText(text: string, sessionLabels: readonly string[]): ReactN
+     cursor = end
+   }
+   if (parts.length === 0) return <MessageText text={text} />
+-  if (cursor < text.length) parts.push(<MessageText key={cursor} text={text.slice(cursor)} />)
++  if (cursor < text.length) parts.push(<MessageText key={`${keyPrefix}:${cursor}`} text={text.slice(cursor)} />)
+   return <>{parts}</>
+ }
+ 
++/**
++ * Display projection of reference forms and Windows absolute paths in a user
++ * bubble. Reference/session tokens decorate as chips; Windows absolute paths
++ * (`C:\...`, `"C:\..."`, `\\share\...`) render as clickable links that open
++ * through the host's native openFile channel when one is supplied. The logged
++ * model text remains the single truth; this is presentation only.
++ */
++function projectUserText(
++  text: string,
++  sessionLabels: readonly string[],
++  options: { openFile?: (path: string) => void; interactive?: boolean } = {},
++): ReactNode {
++  const tokens = splitPathTokens(text)
++  const first = tokens[0]
++  if (tokens.length === 1 && first !== undefined && 'text' in first) {
++    return projectTextSegment(first.text, sessionLabels, 0)
++  }
++  const { openFile, interactive = true } = options
++  return (
++    <>
++      {tokens.map((token, i) => {
++        if (!('path' in token)) return <Fragment key={i}>{projectTextSegment(token.text, sessionLabels, i)}</Fragment>
++        if (openFile === undefined || !interactive) {
++          return <span key={i} className={css.pathLink} data-path-link={token.path} data-interactive="false">{token.path}</span>
++        }
++        return (
++          <button
++            key={i}
++            type="button"
++            className={css.pathLink}
++            data-path-link={token.path}
++            title={token.path}
++            onClick={() => { openFile(token.path) }}
++          >
++            {token.path}
++          </button>
++        )
++      })}
++    </>
++  )
++}
++
+ /** Right-aligned bubble shared by user and steering rows. */
+ function UserStyleBubble({
+-  content, renderMessageImages, actions, pending = false, referenceLabels = [], t,
++  content, renderMessageImages, actions, pending = false, referenceLabels = [], t, openFile,
+ }: {
+   content: readonly unknown[]
+   renderMessageImages: ChatNodeOwnerProps['renderMessageImages']
+@@ -224,17 +280,29 @@ function UserStyleBubble({
+   pending?: boolean
+   /** Exact session mention labels associated by the adjacent recall node. */
+   referenceLabels?: readonly string[]
++  /** Host-native path opener (host.openPath); absent → Windows paths render read-only. */
++  openFile?: ((path: string) => void) | undefined
+   t: ChatViewSlotProps['t']
+ }): ReactNode {
+-  const { text, images, rest } = contentParts(content)
++  const { text, images, files, rest } = contentParts(content)
+   const truncated = (total: number): string => t('json.truncated', { total })
+   const showBubble = text !== '' || rest.length > 0
+   return (
+     <div className={css.userRow} data-pending-steering={pending || undefined} data-time-hover-root>
+       <div className={css.userStack}>
+         {renderMessageImages({ images, align: 'end' })}
++        {files.map(({ attachment }) => (
++          <div key={String(attachment.attachmentId)} className={css.fileRow}>
++            <IconPaperclipOutline16 size={16} className={css.fileIcon} />
++            <span className={css.fileName}>{attachment.name ?? t('file.pending')}</span>
++            <span className={css.fileSize}>{imageSizeText(attachment.bytes)}</span>
++          </div>
++        ))}
+         {showBubble && <div className={css.bubble}>
+-          {projectUserText(text, referenceLabels)}
++          {projectUserText(text, referenceLabels, {
++            ...(openFile === undefined ? {} : { openFile }),
++            interactive: !pending,
++          })}
+           {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
+         </div>}
+         {referenceLabels.length > 0 && (
+@@ -279,13 +347,14 @@ export function PendingSteeringBubble({ content, renderMessageImages, t }: {
+ 
+ /** User and admitted-steering keyed Chat renderer. */
+ export const UserMessageNodeView = memo(function UserMessageNodeView({
+-  node, renderMessageImages, t,
++  node, renderMessageImages, t, openFile,
+ }: ChatNodeViewProps<'user' | 'steering'>) {
+   const data = node.data
+   return (
+     <UserStyleBubble
+       content={data.content}
+       renderMessageImages={renderMessageImages}
++      openFile={openFile}
+       {...data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }}
+       t={t}
+       actions={text => (
+diff --git a/packages/client/ui-conversation/src/client/contract/slots.ts b/packages/client/ui-conversation/src/client/contract/slots.ts
+index 307ac38482..2436b6a5a7 100644
+--- a/packages/client/ui-conversation/src/client/contract/slots.ts
++++ b/packages/client/ui-conversation/src/client/contract/slots.ts
+@@ -23,13 +23,25 @@ import type { ChatNode, ChatNodeKind } from './chat-nodes.ts'
+ import type { CallId, SelectionTarget, ViewTab } from './views.ts'
+ 
+ /** Browser-owned image that has not crossed the durable host boundary. */
+-export interface ComposerAttachment {
++export interface ComposerImageAttachment {
+   kind: 'image'
+   id: DraftAttachmentId
+   file: File
+   previewUrl: string
+ }
+ 
++/** Browser-owned generic file that has not crossed the durable host boundary. */
++export interface ComposerFileAttachment {
++  kind: 'file'
++  id: DraftAttachmentId
++  file: File
++  /** Object URL usable for client-side download while the draft is live. */
++  previewUrl: string
++}
++
++/** Any browser-owned draft attachment. */
++export type ComposerAttachment = ComposerImageAttachment | ComposerFileAttachment
++
+ /** Input state handed to the optional attachment presentation plugin. */
+ export interface ComposerAttachmentsOwnerProps {
+   /** Browser-owned draft images in input order. */
+@@ -494,6 +506,8 @@ export interface ConversationSessionInjected {
+   }
+   /** Release historical image URLs when this rendered session scope unmounts. */
+   releaseSessionImages: (sessionId: SessionId) => void
++  /** Release historical file URLs when this rendered session scope unmounts. */
++  releaseSessionFiles: (sessionId: SessionId) => void
+   /** Bind the input machine's draft persistence mirror to the session store. */
+   bindDraftMirror: (write: (text: string) => void) => () => void
+ }
+@@ -558,7 +572,13 @@ export interface ComposerBarInjected {
+   /** Release one preview and remove its id from session input. */
+   removeImage: ((id: DraftAttachmentId) => void) | undefined
+   /** Resolve ordered input ids to browser-owned draft images. */
+-  draftImages: ((ids: readonly DraftAttachmentId[]) => readonly ComposerAttachment[]) | undefined
++  draftImages: ((ids: readonly DraftAttachmentId[]) => readonly ComposerImageAttachment[]) | undefined
++  /** Create draft files and append file ids to the session input. */
++  addFiles: ((files: readonly File[]) => string | null) | undefined
++  /** Release one draft file and remove its id from session input. */
++  removeFile: ((id: DraftAttachmentId) => void) | undefined
++  /** Resolve ordered input ids to browser-owned draft files. */
++  draftFiles: ((ids: readonly DraftAttachmentId[]) => readonly ComposerFileAttachment[]) | undefined
+   /** Resolve one keyboard submission gesture against the current running state and persisted preference. */
+   resolveSubmitMode: (
+     running: boolean,
+diff --git a/packages/client/ui-conversation/src/client/image-labels.ts b/packages/client/ui-conversation/src/client/image-labels.ts
+index 6d4ee7a130..5d93c71391 100644
+--- a/packages/client/ui-conversation/src/client/image-labels.ts
++++ b/packages/client/ui-conversation/src/client/image-labels.ts
+@@ -1,19 +1,45 @@
+ /** Attachment error and limit copy owned by the conversation input flow. */
+ 
+-import type { ImageAttachmentLimits } from '@deepseek-ai/dsh-attachment'
++import type { FileAttachmentLimits, ImageAttachmentLimits } from '@deepseek-ai/dsh-attachment'
+ import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
+ import type { ConversationKey } from './locales.ts'
+ 
++/**
++ * Sentinel for "no limit" — mirrors attachment-local's UNLIMITED_ATTACHMENT.
++ * The deployment defaults every file/image count and byte quota to this, so a
++ * projected limit equal to it must render as "unlimited" rather than a
++ * gigantic megabyte/count string.
++ */
++export const UNLIMITED_ATTACHMENT = Number.MAX_SAFE_INTEGER
++
++/** True when a projected limit is the deployment's no-limit sentinel. */
++export function isUnlimited(value: number): boolean {
++  return value >= UNLIMITED_ATTACHMENT
++}
++
+ /**
+  * Byte count as user-facing megabytes (`10MB`, `2.5MB`).
+  * @param bytes - the byte count.
+  * @returns the rounded megabyte text.
+  */
+ export function imageSizeText(bytes: number): string {
++  if (isUnlimited(bytes)) return '∞'
+   const mb = bytes / (1024 * 1024)
+   return `${Number.isInteger(mb) ? String(mb) : mb.toFixed(1)}MB`
+ }
+ 
++/**
++ * User-facing representation of one projected limit: the concrete count/size
++ * text, or the localized "unlimited" label when the limit is the sentinel.
++ * @param t - the conversation-namespace translate.
++ * @param value - the projected limit value.
++ * @param concrete - the formatted concrete value (count or size text).
++ * @returns the display text.
++ */
++export function limitText(t: Translate<ConversationKey>, value: number, concrete: string): string {
++  return isUnlimited(value) ? t('attachment.unlimited') : concrete
++}
++
+ /**
+  * Product copy for a host attachment rejection (the `attachment-error`
+  * `details.reason`). User-solvable reasons name the limit and the way out;
+@@ -28,13 +54,14 @@ export function attachmentErrorText(
+   t: Translate<ConversationKey>,
+   reason: string,
+   limits?: ImageAttachmentLimits,
++  fileLimits?: FileAttachmentLimits,
+ ): string {
+   switch (reason) {
+     case 'MODEL_DOES_NOT_SUPPORT_IMAGES': return t('image.modelUnsupported')
+     case 'SUBAGENT_IMAGE_UNSUPPORTED': return t('image.subagentUnsupported')
+     case 'IMAGE_TOO_MANY_PIXELS': return t('image.tooManyPixels')
+     case 'IMAGE_DIMENSION_TOO_LARGE':
+-      if (limits !== undefined) return t('image.dimensionTooLarge', { size: limits.maxImageDimension })
++      if (limits !== undefined) return t('image.dimensionTooLarge', { size: String(limits.maxImageDimension) })
+       break
+     // Undecodable bytes or a declared type its bytes contradict: solvable by
+     // replacing or re-exporting the file, so it reads as a format problem.
+@@ -42,13 +69,38 @@ export function attachmentErrorText(
+     case 'IMAGE_TYPE_MISMATCH':
+       return t('image.unsupportedType')
+     case 'TOO_MANY_IMAGES':
+-      if (limits !== undefined) return t('image.tooMany', { count: limits.maxImagesPerMessage })
++      if (limits !== undefined) {
++        return t('image.tooMany', { count: limitText(t, limits.maxImagesPerMessage, String(limits.maxImagesPerMessage)) })
++      }
+       break
+     case 'IMAGE_TOO_LARGE':
+-      if (limits !== undefined) return t('image.fileTooLarge', { size: imageSizeText(limits.maxImageBytes) })
++      if (limits !== undefined) {
++        return t('image.fileTooLarge', { size: limitText(t, limits.maxImageBytes, imageSizeText(limits.maxImageBytes)) })
++      }
+       break
+     case 'IMAGES_TOO_LARGE':
+-      if (limits !== undefined) return t('image.totalTooLarge', { size: imageSizeText(limits.maxMessageImageBytes) })
++      if (limits !== undefined) {
++        return t('image.totalTooLarge', { size: limitText(t, limits.maxMessageImageBytes, imageSizeText(limits.maxMessageImageBytes)) })
++      }
++      break
++    // Generic-file admission failures (the `file` prompt channel).
++    case 'INVALID_FILE':
++    case 'INVALID_FILE_BASE64':
++      return t('file.unsupportedType')
++    case 'TOO_MANY_FILES':
++      if (fileLimits !== undefined) {
++        return t('file.tooMany', { count: limitText(t, fileLimits.maxFilesPerMessage, String(fileLimits.maxFilesPerMessage)) })
++      }
++      break
++    case 'FILE_TOO_LARGE':
++      if (fileLimits !== undefined) {
++        return t('file.fileTooLarge', { size: limitText(t, fileLimits.maxFileBytes, imageSizeText(fileLimits.maxFileBytes)) })
++      }
++      break
++    case 'FILES_TOO_LARGE':
++      if (fileLimits !== undefined) {
++        return t('file.totalTooLarge', { size: limitText(t, fileLimits.maxMessageFileBytes, imageSizeText(fileLimits.maxMessageFileBytes)) })
++      }
+       break
+     default: break
+   }
+diff --git a/packages/client/ui-conversation/src/client/input/contract.ts b/packages/client/ui-conversation/src/client/input/contract.ts
+index b9ace8b863..8b08716edb 100644
+--- a/packages/client/ui-conversation/src/client/input/contract.ts
++++ b/packages/client/ui-conversation/src/client/input/contract.ts
+@@ -39,6 +39,12 @@ export interface SessionInput extends InputTarget {
+   removeImage(id: DraftAttachmentId): void
+   /** Drop ids whose browser-owned objects no longer exist. */
+   pruneImages(ids: readonly DraftAttachmentId[]): void
++  /** Append ordered browser-owned file ids; busy admission phases refuse. */
++  addFiles(ids: readonly DraftAttachmentId[]): boolean
++  /** Remove one browser-owned file id; busy admission phases refuse. */
++  removeFile(id: DraftAttachmentId): void
++  /** Drop file ids whose browser-owned objects no longer exist. */
++  pruneFiles(ids: readonly DraftAttachmentId[]): void
+   /**
+    * THE complexity sink: enter adjudication, submit transaction, and the default sink live inside.
+    * @param mode - delivery intent retained through asynchronous adjudication and serialization.
+@@ -79,6 +85,12 @@ export interface InputActions {
+   removeImage(id: DraftAttachmentId): void
+   /** Drop ids whose browser-owned objects no longer exist. */
+   pruneImages(ids: readonly DraftAttachmentId[]): void
++  /** Append ordered browser-owned file ids; busy admission phases refuse. */
++  addFiles(ids: readonly DraftAttachmentId[]): boolean
++  /** Remove one browser-owned file id; busy admission phases refuse. */
++  removeFile(id: DraftAttachmentId): void
++  /** Drop file ids whose browser-owned objects no longer exist. */
++  pruneFiles(ids: readonly DraftAttachmentId[]): void
+   /** Enter submission (adjudication / claim transaction / default sink inside). */
+   submit(): void
+ }
+@@ -214,6 +226,8 @@ export interface InputState {
+   readonly draft: string
+   /** Ordered runtime-only image ids; bytes and URLs stay in ConversationController. */
+   readonly imageIds: readonly DraftAttachmentId[]
++  /** Ordered runtime-only file ids; bytes and URLs stay in ConversationController. */
++  readonly fileIds: readonly DraftAttachmentId[]
+   /** Monotonic draft revision (span CAS compares against this). */
+   readonly draftRev: number
+   readonly phase: 'plain' | 'adjudicating' | 'claimed' | 'submitting'
+diff --git a/packages/client/ui-conversation/src/client/input/facade.ts b/packages/client/ui-conversation/src/client/input/facade.ts
+index cc42d0c1ad..1fe408bc19 100644
+--- a/packages/client/ui-conversation/src/client/input/facade.ts
++++ b/packages/client/ui-conversation/src/client/input/facade.ts
+@@ -48,6 +48,7 @@ export interface SessionInputDeps {
+   defaultSink(
+     text: string,
+     imageIds: readonly DraftAttachmentId[],
++    fileIds: readonly DraftAttachmentId[],
+     mode: InputSubmitMode,
+     signal: AbortSignal,
+   ): Promise<SubmitOutcome>
+@@ -60,6 +61,11 @@ export interface SessionInputDeps {
+     /** Localized composer notice for a claimed command that does not accept images. */
+     unsupportedNotice(token: string): string
+   }
++  /** Command-plane file plumbing; commands cannot carry generic files in this increment, so the face is a refusal notice. */
++  commandFiles: {
++    /** Localized composer notice for a claimed command that cannot accept generic-file attachments. */
++    unsupportedNotice(token: string): string
++  }
+ }
+ 
+ /** Guard tier from the machine phase. */
+@@ -91,6 +97,9 @@ export class SessionInputShell implements SessionInput {
+     addImages: ids => this.addImages(ids),
+     removeImage: (id) => { this.removeImage(id) },
+     pruneImages: (ids) => { this.pruneImages(ids) },
++    addFiles: ids => this.addFiles(ids),
++    removeFile: (id) => { this.removeFile(id) },
++    pruneFiles: (ids) => { this.pruneFiles(ids) },
+     submit: () => { this.submit('queue') },
+   }
+ 
+@@ -100,8 +109,9 @@ export class SessionInputShell implements SessionInput {
+   private noticeSeq = 0
+   private lastMirroredDraft = ''
+   private imageIds: readonly DraftAttachmentId[] = []
+-  /** One image-only send at a time: Enter during the Host round-trip is a no-op. */
+-  private imageSendInFlight = false
++  private fileIds: readonly DraftAttachmentId[] = []
++  /** One image/file-only send at a time: Enter during the Host round-trip is a no-op. */
++  private attachmentSendInFlight = false
+   private disposed = false
+   /** Draft persistence mirror (chat store write; receives the clipboard projection, never display-only ranges). */
+   private mirrorFn: ((text: string) => void) | undefined
+@@ -157,15 +167,52 @@ export class SessionInputShell implements SessionInput {
+     this.publish()
+   }
+ 
++  /** Append ordered file ids unless an admission transaction is locked. */
++  addFiles(ids: readonly DraftAttachmentId[]): boolean {
++    if (this.snapshot.phase === 'adjudicating' || this.snapshot.phase === 'submitting') return false
++    if (ids.length === 0) return true
++    this.fileIds = [...this.fileIds, ...ids]
++    this.publish()
++    return true
++  }
++
++  /**
++   * Remove one file id from this draft. Busy admission phases refuse, like
++   * {@link addFiles}: a removal landing while a submit serializes would
++   * otherwise vanish from the rail yet still ride the in-flight send.
++   */
++  removeFile(id: DraftAttachmentId): void {
++    if (this.snapshot.phase === 'adjudicating' || this.snapshot.phase === 'submitting') return
++    const next = this.fileIds.filter(candidate => candidate !== id)
++    if (next.length === this.fileIds.length) return
++    this.fileIds = next
++    this.publish()
++  }
++
++  /**
++   * Keep only file ids that still resolve in the browser attachment registry.
++   * @param available - live registry ids.
++   */
++  pruneFiles(available: readonly DraftAttachmentId[]): void {
++    const keep = new Set(available)
++    const next = this.fileIds.filter(id => keep.has(id))
++    if (next.length === this.fileIds.length) return
++    this.fileIds = next
++    this.publish()
++  }
++
+   /**
+    * Clear the draft as a successful-send commit: no undo unit is recorded and
+    * the undo history is cut, so Ctrl/Cmd-Z cannot resurrect sent content
+    * (the command path gets the same discipline from submit-settled success).
+    * @param imageIds - admitted image ids to remove from this draft.
++   * @param fileIds - admitted file ids to remove from this draft.
+    */
+-  commitSend(imageIds: readonly DraftAttachmentId[]): void {
+-    const submitted = new Set(imageIds)
+-    this.imageIds = this.imageIds.filter(id => !submitted.has(id))
++  commitSend(imageIds: readonly DraftAttachmentId[], fileIds: readonly DraftAttachmentId[]): void {
++    const submittedImages = new Set(imageIds)
++    const submittedFiles = new Set(fileIds)
++    this.imageIds = this.imageIds.filter(id => !submittedImages.has(id))
++    this.fileIds = this.fileIds.filter(id => !submittedFiles.has(id))
+     this.run(this.core.dispatch({ type: 'send-committed' }))
+   }
+ 
+@@ -207,17 +254,20 @@ export class SessionInputShell implements SessionInput {
+    * dismisses and the menu tracks frozen.
+    */
+   submit(mode: InputSubmitMode = 'queue'): void {
+-    if (this.snapshot.draft.trim() === '' && this.imageIds.length > 0) {
+-      if (this.snapshot.phase === 'plain' && !this.imageSendInFlight) {
++    const hasImages = this.imageIds.length > 0
++    const hasFiles = this.fileIds.length > 0
++    if (this.snapshot.draft.trim() === '' && (hasImages || hasFiles)) {
++      if (this.snapshot.phase === 'plain' && !this.attachmentSendInFlight) {
+         const imageIds = [...this.imageIds]
+-        this.imageSendInFlight = true
+-        void this.deps.defaultSink('', imageIds, mode, new AbortController().signal).then((outcome) => {
+-          this.imageSendInFlight = false
++        const fileIds = [...this.fileIds]
++        this.attachmentSendInFlight = true
++        void this.deps.defaultSink('', imageIds, fileIds, mode, new AbortController().signal).then((outcome) => {
++          this.attachmentSendInFlight = false
+           if (this.disposed) return
+-          if (outcome.kind === 'success') this.commitSend(imageIds)
++          if (outcome.kind === 'success') this.commitSend(imageIds, fileIds)
+           else if (outcome.text !== undefined) this.notify('error', outcome.text)
+         }, (error: unknown) => {
+-          this.imageSendInFlight = false
++          this.attachmentSendInFlight = false
+           if (!this.disposed) this.notify('error', error instanceof Error ? error.message : String(error))
+         })
+       }
+@@ -226,11 +276,19 @@ export class SessionInputShell implements SessionInput {
+     // Claimed pre-gate: a claim that does not declare image acceptance never
+     // submits while images are attached — one notice, everything retained.
+     // Enter-time adjudication applies the same policy for unclaimed lines
+-    // inside the command source itself.
++    // inside the command source itself. Generic files never ride a command in
++    // this increment, so a file-bearing command is refused with a dedicated
++    // notice (never a silent drop).
+     const before = this.snapshot
+-    if (before.phase === 'claimed' && this.imageIds.length > 0 && before.claim?.images !== true) {
+-      this.notify('error', this.deps.commandImages.unsupportedNotice(before.claim?.token ?? before.draft))
+-      return
++    if (before.phase === 'claimed') {
++      if (hasFiles) {
++        this.notify('error', this.deps.commandFiles.unsupportedNotice(before.claim?.token ?? before.draft))
++        return
++      }
++      if (hasImages && before.claim?.images !== true) {
++        this.notify('error', this.deps.commandImages.unsupportedNotice(before.claim?.token ?? before.draft))
++        return
++      }
+     }
+     this.run(this.core.dispatch({ type: 'enter', mode }))
+     const phase = this.snapshot.phase
+@@ -455,9 +513,10 @@ export class SessionInputShell implements SessionInput {
+    */
+   private sinkSerialized(attempt: SubmitAttempt, draft: string, mode: InputSubmitMode): void {
+     const imageIds = [...this.imageIds]
++    const fileIds = [...this.fileIds]
+     const occurrences = this.core.state.occurrences
+     if (occurrences.length === 0) {
+-      this.settleSubmit(attempt, this.deps.defaultSink(draft.trim(), imageIds, mode, attempt.signal), imageIds)
++      this.settleSubmit(attempt, this.deps.defaultSink(draft.trim(), imageIds, fileIds, mode, attempt.signal), imageIds, fileIds)
+       return
+     }
+     const inputTriggers = this.deps.inputTriggers?.()
+@@ -481,7 +540,7 @@ export class SessionInputShell implements SessionInput {
+           cursor = part.offset + part.length
+         }
+         out += draft.slice(cursor)
+-        this.settleSubmit(attempt, this.deps.defaultSink(out.trim(), imageIds, mode, attempt.signal), imageIds)
++        this.settleSubmit(attempt, this.deps.defaultSink(out.trim(), imageIds, fileIds, mode, attempt.signal), imageIds, fileIds)
+       },
+       (error: unknown) => {
+         controller.abort()
+@@ -492,18 +551,21 @@ export class SessionInputShell implements SessionInput {
+     )
+   }
+ 
+-  /** Settle one admission attempt; successful sends consume only their captured images. */
++  /** Settle one admission attempt; successful sends consume only their captured attachments. */
+   private settleSubmit(
+     attempt: SubmitAttempt,
+     pending: Promise<SubmitOutcome>,
+     imageIds: readonly DraftAttachmentId[] = [],
++    fileIds: readonly DraftAttachmentId[] = [],
+   ): void {
+     pending.then(
+       (outcome) => {
+         if (this.dead(attempt)) return
+-        if (outcome.kind === 'success' && imageIds.length > 0) {
+-          const submitted = new Set(imageIds)
+-          this.imageIds = this.imageIds.filter(id => !submitted.has(id))
++        if (outcome.kind === 'success' && (imageIds.length > 0 || fileIds.length > 0)) {
++          const submittedImages = new Set(imageIds)
++          const submittedFiles = new Set(fileIds)
++          this.imageIds = this.imageIds.filter(id => !submittedImages.has(id))
++          this.fileIds = this.fileIds.filter(id => !submittedFiles.has(id))
+         }
+         this.run(this.core.dispatch({
+           type: 'submit-settled',
+@@ -590,7 +652,7 @@ export class SessionInputShell implements SessionInput {
+ 
+   private compose(): InputState {
+     const core = this.core.state
+-    return { ...core, imageIds: this.imageIds, queue: this.deps.queue?.getSnapshot() ?? EMPTY_QUEUE }
++    return { ...core, imageIds: this.imageIds, fileIds: this.fileIds, queue: this.deps.queue?.getSnapshot() ?? EMPTY_QUEUE }
+   }
+ 
+   private publish(): void {
+diff --git a/packages/client/ui-conversation/src/client/input/hub.ts b/packages/client/ui-conversation/src/client/input/hub.ts
+index 7e3b95a314..1fc6b934c4 100644
+--- a/packages/client/ui-conversation/src/client/input/hub.ts
++++ b/packages/client/ui-conversation/src/client/input/hub.ts
+@@ -28,11 +28,13 @@ interface ConversationAttachmentFace {
+     session: SessionFace,
+     text: string,
+     imageIds: readonly DraftAttachmentId[],
++    fileIds: readonly DraftAttachmentId[],
+     mode: InputSubmitMode,
+     signal?: AbortSignal,
+   ): Promise<SubmitOutcome>
+   serializeDraftImages(imageIds: readonly DraftAttachmentId[]): Promise<readonly SubmitImageAttachment[]>
+   releaseDraftImage(id: DraftAttachmentId): void
++  releaseDraftFile(id: DraftAttachmentId): void
+ }
+ 
+ /** Session-addressed input facade registry (SessionInputResolver face + composer-layer extras). */
+@@ -77,7 +79,8 @@ export class InputHub implements SessionInputResolver {
+       inputTriggers: () => this.controller(actx),
+       popup: () => this.popup(actx),
+       queue: queueReadFaceOf(session),
+-      defaultSink: (text, imageIds, mode, signal) => this.sink(session, text, imageIds, mode, signal),
++      defaultSink: (text, imageIds, fileIds, mode, signal) =>
++        this.sink(session, text, imageIds, fileIds, mode, signal),
+       steerQueue: () => { void this.steerQueue(session, shell) },
+       commandImages: {
+         serialize: ids => this.conversation().serializeDraftImages(ids),
+@@ -93,6 +96,11 @@ export class InputHub implements SessionInputResolver {
+           command: token.trim().replace(/^\//u, ''),
+         }),
+       },
++      commandFiles: {
++        unsupportedNotice: token => this.t('command.filesUnsupported', {
++          command: token.trim().replace(/^\//u, ''),
++        }),
++      },
+     })
+     this.shells.set(id, shell)
+     // The one teardown axis: listeners, shell, and map entries all ride the
+@@ -111,10 +119,12 @@ export class InputHub implements SessionInputResolver {
+       return () => {
+         for (const off of offs) off()
+         const drafts = shell.snapshot.imageIds
++        const files = shell.snapshot.fileIds
+         shell.dispose()
+         this.shells.delete(id)
+         const conversation = this.rootCtx.get('conversation') as ConversationAttachmentFace | undefined
+         for (const imageId of drafts) conversation?.releaseDraftImage(imageId)
++        for (const fileId of files) conversation?.releaseDraftFile(fileId)
+       }
+     }, 'conversation.input: session shell')
+     return shell
+@@ -166,11 +176,12 @@ export class InputHub implements SessionInputResolver {
+     session: SessionFace,
+     text: string,
+     imageIds: readonly DraftAttachmentId[],
++    fileIds: readonly DraftAttachmentId[],
+     mode: InputSubmitMode,
+     signal: AbortSignal,
+   ): Promise<SubmitOutcome> {
+-    if (text === '' && imageIds.length === 0) return Promise.resolve({ kind: 'success' })
+-    return this.conversation().sendSession(session, text, imageIds, mode, signal)
++    if (text === '' && imageIds.length === 0 && fileIds.length === 0) return Promise.resolve({ kind: 'success' })
++    return this.conversation().sendSession(session, text, imageIds, fileIds, mode, signal)
+   }
+ 
+   /**
+diff --git a/packages/client/ui-conversation/src/client/input/machine.ts b/packages/client/ui-conversation/src/client/input/machine.ts
+index a1a49004a4..84ed83e706 100644
+--- a/packages/client/ui-conversation/src/client/input/machine.ts
++++ b/packages/client/ui-conversation/src/client/input/machine.ts
+@@ -145,6 +145,7 @@ export class InputMachine {
+     return {
+       draft: this.draft,
+       imageIds: [],
++      fileIds: [],
+       draftRev: this.draftRev,
+       phase: this.phase,
+       ...(c
+diff --git a/packages/client/ui-conversation/src/client/locales.ts b/packages/client/ui-conversation/src/client/locales.ts
+index db4d218d21..cc471cb4d4 100644
+--- a/packages/client/ui-conversation/src/client/locales.ts
++++ b/packages/client/ui-conversation/src/client/locales.ts
+@@ -144,6 +144,15 @@ export const zh = {
+   'command.done': '已完成',
+   'command.title': '命令',
+   'command.imagesUnsupported': '/{command} 不接受图片附件，请先移除图片',
++  'command.filesUnsupported': '/{command} 当前不接受文件附件，请先移除文件',
++  'attachment.unlimited': '无限制',
++  'file.unsupportedType': '无法识别该文件格式，请更换或重新导出',
++  'file.tooMany': '文件数量超出限制（{count}）',
++  'file.fileTooLarge': '单个文件过大（{size}）',
++  'file.totalTooLarge': '文件总量过大（{size}）',
++  'file.pending': '待发送文件',
++  'file.remove': '移除 {name}',
++  'file.download': '下载 {name}',
+   'approval.waiting': '等待审批',
+   'approval.detail.aria': '审批详情',
+   'approval.escalation': '工具 {toolName} 请求越权执行',
+@@ -324,6 +333,15 @@ export const en = {
+   'command.done': 'Completed',
+   'command.title': 'Command',
+   'command.imagesUnsupported': '/{command} does not accept image attachments; remove them first',
++  'command.filesUnsupported': '/{command} does not accept file attachments yet; remove them first',
++  'attachment.unlimited': 'Unlimited',
++  'file.unsupportedType': 'Unrecognized file format; replace or re-export it',
++  'file.tooMany': 'Too many files ({count})',
++  'file.fileTooLarge': 'One file is too large ({size})',
++  'file.totalTooLarge': 'Files are too large in total ({size})',
++  'file.pending': 'Pending file',
++  'file.remove': 'Remove {name}',
++  'file.download': 'Download {name}',
+   'approval.waiting': 'Waiting for approval',
+   'approval.detail.aria': 'Approval details',
+   'approval.escalation': 'Tool {toolName} requests privileged execution',
+diff --git a/packages/client/ui-conversation/src/client/path-links.ts b/packages/client/ui-conversation/src/client/path-links.ts
+new file mode 100644
+index 0000000000..5c53e6f590
+--- /dev/null
++++ b/packages/client/ui-conversation/src/client/path-links.ts
+@@ -0,0 +1,10 @@
++/**
++ * 本地路径链接化：用户气泡里把 Windows 绝对路径渲染成可点击链接。
++ * 逻辑已单源到 @captain1275/dsh-path-links 插件包（dsh-ui-web），此处仅
++ * re-export 保持 ui-conversation 的 import 面不变（MessageItem 等继续
++ * `import { splitPathTokens } from '../path-links.ts'`）。
++ * @module dsh-client-ui-conversation/path-links
++ */
++
++export { splitPathTokens } from '@captain1275/dsh-path-links'
++export type { PathToken } from '@captain1275/dsh-path-links'
+diff --git a/packages/client/ui-conversation/src/client/service.ts b/packages/client/ui-conversation/src/client/service.ts
+index a37816472c..ff21374c97 100644
+--- a/packages/client/ui-conversation/src/client/service.ts
++++ b/packages/client/ui-conversation/src/client/service.ts
+@@ -14,8 +14,8 @@ import type { Context } from '@deepseek-ai/cordis'
+ // method) instead of the standalone helper.
+ import type { ISessions, SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+ import type { SubmitImageAttachment, SubmitOutcome } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+-import type { ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
+-import type { ComposerAttachment } from './contract/slots.ts'
++import type { FileAttachmentRef, ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
++import type { ComposerFileAttachment, ComposerImageAttachment } from './contract/slots.ts'
+ import type { QueueAction, QueueItemId } from './contract/queue.ts'
+ import type { ComposerBlocks } from './input/blocks.ts'
+ import type { DraftAttachmentId, SessionInputResolver } from './input/contract.ts'
+@@ -59,8 +59,8 @@ export interface IConversation {
+   loadOlder(): Promise<void>
+ }
+ 
+-/** Create one browser-only draft descriptor; only its id enters input state. */
+-function browserDraftAttachment(file: File): ComposerAttachment {
++/** Create one browser-only draft image descriptor; only its id enters input state. */
++function browserDraftImage(file: File): ComposerImageAttachment {
+   return {
+     kind: 'image',
+     id: crypto.randomUUID() as DraftAttachmentId,
+@@ -69,6 +69,16 @@ function browserDraftAttachment(file: File): ComposerAttachment {
+   }
+ }
+ 
++/** Create one browser-only draft file descriptor; only its id enters input state. */
++function browserDraftFile(file: File): ComposerFileAttachment {
++  return {
++    kind: 'file',
++    id: crypto.randomUUID() as DraftAttachmentId,
++    previewUrl: URL.createObjectURL(file),
++    file,
++  }
++}
++
+ interface ImageUrlEntry {
+   readonly sessionId: SessionId
+   readonly generation: number
+@@ -94,10 +104,13 @@ export class ConversationController extends Service implements IConversation {
+   readonly input: SessionInputResolver
+   /** The per-session composer-block registry. */
+   readonly blocks: ComposerBlocks
+-  private readonly draftAttachments = new Map<DraftAttachmentId, ComposerAttachment>()
++  private readonly draftAttachments = new Map<DraftAttachmentId, ComposerImageAttachment | ComposerFileAttachment>()
+   private readonly imageUrls = new Map<string, ImageUrlEntry>()
+   private readonly imageGenerations = new Map<SessionId, number>()
+   private readonly createdImageUrls = new Set<string>()
++  private readonly fileUrls = new Map<string, ImageUrlEntry>()
++  private readonly fileGenerations = new Map<SessionId, number>()
++  private readonly createdFileUrls = new Set<string>()
+   private disposed = false
+ 
+   /**
+@@ -115,9 +128,13 @@ export class ConversationController extends Service implements IConversation {
+       this.disposed = true
+       for (const url of this.createdImageUrls) revokePreview(url)
+       this.createdImageUrls.clear()
++      for (const url of this.createdFileUrls) revokePreview(url)
++      this.createdFileUrls.clear()
+       this.draftAttachments.clear()
+       this.imageUrls.clear()
+       this.imageGenerations.clear()
++      this.fileUrls.clear()
++      this.fileGenerations.clear()
+     }, 'conversation attachment URL cache')
+   }
+ 
+@@ -134,10 +151,11 @@ export class ConversationController extends Service implements IConversation {
+   }
+ 
+   /**
+-   * Submit ordered draft images with text through one host admission.
++   * Submit ordered draft images and files with text through one host admission.
+    * @param session - target session.
+    * @param text - serialized prompt text.
+-   * @param imageIds - ordered draft-local attachment ids.
++   * @param imageIds - ordered draft-local image attachment ids.
++   * @param fileIds - ordered draft-local file attachment ids.
+    * @param mode - queue or steer delivery selected by composer policy.
+    * @param signal - optional cancellation for the complete Host admission.
+    * @returns the Host admission outcome; local attachment preparation failures reject.
+@@ -146,18 +164,25 @@ export class ConversationController extends Service implements IConversation {
+     session: SessionFace,
+     text: string,
+     imageIds: readonly DraftAttachmentId[],
++    fileIds: readonly DraftAttachmentId[],
+     mode: InputSubmitMode,
+     signal?: AbortSignal,
+   ): Promise<SubmitOutcome> {
+-    const attachments = this.draftImages(imageIds)
+-    if (attachments.length !== imageIds.length) {
++    const images = this.draftImages(imageIds)
++    if (images.length !== imageIds.length) {
+       throw new Error('conversation.sendSession: one or more draft images are no longer available')
+     }
+-    const uploaded = await this.serializeImages(attachments.map(attachment => attachment.file))
+-    const content = [...uploaded, ...(text === '' ? [] : [{ type: 'text' as const, text }])]
++    const files = this.draftFiles(fileIds)
++    if (files.length !== fileIds.length) {
++      throw new Error('conversation.sendSession: one or more draft files are no longer available')
++    }
++    const uploadedImages = await this.serializeImages(images.map(image => image.file))
++    const uploadedFiles = await this.serializeFiles(files.map(file => file.file))
++    const content = [...uploadedImages, ...uploadedFiles, ...(text === '' ? [] : [{ type: 'text' as const, text }])]
+     const result = await session.prompt(content, mode, signal)
+     if (!result.ok) return { kind: 'error' }
+-    this.releaseDraftImages(attachments)
++    this.releaseDraftImages(images)
++    this.releaseDraftFiles(files)
+     return { kind: 'success' }
+   }
+ 
+@@ -166,26 +191,54 @@ export class ConversationController extends Service implements IConversation {
+    * @param files - browser files to register after MIME validation.
+    * @returns ordered draft descriptors.
+    */
+-  createDraftImages(files: readonly File[]): readonly ComposerAttachment[] {
++  createDraftImages(files: readonly File[]): readonly ComposerImageAttachment[] {
+     for (const file of files) imageMediaType(file.type)
+     return files.map((file) => {
+-      const attachment = browserDraftAttachment(file)
++      const attachment = browserDraftImage(file)
+       this.draftAttachments.set(attachment.id, attachment)
+       this.createdImageUrls.add(attachment.previewUrl)
+       return attachment
+     })
+   }
+ 
++  /**
++   * Create runtime-only draft files and their object URLs.
++   * @param files - browser generic files to register.
++   * @returns ordered draft descriptors.
++   */
++  createDraftFiles(files: readonly File[]): readonly ComposerFileAttachment[] {
++    return files.map((file) => {
++      const attachment = browserDraftFile(file)
++      this.draftAttachments.set(attachment.id, attachment)
++      this.createdFileUrls.add(attachment.previewUrl)
++      return attachment
++    })
++  }
++
+   /**
+    * Resolve ordered input-state ids to runtime-owned draft images.
+    * @param ids - draft attachment ids.
+    * @returns descriptors that remain live, in requested order.
+    */
+-  draftImages(ids: readonly DraftAttachmentId[]): readonly ComposerAttachment[] {
+-    const attachments: ComposerAttachment[] = []
++  draftImages(ids: readonly DraftAttachmentId[]): readonly ComposerImageAttachment[] {
++    const attachments: ComposerImageAttachment[] = []
+     for (const id of ids) {
+       const attachment = this.draftAttachments.get(id)
+-      if (attachment !== undefined) attachments.push(attachment)
++      if (attachment !== undefined && attachment.kind === 'image') attachments.push(attachment)
++    }
++    return attachments
++  }
++
++  /**
++   * Resolve ordered input-state ids to runtime-owned draft files.
++   * @param ids - draft attachment ids.
++   * @returns descriptors that remain live, in requested order.
++   */
++  draftFiles(ids: readonly DraftAttachmentId[]): readonly ComposerFileAttachment[] {
++    const attachments: ComposerFileAttachment[] = []
++    for (const id of ids) {
++      const attachment = this.draftAttachments.get(id)
++      if (attachment !== undefined && attachment.kind === 'file') attachments.push(attachment)
+     }
+     return attachments
+   }
+@@ -211,7 +264,7 @@ export class ConversationController extends Service implements IConversation {
+    */
+   releaseDraftImage(id: DraftAttachmentId): void {
+     const attachment = this.draftAttachments.get(id)
+-    if (attachment === undefined) return
++    if (attachment === undefined || attachment.kind !== 'image') return
+     this.draftAttachments.delete(id)
+     this.createdImageUrls.delete(attachment.previewUrl)
+     revokePreview(attachment.previewUrl)
+@@ -221,10 +274,30 @@ export class ConversationController extends Service implements IConversation {
+    * Release a set of browser-owned draft images.
+    * @param attachments - descriptors to release.
+    */
+-  releaseDraftImages(attachments: readonly ComposerAttachment[]): void {
++  releaseDraftImages(attachments: readonly ComposerImageAttachment[]): void {
+     for (const attachment of attachments) this.releaseDraftImage(attachment.id)
+   }
+ 
++  /**
++   * Release one browser-owned draft file and preview URL.
++   * @param id - draft attachment id.
++   */
++  releaseDraftFile(id: DraftAttachmentId): void {
++    const attachment = this.draftAttachments.get(id)
++    if (attachment === undefined || attachment.kind !== 'file') return
++    this.draftAttachments.delete(id)
++    this.createdFileUrls.delete(attachment.previewUrl)
++    revokePreview(attachment.previewUrl)
++  }
++
++  /**
++   * Release a set of browser-owned draft files.
++   * @param attachments - descriptors to release.
++   */
++  releaseDraftFiles(attachments: readonly ComposerFileAttachment[]): void {
++    for (const attachment of attachments) this.releaseDraftFile(attachment.id)
++  }
++
+   /**
+    * Resolve and cache one session-authorized historical image URL.
+    * @param sessionId - owning session authorization scope.
+@@ -282,6 +355,63 @@ export class ConversationController extends Service implements IConversation {
+     }
+   }
+ 
++  /**
++   * Resolve and cache one session-authorized historical file URL.
++   * @param sessionId - owning session authorization scope.
++   * @param attachment - durable file reference.
++   * @returns browser URL valid until its rendered session is released.
++   */
++  resolveFile(sessionId: SessionId, attachment: FileAttachmentRef): Promise<string> {
++    if (this.disposed) return Promise.reject(new Error('conversation.resolveFile: service is disposed'))
++    const key = `${sessionId}:${attachment.attachmentId}`
++    const cached = this.fileUrls.get(key)
++    if (cached !== undefined) return cached.pending
++    const generation = this.fileGenerations.get(sessionId) ?? 0
++    const session = this.requireSessions().binding(sessionId)?.session
++    if (session === undefined) {
++      return Promise.reject(new Error(`conversation.resolveFile: unknown session "${sessionId}"`))
++    }
++    const pending = session.readAttachment(attachment.attachmentId)
++      .then((result) => {
++        if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`)
++        if (this.disposed) throw new Error('conversation.resolveFile: service was disposed before loading completed')
++        if ((this.fileGenerations.get(sessionId) ?? 0) !== generation) {
++          throw new Error('historical file scope was released before loading completed')
++        }
++        if (typeof URL.createObjectURL !== 'function') {
++          return `data:${result.value.attachment.mediaType};base64,${bytesToBase64(result.value.data)}`
++        }
++        const bytes = Uint8Array.from(result.value.data)
++        const url = URL.createObjectURL(new Blob([bytes.buffer], { type: result.value.attachment.mediaType }))
++        this.createdFileUrls.add(url)
++        return url
++      })
++      .catch((error: unknown) => {
++        if (this.fileUrls.get(key)?.generation === generation) this.fileUrls.delete(key)
++        throw error
++      })
++    this.fileUrls.set(key, { sessionId, generation, pending })
++    return pending
++  }
++
++  /**
++   * Release every historical file URL owned by one rendered session.
++   * @param sessionId - rendered session scope.
++   */
++  releaseSessionFiles(sessionId: SessionId): void {
++    this.fileGenerations.set(sessionId, (this.fileGenerations.get(sessionId) ?? 0) + 1)
++    for (const [key, entry] of this.fileUrls) {
++      if (entry.sessionId !== sessionId) continue
++      this.fileUrls.delete(key)
++      void entry.pending.then((url) => {
++        if (!this.createdFileUrls.delete(url)) return
++        revokePreview(url)
++      }, () => {
++        // A failed or invalidated load owns no object URL.
++      })
++    }
++  }
++
+   /** Apply one operation to a pending queue occurrence. */
+   async updateQueue(itemId: QueueItemId, action: QueueAction): Promise<void> {
+     const session = this.scopedSession('updateQueue')
+@@ -337,6 +467,16 @@ export class ConversationController extends Service implements IConversation {
+     return Promise.all(images.map(async file => ({ type: 'image' as const, ...await this.encodeImage(file) })))
+   }
+ 
++  /** Convert browser generic files to canonical base64 prompt parts. */
++  private serializeFiles(files: readonly File[]): Promise<Parameters<SessionFace['prompt']>[0]> {
++    return Promise.all(files.map(async file => ({
++      type: 'file' as const,
++      mediaType: file.type === '' ? 'application/octet-stream' : file.type,
++      data: bytesToBase64(new Uint8Array(await file.arrayBuffer())),
++      ...(file.name === '' ? {} : { name: file.name }),
++    })))
++  }
++
+   /** Canonical base64 wire form of one browser image file. */
+   private async encodeImage(file: File): Promise<SubmitImageAttachment> {
+     return {
+diff --git a/packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx b/packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx
+index c726bcc753..0741b02efe 100644
+--- a/packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx
++++ b/packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx
+@@ -172,7 +172,7 @@ export function ConversationSessionHeader({
+  */
+ export function ConversationSession({
+   sessionId, useSession, useInput, inputActions, useStore, actions,
+-  renderSlot, views, bindDraftMirror, releaseSessionImages,
++  renderSlot, views, bindDraftMirror, releaseSessionImages, releaseSessionFiles,
+ }: ConversationSessionProps) {
+   useSyncExternalStore(views.subscribe, views.version)
+   const tabs = views.list()
+@@ -195,7 +195,8 @@ export function ConversationSession({
+ 
+   useEffect(() => () => {
+     releaseSessionImages(sessionId)
+-  }, [releaseSessionImages, sessionId])
++    releaseSessionFiles(sessionId)
++  }, [releaseSessionImages, releaseSessionFiles, sessionId])
+ 
+   if (blank && composerPhase === 'blank') return null
+   return (
+diff --git a/packages/client/ui-conversation/src/client/skeleton/InputBar.module.css b/packages/client/ui-conversation/src/client/skeleton/InputBar.module.css
+index e5b85df3e9..5985d12d4f 100644
+--- a/packages/client/ui-conversation/src/client/skeleton/InputBar.module.css
++++ b/packages/client/ui-conversation/src/client/skeleton/InputBar.module.css
+@@ -471,3 +471,51 @@
+   opacity: 0.7;
+   color: var(--dsw-alias-state-error-primary);
+ }
++
++/* ---- Generic-file attachment chips (draft) ---- */
++.fileAttachments {
++  display: flex;
++  flex-direction: column;
++  gap: 6px;
++  padding: 4px 8px;
++}
++.fileAttachment {
++  display: flex;
++  align-items: center;
++  gap: 8px;
++  padding: 6px 8px;
++  border-radius: 8px;
++  background: var(--dsw-canvas-overlay, rgba(127,127,127,0.10));
++  max-width: 100%;
++}
++.fileAttachmentIcon {
++  flex: none;
++  font-size: 14px;
++  line-height: 1;
++}
++.fileAttachmentName {
++  flex: 1 1 auto;
++  min-width: 0;
++  overflow: hidden;
++  text-overflow: ellipsis;
++  white-space: nowrap;
++  font-size: 13px;
++}
++.fileAttachmentSize {
++  flex: none;
++  font-size: 12px;
++  opacity: 0.7;
++}
++.fileAttachmentRemove {
++  flex: none;
++  border: none;
++  background: transparent;
++  cursor: pointer;
++  font-size: 14px;
++  line-height: 1;
++  padding: 2px 6px;
++  border-radius: 6px;
++  color: inherit;
++  opacity: 0.7;
++}
++.fileAttachmentRemove:hover { opacity: 1; background: rgba(127,127,127,0.15); }
+diff --git a/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx b/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx
+index 4e5d526176..97ec383312 100644
+--- a/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx
++++ b/packages/client/ui-conversation/src/client/skeleton/InputBar.tsx
+@@ -78,6 +78,7 @@ export type InputBarProps = ComposerBarProps
+ 
+ export function InputBar({
+   useSession, useInput, inputActions, keyboard, addImages, removeImage, draftImages,
++  addFiles, removeFile, draftFiles,
+   resolveSubmitMode, toggleCommandMenu, stop, command, t,
+   renderSlot, useNotices, useLexicon, useMenuLauncher,
+   useProjection, sessionId, variant, disabled: inert = false, blocked,
+@@ -105,7 +106,11 @@ export function InputBar({
+     () => input === undefined || draftImages === undefined ? [] : draftImages(input.imageIds),
+     [draftImages, input?.imageIds],
+   )
+-  const empty = draft.trim() === '' && attachments.length === 0
++  const fileAttachments = useMemo(
++    () => input === undefined || draftFiles === undefined ? [] : draftFiles(input.fileIds),
++    [draftFiles, input?.fileIds],
++  )
++  const empty = draft.trim() === '' && attachments.length === 0 && fileAttachments.length === 0
+   // Transient error banner (machine notices, image-intake rejections, and
+   // prompt failures): the seq keys the Toast so an identical repeated message
+   // restarts the hold-then-fade cycle instead of reusing the faded one.
+@@ -119,6 +124,9 @@ export function InputBar({
+   // The deployment's image-intake limits (absent while no attachment service
+   // is composed — the pre-check below then defers entirely to the host).
+   const imageLimits = useProjection('imageLimits')
++  // The deployment's generic-file-intake limits (absent while no file policy
++  // is composed — the pre-check below then defers entirely to the host).
++  const fileLimits = useProjection('fileLimits')
+   // Prompt failures are ordinary failures (no create/attach transaction exists
+   // anymore): the toast announces promptError, the draft stays in the machine,
+   // and the user resubmits. A remount over a session whose machine still holds
+@@ -129,9 +137,9 @@ export function InputBar({
+   useEffect(() => {
+     if (promptError === null) return
+     showToast(promptError.error.code === 'attachment-error'
+-      ? attachmentErrorText(t, promptError.error.details.reason, imageLimits)
++      ? attachmentErrorText(t, promptError.error.details.reason, imageLimits, fileLimits)
+       : `${promptError.error.message} (${promptError.error.code})`)
+-  }, [promptError, showToast, t, imageLimits])
++  }, [promptError, showToast, t, imageLimits, fileLimits])
+   useEffect(() => {
+     if (notice?.level === 'error') showToast(notice.text)
+   }, [notice, showToast])
+@@ -189,6 +197,13 @@ export function InputBar({
+     }
+   }, [attachments, input?.imageIds, inputActions])
+ 
++  useEffect(() => {
++    if (input === undefined || inputActions === undefined) return
++    if (fileAttachments.length !== input.fileIds.length) {
++      inputActions.pruneFiles(fileAttachments.map(attachment => attachment.id))
++    }
++  }, [fileAttachments, input?.fileIds, inputActions])
++
+   // A native Safari edit that shortens the draft may leave the previous
+   // soft-wrap layout behind after the mirror shrinks. The native-change signal
+   // keeps ordinary typing and programmatic draft updates from reading layout;
+@@ -483,7 +498,7 @@ export function InputBar({
+       .filter(item => item.kind === 'file')
+       .map(item => item.getAsFile())
+       .filter((file): file is File => file !== null)
+-    if (files.length > 0) intakeImages(files)
++    if (files.length > 0) intakeAttachments(files)
+     const text = e.clipboardData.getData('text/plain')
+     if (text === '') {
+       if (files.length > 0) e.preventDefault()
+@@ -534,7 +549,40 @@ export function InputBar({
+     if (rejected !== null) showToast(rejected)
+   }, [addImages, attachments, imageLimits, showToast, t])
+ 
+-  const canAcceptDrop = !locked && !machineBusy && addImages !== undefined
++  // Generic-file intake pre-check (the file twin of intakeImages): an
++  // addition that would break a projected file limit is refused as a whole
++  // batch and announced immediately.
++  const intakeFiles = useCallback((files: readonly File[]): void => {
++    if (addFiles === undefined || files.length === 0) return
++    const rejected = ((): string | null => {
++      if (fileLimits !== undefined) {
++        if (fileAttachments.length + files.length > fileLimits.maxFilesPerMessage) {
++          return t('file.tooMany', { count: fileLimits.maxFilesPerMessage })
++        }
++        if (files.some(file => file.size > fileLimits.maxFileBytes)) {
++          return t('file.fileTooLarge', { size: imageSizeText(fileLimits.maxFileBytes) })
++        }
++        const total = fileAttachments.reduce((sum, attachment) => sum + attachment.file.size, 0)
++          + files.reduce((sum, file) => sum + file.size, 0)
++        if (total > fileLimits.maxMessageFileBytes) {
++          return t('file.totalTooLarge', { size: imageSizeText(fileLimits.maxMessageFileBytes) })
++        }
++      }
++      return addFiles(files)
++    })()
++    if (rejected !== null) showToast(rejected)
++  }, [addFiles, fileAttachments, fileLimits, showToast, t])
++
++  // Copy-paste / drop file split: image MIME types ride the image rail, every
++  // other file rides the generic-file attachment channel.
++  const intakeAttachments = useCallback((files: readonly File[]): void => {
++    const images = files.filter(file => file.type.startsWith('image/'))
++    const others = files.filter(file => !file.type.startsWith('image/'))
++    if (images.length > 0) intakeImages(images)
++    if (others.length > 0) intakeFiles(others)
++  }, [intakeImages, intakeFiles])
++
++  const canAcceptDrop = !locked && !machineBusy && (addImages !== undefined || addFiles !== undefined)
+ 
+   const onSelect = (e: React.SyntheticEvent<HTMLTextAreaElement>): void => {
+     // Any caret/selection gesture ends a live paste attempt (the machine
+@@ -717,6 +765,27 @@ export function InputBar({
+             size: imageSizeText(imageLimits.maxImageBytes),
+           },
+         })}
++        {fileAttachments.length > 0 && (
++          <div className={css.fileAttachments} role="group" aria-label={t('file.pending')}>
++            {fileAttachments.map(attachment => (
++              <div key={attachment.id} className={css.fileAttachment}>
++                <span className={css.fileAttachmentIcon}>📎</span>
++                <span className={css.fileAttachmentName} title={attachment.file.name}>
++                  {attachment.file.name || t('file.pending')}
++                </span>
++                <span className={css.fileAttachmentSize}>{imageSizeText(attachment.file.size)}</span>
++                <button
++                  type="button"
++                  className={css.fileAttachmentRemove}
++                  aria-label={t('file.remove', { name: attachment.file.name })}
++                  onClick={() => { removeFile?.(attachment.id) }}
++                >
++                  ×
++                </button>
++              </div>
++            ))}
++          </div>
++        )}
+         {/* One scrollport, two text layers. The hidden mirror renders draft+'\n' and stretches the
+             stack to the draft's FULL height (counting rows by '\n' cannot see soft wraps); the
+             absolutely-positioned backdrop and textarea ride that height, and .scroll — capped at 14
+diff --git a/packages/client/ui-conversation/tests/chat-view.client.spec.tsx b/packages/client/ui-conversation/tests/chat-view.client.spec.tsx
+index b81dff8e6e..7848cd8170 100644
+--- a/packages/client/ui-conversation/tests/chat-view.client.spec.tsx
++++ b/packages/client/ui-conversation/tests/chat-view.client.spec.tsx
+@@ -274,6 +274,9 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
+       addImages: () => true,
+       removeImage: () => {},
+       pruneImages: () => {},
++      addFiles: () => true,
++      removeFile: () => {},
++      pruneFiles: () => {},
+       submit: () => {},
+     },
+     useStore: bindSnapshotSelector(chat),
+diff --git a/packages/client/ui-conversation/tests/gate-branch-tails.client.spec.tsx b/packages/client/ui-conversation/tests/gate-branch-tails.client.spec.tsx
+index debca260e7..09cc864350 100644
+--- a/packages/client/ui-conversation/tests/gate-branch-tails.client.spec.tsx
++++ b/packages/client/ui-conversation/tests/gate-branch-tails.client.spec.tsx
+@@ -138,6 +138,9 @@ describe('render branch tails', () => {
+           addImages: () => true,
+           removeImage: () => {},
+           pruneImages: () => {},
++          addFiles: () => true,
++          removeFile: () => {},
++          pruneFiles: () => {},
+           submit: () => {},
+         }}
+         useStore={bindSnapshotSelector(chat)}
+@@ -195,6 +198,9 @@ describe('render branch tails', () => {
+           addImages: () => true,
+           removeImage: () => {},
+           pruneImages: () => {},
++          addFiles: () => true,
++          removeFile: () => {},
++          pruneFiles: () => {},
+           submit: () => {},
+         }}
+         useStore={bindSnapshotSelector(chat)}
+diff --git a/packages/client/ui-conversation/tests/input-bar.client.spec.tsx b/packages/client/ui-conversation/tests/input-bar.client.spec.tsx
+index 202784046d..e6e2135e9c 100644
+--- a/packages/client/ui-conversation/tests/input-bar.client.spec.tsx
++++ b/packages/client/ui-conversation/tests/input-bar.client.spec.tsx
+@@ -108,6 +108,7 @@ function bench(over?: BenchOptions) {
+   const sink = vi.fn<(
+     text: string,
+     imageIds: readonly DraftAttachmentId[],
++    fileIds: readonly DraftAttachmentId[],
+     mode: 'queue' | 'steer',
+     signal: AbortSignal,
+   ) => Promise<SubmitOutcome>>(() => Promise.resolve({ kind: 'success' }))
+@@ -124,6 +125,7 @@ function bench(over?: BenchOptions) {
+     actx: SCTX,
+     defaultSink: sink,
+     commandImages: { serialize: () => Promise.resolve([]), release: () => {}, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` },
++    commandFiles: { unsupportedNotice: (token: string) => `${token.trim()} files-unsupported` },
+     queue: {
+       getSnapshot: () => session.getSnapshot().queue,
+       subscribe: fn => session.subscribe(fn),
+@@ -174,8 +176,11 @@ function bench(over?: BenchOptions) {
+     removeImage,
+     draftImages: ids => ids.flatMap((id) => {
+       const attachment = over?.attachments?.find(candidate => candidate.id === id)
+-      return attachment === undefined ? [] : [attachment]
++      return attachment === undefined || attachment.kind !== 'image' ? [] : [attachment]
+     }),
++    addFiles: undefined,
++    removeFile: undefined,
++    draftFiles: undefined,
+     resolveSubmitMode: (running, gesture, steeringAvailable) => {
+       if (!running || !steeringAvailable) return 'queue'
+       const preferred = over?.busyEnter ?? 'queue'
+@@ -368,7 +373,7 @@ describe('image draft rail', () => {
+     let settle!: (outcome: SubmitOutcome) => void
+     sink.mockImplementationOnce(() => new Promise<SubmitOutcome>((resolve) => { settle = resolve }))
+     fireEvent.keyDown(textarea, { key: 'Enter' })
+-    expect(sink).toHaveBeenCalledWith('', ['draft-1'], 'queue', expect.any(AbortSignal))
++    expect(sink).toHaveBeenCalledWith('', ['draft-1'], [], 'queue', expect.any(AbortSignal))
+     expect(attachmentOwner(result.slotCalls).attachments).toEqual([attachments[0]])
+     await act(async () => { settle({ kind: 'success' }) })
+     await vi.waitFor(() => {
+@@ -384,7 +389,7 @@ describe('image draft rail', () => {
+       const paste = () => {
+         fireEvent.paste(textarea, {
+           clipboardData: {
+-            items: [{ kind: 'file', type: 'text/plain', getAsFile: () => new File(['x'], 'note.txt', { type: 'text/plain' }) }],
++            items: [{ kind: 'file', type: 'image/gif', getAsFile: () => new File(['x'], 'note.gif', { type: 'image/gif' }) }],
+             getData: () => '',
+           },
+         })
+@@ -468,7 +473,7 @@ describe('Enter semantics', () => {
+   it('plain Enter submits queue mode through the machine; repeat and empty are suppressed', () => {
+     const { textarea, sink } = bench({ draft: 'hello' })
+     fireEvent.keyDown(textarea, { key: 'Enter' })
+-    expect(sink).toHaveBeenCalledWith('hello', [], 'queue', expect.any(AbortSignal))
++    expect(sink).toHaveBeenCalledWith('hello', [], [], 'queue', expect.any(AbortSignal))
+     // The submitting-phase lock, not draft emptiness, suppresses the repeat:
+     // the draft is still uncleared while the sink round-trip is in flight.
+     fireEvent.keyDown(textarea, { key: 'Enter', repeat: true })
+@@ -496,15 +501,15 @@ describe('Enter semantics', () => {
+   it('Ctrl/Meta+Enter sends normally while idle and steers while running', () => {
+     const idle = bench({ draft: 'hello' })
+     fireEvent.keyDown(idle.textarea, { key: 'Enter', metaKey: true })
+-    expect(idle.sink).toHaveBeenCalledWith('hello', [], 'queue', expect.any(AbortSignal))
++    expect(idle.sink).toHaveBeenCalledWith('hello', [], [], 'queue', expect.any(AbortSignal))
+ 
+     const busyCtrl = bench({ running: true, draft: 'steer with ctrl' })
+     fireEvent.keyDown(busyCtrl.textarea, { key: 'Enter', ctrlKey: true })
+-    expect(busyCtrl.sink).toHaveBeenCalledWith('steer with ctrl', [], 'steer', expect.any(AbortSignal))
++    expect(busyCtrl.sink).toHaveBeenCalledWith('steer with ctrl', [], [], 'steer', expect.any(AbortSignal))
+ 
+     const busyMeta = bench({ running: true, draft: 'steer with cmd' })
+     fireEvent.keyDown(busyMeta.textarea, { key: 'Enter', metaKey: true })
+-    expect(busyMeta.sink).toHaveBeenCalledWith('steer with cmd', [], 'steer', expect.any(AbortSignal))
++    expect(busyMeta.sink).toHaveBeenCalledWith('steer with cmd', [], [], 'steer', expect.any(AbortSignal))
+   })
+ 
+   it('empty-draft Cmd/Ctrl+Enter steers the whole queue instead of submitting', () => {
+@@ -569,7 +574,7 @@ describe('Enter semantics', () => {
+     const steerQueue = vi.fn()
+     const { textarea, sink } = bench({ running: true, queue: [row('q-1')], draft: '插话', steerQueue })
+     fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true })
+-    expect(sink).toHaveBeenCalledWith('插话', [], 'steer', expect.any(AbortSignal))
++    expect(sink).toHaveBeenCalledWith('插话', [], [], 'steer', expect.any(AbortSignal))
+     expect(steerQueue).not.toHaveBeenCalled()
+   })
+ 
+@@ -617,7 +622,7 @@ describe('running and lock semantics', () => {
+     expect(textarea.disabled).toBe(false)
+     fireEvent.change(textarea, { target: { value: '排队消息2' } })
+     fireEvent.keyDown(textarea, { key: 'Enter' })
+-    expect(sink).toHaveBeenCalledWith('排队消息2', [], 'queue', expect.any(AbortSignal))
++    expect(sink).toHaveBeenCalledWith('排队消息2', [], [], 'queue', expect.any(AbortSignal))
+     expect(button.getAttribute('aria-label')).toBe('停止生成')
+     fireEvent.click(button)
+     expect(stop).toHaveBeenCalledTimes(1)
+@@ -626,17 +631,17 @@ describe('running and lock semantics', () => {
+   it('running plain Enter follows the busy-state Steer preference', () => {
+     const { textarea, sink } = bench({ running: true, busyEnter: 'steer', draft: '直接插话' })
+     fireEvent.keyDown(textarea, { key: 'Enter' })
+-    expect(sink).toHaveBeenCalledWith('直接插话', [], 'steer', expect.any(AbortSignal))
++    expect(sink).toHaveBeenCalledWith('直接插话', [], [], 'steer', expect.any(AbortSignal))
+   })
+ 
+   it('running Cmd/Ctrl+Enter uses the opposite of the busy-state Enter preference', () => {
+     const meta = bench({ running: true, busyEnter: 'steer', draft: '排到下一轮' })
+     fireEvent.keyDown(meta.textarea, { key: 'Enter', metaKey: true })
+-    expect(meta.sink).toHaveBeenCalledWith('排到下一轮', [], 'queue', expect.any(AbortSignal))
++    expect(meta.sink).toHaveBeenCalledWith('排到下一轮', [], [], 'queue', expect.any(AbortSignal))
+ 
+     const ctrl = bench({ running: true, busyEnter: 'steer', draft: 'also queue' })
+     fireEvent.keyDown(ctrl.textarea, { key: 'Enter', ctrlKey: true })
+-    expect(ctrl.sink).toHaveBeenCalledWith('also queue', [], 'queue', expect.any(AbortSignal))
++    expect(ctrl.sink).toHaveBeenCalledWith('also queue', [], [], 'queue', expect.any(AbortSignal))
+   })
+ 
+   it('running continuable subagent keeps Send beside an independent Stop', () => {
+@@ -656,7 +661,7 @@ describe('running and lock semantics', () => {
+     expect(interruptButton).not.toBeNull()
+     expect(textarea.disabled).toBe(false)
+     fireEvent.click(button)
+-    expect(sink).toHaveBeenCalledWith('后续消息', [], 'queue', expect.any(AbortSignal))
++    expect(sink).toHaveBeenCalledWith('后续消息', [], [], 'queue', expect.any(AbortSignal))
+     fireEvent.click(interruptButton!)
+     expect(stop).toHaveBeenCalledTimes(1)
+   })
+@@ -713,11 +718,11 @@ describe('running and lock semantics', () => {
+     }
+     const plain = bench({ running: true, busyEnter: 'steer', draft: 'plain', subagent })
+     fireEvent.keyDown(plain.textarea, { key: 'Enter' })
+-    expect(plain.sink).toHaveBeenCalledWith('plain', [], 'queue', expect.any(AbortSignal))
++    expect(plain.sink).toHaveBeenCalledWith('plain', [], [], 'queue', expect.any(AbortSignal))
+ 
+     const accelerated = bench({ running: true, draft: 'accelerated', subagent })
+     fireEvent.keyDown(accelerated.textarea, { key: 'Enter', metaKey: true })
+-    expect(accelerated.sink).toHaveBeenCalledWith('accelerated', [], 'queue', expect.any(AbortSignal))
++    expect(accelerated.sink).toHaveBeenCalledWith('accelerated', [], [], 'queue', expect.any(AbortSignal))
+   })
+ 
+   it('disabled (session removed) locks the textarea and chrome', () => {
+@@ -730,7 +735,7 @@ describe('running and lock semantics', () => {
+   it('idle primary sends and disables on empty draft', () => {
+     const { button, sink } = bench({ draft: 'go' })
+     fireEvent.click(button)
+-    expect(sink).toHaveBeenCalledWith('go', [], 'queue', expect.any(AbortSignal))
++    expect(sink).toHaveBeenCalledWith('go', [], [], 'queue', expect.any(AbortSignal))
+     const empty = bench()
+     expect(empty.button.disabled).toBe(true)
+   })
+diff --git a/packages/client/ui-conversation/tests/input-matrix.client.spec.tsx b/packages/client/ui-conversation/tests/input-matrix.client.spec.tsx
+index 71f96b8d4e..d483041890 100644
+--- a/packages/client/ui-conversation/tests/input-matrix.client.spec.tsx
++++ b/packages/client/ui-conversation/tests/input-matrix.client.spec.tsx
+@@ -59,6 +59,9 @@ function mountBar(shell: SessionInputShell, over?: { running?: boolean; disabled
+       file: new File([Uint8Array.of(1)], `${id}.png`, { type: 'image/png' }),
+       previewUrl: `blob:${id}`,
+     })),
++    addFiles: undefined,
++    removeFile: undefined,
++    draftFiles: undefined,
+     resolveSubmitMode: () => 'queue',
+     toggleCommandMenu: vi.fn(),
+     useNotices: bindSnapshotSelector(shell.notices),
+@@ -83,7 +86,7 @@ function bench(over?: {
+   const sink = vi.fn(() => Promise.resolve<SubmitOutcome>({ kind: 'success' }))
+   const serialize = vi.fn(over?.serialize ?? (() => Promise.resolve<readonly SubmitImageAttachment[]>([])))
+   const release = vi.fn()
+-  const shell = new SessionInputShell({ actx: SCTX, defaultSink: sink, commandImages: { serialize, release, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` } })
++  const shell = new SessionInputShell({ actx: SCTX, defaultSink: sink, commandImages: { serialize, release, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` }, commandFiles: { unsupportedNotice: (_token: string) => '' } })
+   const wiring = shell
+   const view = mountBar(shell, over)
+   const textarea = view.container.querySelector('textarea')!
+@@ -109,7 +112,7 @@ describe('matrix row: plain', () => {
+     fireEvent.change(textarea, { target: { value: '普通消息' } })
+     expect(shell.snapshot.claim).toBeUndefined()
+     fireEvent.keyDown(textarea, { key: 'Enter' })
+-    expect(sink).toHaveBeenCalledWith('普通消息', [], 'queue', expect.any(AbortSignal))
++    expect(sink).toHaveBeenCalledWith('普通消息', [], [], 'queue', expect.any(AbortSignal))
+     expect(shell.snapshot.phase).toBe('submitting')
+     await vi.waitFor(() => { expect(shell.snapshot.phase).toBe('plain') })
+     expect(shell.snapshot.claim).toBeUndefined()
+@@ -301,7 +304,7 @@ describe('matrix row: locked (session disabled)', () => {
+     expect((textarea).disabled).toBe(false)
+     fireEvent.change(textarea, { target: { value: '排队' } })
+     fireEvent.keyDown(textarea, { key: 'Enter' })
+-    expect(sink).toHaveBeenCalledWith('排队', [], 'queue', expect.any(AbortSignal))
++    expect(sink).toHaveBeenCalledWith('排队', [], [], 'queue', expect.any(AbortSignal))
+   })
+ })
+ 
+diff --git a/packages/client/ui-conversation/tests/input-reference-submit.client.spec.ts b/packages/client/ui-conversation/tests/input-reference-submit.client.spec.ts
+index 876f992af8..c107344527 100644
+--- a/packages/client/ui-conversation/tests/input-reference-submit.client.spec.ts
++++ b/packages/client/ui-conversation/tests/input-reference-submit.client.spec.ts
+@@ -39,6 +39,7 @@ describe('reference submission', () => {
+       actx: {} as ClientContext,
+       defaultSink: vi.fn(),
+       commandImages,
++      commandFiles: { unsupportedNotice: (_token: string) => '' },
+     })
+     first.bindMirror(mirror)
+     first.setDraft('@res')
+@@ -61,11 +62,12 @@ describe('reference submission', () => {
+       actx: {} as ClientContext,
+       defaultSink: sink,
+       commandImages,
++      commandFiles: { unsupportedNotice: (_token: string) => '' },
+     })
+     restored.setDraft(mirror.mock.calls.at(-1)?.[0] as string)
+     restored.submit()
+     await vi.waitFor(() => {
+-      expect(sink).toHaveBeenCalledWith(spacedMention, [], 'queue', expect.any(AbortSignal))
++      expect(sink).toHaveBeenCalledWith(spacedMention, [], [], 'queue', expect.any(AbortSignal))
+     })
+   })
+ 
+@@ -74,6 +76,7 @@ describe('reference submission', () => {
+     const sink = vi.fn<(
+       _text: string,
+       _imageIds: readonly DraftAttachmentId[],
++      _fileIds: readonly DraftAttachmentId[],
+       _mode: 'queue' | 'steer',
+       _signal: AbortSignal,
+     ) => Promise<SubmitOutcome>>()
+@@ -88,6 +91,7 @@ describe('reference submission', () => {
+       inputTriggers: () => inputTriggers,
+       defaultSink: sink,
+       commandImages,
++      commandFiles: { unsupportedNotice: (_token: string) => '' },
+     })
+     chip(shell)
+     expect(shell.snapshot).toMatchObject({
+@@ -100,7 +104,7 @@ describe('reference submission', () => {
+     await vi.waitFor(() => {
+       expect(shell.snapshot.phase).toBe('plain')
+     })
+-    expect(sink).toHaveBeenNthCalledWith(1, mention, [], 'queue', expect.any(AbortSignal))
++    expect(sink).toHaveBeenNthCalledWith(1, mention, [], [], 'queue', expect.any(AbortSignal))
+     expect(shell.snapshot).toMatchObject({
+       draft: '@Research ',
+       occurrences: [{ source: 'reference', ref: mention, label: 'Research', offset: 0, length: 9 }],
+@@ -114,7 +118,7 @@ describe('reference submission', () => {
+     await vi.waitFor(() => {
+       expect(shell.snapshot.draft).toBe('')
+     })
+-    expect(sink).toHaveBeenNthCalledWith(2, mention, [], 'queue', expect.any(AbortSignal))
++    expect(sink).toHaveBeenNthCalledWith(2, mention, [], [], 'queue', expect.any(AbortSignal))
+     expect(shell.snapshot.occurrences).toEqual([])
+     expect(serializeReference).toHaveBeenCalledTimes(2)
+   })
+@@ -130,6 +134,7 @@ describe('reference submission', () => {
+       inputTriggers: () => inputTriggers,
+       defaultSink: sink,
+       commandImages,
++      commandFiles: { unsupportedNotice: (_token: string) => '' },
+     })
+     chip(shell)
+     shell.submit()
+@@ -149,11 +154,12 @@ describe('reference submission', () => {
+     let signal: AbortSignal | undefined
+     const shell = new SessionInputShell({
+       actx: {} as ClientContext,
+-      defaultSink: (_text, _imageIds, _mode, received) => {
++      defaultSink: (_text, _imageIds, _fileIds, _mode, received) => {
+         signal = received
+         return new Promise<SubmitOutcome>(() => {})
+       },
+       commandImages,
++      commandFiles: { unsupportedNotice: (_token: string) => '' },
+     })
+     shell.setDraft('send this')
+     shell.submit()
+@@ -169,6 +175,7 @@ describe('reference submission', () => {
+       actx: {} as ClientContext,
+       defaultSink: () => Promise.resolve({ kind: 'error' }),
+       commandImages,
++      commandFiles: { unsupportedNotice: (_token: string) => '' },
+     })
+     shell.setDraft('retry this')
+     shell.submit()
+@@ -188,6 +195,7 @@ describe('submit transaction hardening', () => {
+       actx: {} as ClientContext,
+       defaultSink: sink,
+       commandImages,
++      commandFiles: { unsupportedNotice: (_token: string) => '' },
+     })
+     expect(shell.addImages(['img-1' as DraftAttachmentId])).toBe(true)
+     shell.submit('queue')
+@@ -209,6 +217,7 @@ describe('submit transaction hardening', () => {
+       actx: {} as ClientContext,
+       defaultSink: sink,
+       commandImages,
++      commandFiles: { unsupportedNotice: (_token: string) => '' },
+     })
+     const imageId = 'img-1' as DraftAttachmentId
+     shell.addImages([imageId])
+@@ -226,6 +235,7 @@ describe('submit transaction hardening', () => {
+       inputTriggers: () => ({ track } as unknown as InputTriggerController),
+       defaultSink: vi.fn(),
+       commandImages,
++      commandFiles: { unsupportedNotice: (_token: string) => '' },
+     })
+     shell.setDraft('@sr')
+     const applied = shell.insertText('@src/', { start: 0, end: 3, draftRev: shell.snapshot.draftRev }, true)
+diff --git a/packages/client/ui-conversation/tests/input-scenarios.client.spec.tsx b/packages/client/ui-conversation/tests/input-scenarios.client.spec.tsx
+index 6231519bc2..a7ea441439 100644
+--- a/packages/client/ui-conversation/tests/input-scenarios.client.spec.tsx
++++ b/packages/client/ui-conversation/tests/input-scenarios.client.spec.tsx
+@@ -122,7 +122,7 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
+   const sink = vi.fn(() => Promise.resolve<SubmitOutcome>({ kind: 'success' }))
+   const serialize = vi.fn((ids: readonly DraftAttachmentId[]) => Promise.resolve(ids.map(() => PNG)))
+   const release = vi.fn()
+-  const shell = new SessionInputShell({ actx, inputTriggers: () => controller, defaultSink: sink, commandImages: { serialize, release, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` } })
++  const shell = new SessionInputShell({ actx, inputTriggers: () => controller, defaultSink: sink, commandImages: { serialize, release, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` }, commandFiles: { unsupportedNotice: (_token: string) => '' } })
+   // The hub's listener wiring, verbatim.
+   actx.on('slash/input-begin-command', req => shell.beginCommand(req.claim, req.span) ? true : undefined)
+   actx.on('slash/input-insert-reference', req => shell.insertReference(req.reference, req.span) ? true : undefined)
+@@ -159,6 +159,9 @@ async function scopedBench(register?: (inputTriggers: InputTriggerService) => vo
+       file: new File([Uint8Array.of(1)], `${id}.png`, { type: 'image/png' }),
+       previewUrl: `blob:${id}`,
+     })),
++    addFiles: undefined,
++    removeFile: undefined,
++    draftFiles: undefined,
+     resolveSubmitMode: () => 'queue',
+     toggleCommandMenu: (selection) => {
+       const snapshot = shell.snapshot
+@@ -263,7 +266,7 @@ describe('scenario D: execute-kind /compact', () => {
+     act(() => { b2.shell.setDraft('/compact 现在') })
+     fireEvent.keyDown(b2.textarea, { key: 'Enter' })
+     // execute with trailing → matchEnter answers undefined → default sink.
+-    await vi.waitFor(() => { expect(b2.sink).toHaveBeenCalledWith('/compact 现在', [], 'queue', expect.any(AbortSignal)) })
++    await vi.waitFor(() => { expect(b2.sink).toHaveBeenCalledWith('/compact 现在', [], [], 'queue', expect.any(AbortSignal)) })
+     expect(b2.executed).toHaveLength(0)
+   })
+ })
+@@ -344,7 +347,7 @@ describe('scenario I: unknown /xyz + enter', () => {
+     const b = await bench()
+     act(() => { b.shell.setDraft('/xyz 干点啥') })
+     fireEvent.keyDown(b.textarea, { key: 'Enter' })
+-    await vi.waitFor(() => { expect(b.sink).toHaveBeenCalledWith('/xyz 干点啥', [], 'queue', expect.any(AbortSignal)) })
++    await vi.waitFor(() => { expect(b.sink).toHaveBeenCalledWith('/xyz 干点啥', [], [], 'queue', expect.any(AbortSignal)) })
+     await vi.waitFor(() => { expect(b.shell.snapshot.phase).toBe('plain') })
+     expect(b.execute).not.toHaveBeenCalled()
+   })
+diff --git a/packages/client/ui-conversation/tests/queue-dock.client.spec.tsx b/packages/client/ui-conversation/tests/queue-dock.client.spec.tsx
+index 4367a74dad..2a9e3aed5c 100644
+--- a/packages/client/ui-conversation/tests/queue-dock.client.spec.tsx
++++ b/packages/client/ui-conversation/tests/queue-dock.client.spec.tsx
+@@ -64,7 +64,7 @@ function liveSession(initial: ConversationSnapshot) {
+ }
+ 
+ /** InputZone owner stub (the dock reads useSession only; the zone fields satisfy the owner share). */
+-const INPUT_STATE: InputState = { draft: '', imageIds: [], draftRev: 0, phase: 'plain', occurrences: [], queue: [] }
++const INPUT_STATE: InputState = { draft: '', imageIds: [], fileIds: [], draftRev: 0, phase: 'plain', occurrences: [], queue: [] }
+ 
+ // Standard locale seat stub mirroring the real ns → common → key chain.
+ const t: QueueDockProps['t'] = makeTranslate(zh, commonZh)
+diff --git a/packages/client/ui-conversation/tests/skeleton.client.spec.tsx b/packages/client/ui-conversation/tests/skeleton.client.spec.tsx
+index 76450d1805..eb9168ab6f 100644
+--- a/packages/client/ui-conversation/tests/skeleton.client.spec.tsx
++++ b/packages/client/ui-conversation/tests/skeleton.client.spec.tsx
+@@ -34,7 +34,7 @@ import type { ViewTab } from '../src/client/contract/views.ts'
+ /** Machine-backed wiring over a sink spy. */
+ function fakeWiring() {
+   const sink = vi.fn(() => Promise.resolve({ kind: 'success' as const }))
+-  const shell = new SessionInputShell({ actx: {} as ClientContext, defaultSink: sink, commandImages: { serialize: () => Promise.resolve([]), release: () => {}, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` } })
++  const shell = new SessionInputShell({ actx: {} as ClientContext, defaultSink: sink, commandImages: { serialize: () => Promise.resolve([]), release: () => {}, unsupportedNotice: (token: string) => `${token.trim()} images-unsupported` }, commandFiles: { unsupportedNotice: (_token: string) => '' } })
+   return { wiring: shell, sink, shell }
+ }
+ 
+@@ -200,6 +200,7 @@ function mount(
+           renderSlot={renderSlot as never}
+           views={views}
+           releaseSessionImages={vi.fn()}
++          releaseSessionFiles={vi.fn()}
+           bindDraftMirror={write => wiring.bindMirror(write)}
+         />
+       )
+@@ -222,6 +223,9 @@ function mount(
+           addImages={() => null}
+           removeImage={() => {}}
+           draftImages={() => []}
++          addFiles={() => null}
++          removeFile={() => {}}
++          draftFiles={() => []}
+           resolveSubmitMode={() => 'queue'}
+           toggleCommandMenu={vi.fn()}
+           useNotices={bindSnapshotSelector(wiring.notices)}
+@@ -339,7 +343,7 @@ describe('ConversationRoot resident composer', () => {
+     fireEvent.change(box, { target: { value: 'ordinary revised' } })
+     expect(b.chat.store.getSnapshot().draft).toBe('ordinary revised')
+     fireEvent.keyDown(box, { key: 'Enter' })
+-    expect(b.sink).toHaveBeenCalledWith('ordinary revised', [], 'queue', expect.any(AbortSignal))
++    expect(b.sink).toHaveBeenCalledWith('ordinary revised', [], [], 'queue', expect.any(AbortSignal))
+     expect((b.view.getByRole('button', { name: 'Child' }) as HTMLButtonElement).disabled).toBe(true)
+     expect(b.view.queryByText('Root')).toBeNull()
+   })
