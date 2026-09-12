@@ -27,6 +27,9 @@ import { mountBoard } from './board-mount.tsx'
 import { mountSidebarEntry } from './sidebar-entry.ts'
 import { TaskBoardSettingsCard, TaskBoardSettingsCardController, type TaskBoardSettings } from './TaskBoardSettingsCard.tsx'
 import { en, zh, type TaskBoardKey } from './locales.ts'
+// Type-only: 0.1.5 declares `ctx.slots` in ui-renderer's Context merge (ui-slots
+// keeps the slot contracts).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 
 /** Locale namespace this plugin owns. */
 const NS = 'task-board'

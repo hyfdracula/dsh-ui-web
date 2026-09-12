@@ -7,7 +7,8 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+// Type-only: pulls the settings service seat (ctx.settings).
+import type {} from '@deepseek-ai/dsh-settings'
 import z from 'schemastery'
 import { makeRoutes } from './routes.ts'
 
@@ -18,7 +19,8 @@ export const name = 'ui-bilibili-download'
 export const inject = ['webServer']
 
 /** The remembered-cookie namespace (spelled here AND in the browser half). */
-export const BILI_SETTINGS_NAMESPACE = settingsNamespace('bili-download')
+/** The remembered-cookie namespace (spelled here AND in the browser half). */
+export const BILI_SETTINGS_NAMESPACE = 'bili-download' as const
 
 /** Schema of the remembered-cookie namespace. Empty strings mean "not saved". */
 export interface CookieSettings {
@@ -53,9 +55,11 @@ export function apply(ctx: Context): void {
 
   // The settings section only carries the remembered cookies; routes never
   // read it, so a change needs no live re-sync.
-  installSettingsSection(ctx, BILI_SETTINGS_NAMESPACE, Config, ENTRY, {
-    setSource: () => {},
-    onChange: () => {},
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, BILI_SETTINGS_NAMESPACE, Config, ENTRY, {
+      setSource: () => {},
+      onChange: () => {},
+    })
   })
 
   ctx.effect(() => () => {

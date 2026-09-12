@@ -25,6 +25,9 @@ import { RemoteSettingsCard, RemoteSettingsCardController, type RemoteSettings }
 import { en, zh, type RemoteKey } from './locales.ts'
 import { PAIR_FAILED_MARKER, runPairBootFlow } from './deep-link.ts'
 import { sendHeartbeat } from './pair-api.ts'
+// Type-only: 0.1.5 declares `ctx.slots` in ui-renderer's Context merge (ui-slots
+// keeps the slot contracts).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 
 export type { RemoteEntryProps } from './RemoteEntry.tsx'
 export type { PanelState, RemotePanelProps } from './RemotePanel.tsx'

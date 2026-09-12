@@ -13,6 +13,9 @@
 import { createElement, memo } from 'react'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { FullStatsSettingsCard, FULL_STATS_EVENT, type FullStatsConfig } from './FullStatsSettingsCard.tsx'
+// Type-only: 0.1.5 declares `ctx.slots` in ui-renderer's Context merge (ui-slots
+// keeps the slot contracts).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 
 /** 需要的客户端服务：插槽（覆盖注册 + 配置卡片）。 */
 export const inject = ['slots']

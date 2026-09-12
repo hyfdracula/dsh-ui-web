@@ -8,7 +8,8 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-host-webserver'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+// Type-only: pulls the settings service seat (ctx.settings).
+import type {} from '@deepseek-ai/dsh-settings'
 import z from '@deepseek-ai/schemastery'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs'
@@ -19,7 +20,7 @@ import { homedir } from 'node:os'
 export const name = 'ui-web-ui-settings'
 
 /** 组卡片配对的 settings namespace（rc.8 keyed 协议：卡片按 namespace 分发）。 */
-export const WEB_UI_PLUGINS_SETTINGS_NAMESPACE = settingsNamespace('web-ui-plugins')
+export const WEB_UI_PLUGINS_SETTINGS_NAMESPACE = 'web-ui-plugins' as const
 
 /** 人格配置形状。 */
 export interface PersonaConfig {
@@ -355,8 +356,10 @@ export function apply(ctx: Context): void {
   })
   // rc.8 keyed 协议：settings.plugin.item 按 namespace 分发，组卡片以
   // web-ui-plugins 为 key，这里注册空 section 让 Host 提供该 namespace。
-  installSettingsSection(ctx, WEB_UI_PLUGINS_SETTINGS_NAMESPACE, z.object({}), {}, {
-    setSource: () => {},
-    onChange: () => {},
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, WEB_UI_PLUGINS_SETTINGS_NAMESPACE, z.object({}), {}, {
+      setSource: () => {},
+      onChange: () => {},
+    })
   })
 }

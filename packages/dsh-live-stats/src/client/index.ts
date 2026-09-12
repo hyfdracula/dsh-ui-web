@@ -10,6 +10,9 @@ import type {} from '@deepseek-ai/dsh-token-meter/client'
 import { LiveStatsSettingsCard, LiveStatsSettingsCardController, type LiveStatsSettings } from './LiveStatsSettingsCard.tsx'
 import { TpsLineDockEntry } from './TpsLine.tsx'
 import { en, zh, type SettingsCardKey } from './locales.ts'
+// Type-only: 0.1.5 declares `ctx.slots` in ui-renderer's Context merge (ui-slots
+// keeps the slot contracts).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 
 export { TpsLine, formatTokensPerSecond } from './TpsLine.tsx'
 export type { LiveStatsSettings, LiveStatsSettingsCardFace, LiveStatsSettingsCardState } from './LiveStatsSettingsCard.tsx'

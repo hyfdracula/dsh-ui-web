@@ -15,6 +15,9 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { WebUIPluginsCard } from './WebUIPluginsCard.tsx'
 import { en, zh, type WebUIPluginsKey } from './locales.ts'
+// Type-only: 0.1.5 declares `ctx.slots` in ui-renderer's Context merge (ui-slots
+// keeps the slot contracts).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 
 export type { WebUIPluginsCardProps } from './WebUIPluginsCard.tsx'
 

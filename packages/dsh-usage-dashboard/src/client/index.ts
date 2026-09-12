@@ -21,6 +21,9 @@ import { UsageSettingsCard, type UsageSettingsCardProps } from './UsageSettingsC
 import { PricingCard, type PricingCardProps } from './PricingCard.tsx'
 import { NS, en, zh } from './locales.ts'
 import { getActiveSessionId, setCurrentModel, setModelFetcher, setSessionChangeListener } from './model.ts'
+// Type-only: 0.1.5 declares `ctx.slots` in ui-renderer's Context merge (ui-slots
+// keeps the slot contracts).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 
 export { openDashboard, closeDashboard, mountUsageEntry } from './UsageEntry.tsx'
 export type { UsageRecorderProps } from './UsageRecorder.tsx'
