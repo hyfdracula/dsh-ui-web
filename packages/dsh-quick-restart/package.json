@@ -1,0 +1,52 @@
+{
+  "name": "@captain1275/dsh-quick-restart",
+  "description": "侧栏「重启 DSH」入口：点一下写重启请求，宿主空闲时由巡检自动重启（不需要任何人手动参与）。",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-connection"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "watch": "tsdown --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "Apache-2.0",
+  "peerDependencies": {
+    "react": "^18.2.0"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-client-locale": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-sidebar": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-client-ui-slots": "^0.1.5-rc.2",
+    "@deepseek-ai/dsh-host-webserver": "^0.1.5-rc.2",
+    "@types/react": "~18.3.1",
+    "@types/node": "^22.10.2",
+    "lightningcss": "^1.32.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tsdown": "^0.22.2",
+    "typescript": "~5.7.2"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml"
+  ]
+}
