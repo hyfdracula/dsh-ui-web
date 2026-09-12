@@ -1,4 +1,4 @@
-﻿# DSH Fork 改动适配清单（0.1.5）
+# DSH Fork 改动适配清单（0.1.5）
 
 > 用途：记录本 fork 相对 DSH 官方源码的全部改动，一处一份补丁，升级/换 checkout 后按此清单重放。
 > 历史教训：rc.8 升级时 SettingsRoot 改动曾因未入库、未生成补丁而丢失（2026-08-20）。
@@ -270,6 +270,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\dsh-web-restart.ps1
   以及若干运行日志。这些内容仍在持续变动（同一 checkout 上还有别的会话在改），
   要用它们就先在 fork 里提交，再跑 `regenerate-fork-patches.ps1`（新增提交应成为新的 `050-fork-*.patch`，
   并同步更新两个脚本里的补丁表与基线）。
+- **补丁表落后于分支 HEAD（2026-09-12 20:30 实测）**：`regenerate-fork-patches.ps1` 的表固定到
+  `7e49898`（`060`）为止，而分支 `fork/0.1.5-rc.2` 之后又提交了 4 个：
+  `6bdfbf8`（只读本端口的 token 行）、`b54e834`（切到 profile web / 3080）、
+  `e484800`（读宿主自己的日志）、`46c686d`（重启替换旧窗口 + 快捷发送框：新增
+  `dsh-web-browser.ps1`、`dsh-quick-send.ps1/.vbs/.strings.json`，改 `dsh-web-open.ps1` /
+  `dsh-web-restart.ps1`，`.gitignore` 收纳运行产物）。这 4 个提交**尚未**进补丁集，
+  一键重放目前只到 `060`；补齐做法是把它们按顺序加进 regenerate/apply 两张表后重跑 `-Verify`。
 - **050/060 的通用文件输入链未移植**：0.1.1 fork 曾在输入层加过 `addFiles/removeFile/pruneFiles`、
   `fileIds`、`releaseSessionFiles` 与 InputBar 文件 chip。0.1.5 上游与 fork 提交都没有这套成员，
   因此当前 0.1.5 fork **不具备**「粘贴任意文件」能力（图片附件走上游原生路径）。如仍需该能力，
