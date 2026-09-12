@@ -12,7 +12,8 @@ export declare const name = "ui-bilibili-download";
 /** Required services (settings optional: installSettingsSection degrades gracefully). */
 export declare const inject: string[];
 /** The remembered-cookie namespace (spelled here AND in the browser half). */
-export declare const BILI_SETTINGS_NAMESPACE: import("@deepseek-ai/dsh-settings").SettingsNamespace;
+/** The remembered-cookie namespace (spelled here AND in the browser half). */
+export declare const BILI_SETTINGS_NAMESPACE: "bili-download";
 /** Schema of the remembered-cookie namespace. Empty strings mean "not saved". */
 export interface CookieSettings {
     sessdata?: string;

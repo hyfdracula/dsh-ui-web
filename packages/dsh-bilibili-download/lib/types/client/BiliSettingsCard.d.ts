@@ -8,7 +8,7 @@
  */
 import { type FC } from 'react';
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots';
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client';
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client';
 import type { BiliApi } from './api.ts';
 import type { CookieSettings } from '../protocol.ts';
 /** What the registration injects (beyond the locale reader). */
