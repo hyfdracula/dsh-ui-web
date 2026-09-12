@@ -6,8 +6,8 @@ window.__ModuleLoader__.load({
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 		let react = require("react");
 		let react_jsx_runtime = require("react/jsx-runtime");
-		//#region \0dsh-css:C:\Users\19161\Documents\dsh-work\dsh-ui-web\packages\dsh-effort-slider\src\client\effort.module.css.mjs
-		const css$1 = ".v5_bmW_panel{user-select:none;z-index:10;pointer-events:auto;width:280px;position:absolute;top:0;left:0}.v5_bmW_glow{opacity:.55;filter:blur(10px);z-index:0;pointer-events:none;background:linear-gradient(135deg,#6e9be847,#3f76d81f,#6e9be82e);border-radius:22px;position:absolute;inset:-3px}.v5_bmW_inner{z-index:1;border:1px solid var(--dsw-alias-border-l2,#132d5342);background:linear-gradient(180deg, var(--dsw-alias-bg-layer-1,#ffffffb8), var(--dsw-alias-bg-layer-2,#ffffff94));backdrop-filter:blur(var(--dsh-aqua-blur,14px));border-radius:20px;padding:14px 16px 12px;position:relative;box-shadow:inset 0 1px #ffffff80,0 12px 32px #132d5324}body[data-ds-dark-theme] .v5_bmW_inner,html[data-ds-dark-theme] .v5_bmW_inner,[data-theme=dark] .v5_bmW_inner{border-color:var(--dsw-alias-border-l2,#94b4dc52);background:linear-gradient(#2a2e38d1,#161922d1);box-shadow:inset 0 1px #ffffff12,0 12px 32px #02060e80}.v5_bmW_head{justify-content:space-between;align-items:center;margin-bottom:2px;display:flex}.v5_bmW_headLeft{align-items:center;gap:7px;font-size:14px;font-weight:500;display:inline-flex;overflow:hidden}.v5_bmW_labelText{color:var(--dsw-alias-label-secondary,#132d539e);letter-spacing:.03em;font-weight:600}.v5_bmW_status{color:var(--dsw-alias-label-caption,#132d5373);text-transform:uppercase;letter-spacing:.04em;vertical-align:middle;font-weight:700;transition:color .25s,text-shadow .25s;display:inline-block}.v5_bmW_statusError{color:var(--dsw-alias-state-error-primary,#c93a3a)}.v5_bmW_statusUnknown{color:var(--dsw-alias-label-tertiary,#132d5373)}.v5_bmW_statusGlow{color:#3f76d8;text-shadow:0 0 14px #3f76d88c}body[data-ds-dark-theme] .v5_bmW_statusGlow,html[data-ds-dark-theme] .v5_bmW_statusGlow,[data-theme=dark] .v5_bmW_statusGlow{color:#6e9be8;text-shadow:0 0 14px #6e9be899}.v5_bmW_level0{color:#132d5366}.v5_bmW_level1{color:#3f76d88c}.v5_bmW_level2{color:#3f76d8bf}.v5_bmW_level3{color:#3f76d8;text-shadow:0 0 10px #3f76d873}.v5_bmW_level4{color:#2f62c4;text-shadow:0 0 12px #3f76d899}body[data-ds-dark-theme] .v5_bmW_level0,html[data-ds-dark-theme] .v5_bmW_level0,[data-theme=dark] .v5_bmW_level0{color:#94b4dc59}body[data-ds-dark-theme] .v5_bmW_level1,html[data-ds-dark-theme] .v5_bmW_level1,[data-theme=dark] .v5_bmW_level1{color:#6e9be880}body[data-ds-dark-theme] .v5_bmW_level2,html[data-ds-dark-theme] .v5_bmW_level2,[data-theme=dark] .v5_bmW_level2{color:#6e9be8b3}body[data-ds-dark-theme] .v5_bmW_level3,html[data-ds-dark-theme] .v5_bmW_level3,[data-theme=dark] .v5_bmW_level3{color:#6e9be8;text-shadow:0 0 10px #6e9be880}body[data-ds-dark-theme] .v5_bmW_level4,html[data-ds-dark-theme] .v5_bmW_level4,[data-theme=dark] .v5_bmW_level4{color:#9dbcf0;text-shadow:0 0 12px #6e9be8a6}.v5_bmW_close{border:1px solid var(--dsw-alias-border-l2,#132d5329);background:var(--dsw-alias-interactive-bg-hover,#ffffff59);color:var(--dsw-alias-label-secondary,#132d539e);cursor:pointer;border-radius:8px;justify-content:center;align-items:center;width:24px;height:24px;font-size:13px;line-height:1;display:inline-flex}.v5_bmW_close:hover{color:var(--dsw-alias-label-primary,#132d53);border-color:var(--dsw-alias-border-l3,#132d5357);background:var(--dsw-alias-interactive-bg-hover-accent,#ffffff8c)}body[data-ds-dark-theme] .v5_bmW_close,html[data-ds-dark-theme] .v5_bmW_close,[data-theme=dark] .v5_bmW_close{border-color:var(--dsw-alias-border-l2,#94b4dc33);color:#94b4dcbf;background:#94b4dc14}body[data-ds-dark-theme] .v5_bmW_close:hover,html[data-ds-dark-theme] .v5_bmW_close:hover,[data-theme=dark] .v5_bmW_close:hover{color:#dbe7f7;background:#94b4dc29;border-color:#94b4dc66}.v5_bmW_levelLabels{height:15px;margin-bottom:4px;position:relative}.v5_bmW_levelLabel{color:var(--dsw-alias-label-caption,#132d5373);letter-spacing:.04em;text-transform:uppercase;font-size:10px;font-weight:700;transition:color .15s;position:absolute;top:0;transform:translate(-50%)}.v5_bmW_levelLabelActive{color:#3f76d8}body[data-ds-dark-theme] .v5_bmW_levelLabelActive,html[data-ds-dark-theme] .v5_bmW_levelLabelActive,[data-theme=dark] .v5_bmW_levelLabelActive{color:#6e9be8}.v5_bmW_trackWrapper{border:1px solid var(--dsw-alias-border-l2,#132d531f);background:var(--dsw-alias-interactive-bg-hover,#132d530d);isolation:isolate;border-radius:10px;height:32px;position:relative;overflow:hidden}body[data-ds-dark-theme] .v5_bmW_trackWrapper,html[data-ds-dark-theme] .v5_bmW_trackWrapper,[data-theme=dark] .v5_bmW_trackWrapper{border-color:var(--dsw-alias-border-l2,#94b4dc24);background:#0a0e1680}.v5_bmW_trackBg{z-index:0;position:absolute;inset:0}.v5_bmW_fill{z-index:1;pointer-events:none;background:linear-gradient(90deg,#3f76d838,#3f76d880);border-radius:9px 0 0 9px;transition:width 80ms linear;position:absolute;top:0;bottom:0;left:0;box-shadow:inset 0 1px #ffffff40}body[data-ds-dark-theme] .v5_bmW_fill,html[data-ds-dark-theme] .v5_bmW_fill,[data-theme=dark] .v5_bmW_fill{background:linear-gradient(90deg,#6e9be82e,#6e9be873);box-shadow:inset 0 1px #ffffff1f}.v5_bmW_dotsLayer{pointer-events:none;z-index:2;position:absolute;inset:0}.v5_bmW_dot{background:#3f76d84d;border-radius:50%;width:4px;height:4px;transition:background .15s,box-shadow .15s;position:absolute;top:50%;transform:translate(-50%,-50%)}.v5_bmW_dotActive{background:#3f76d8;box-shadow:0 0 8px #3f76d8cc}body[data-ds-dark-theme] .v5_bmW_dot,html[data-ds-dark-theme] .v5_bmW_dot,[data-theme=dark] .v5_bmW_dot{background:#6e9be84d}body[data-ds-dark-theme] .v5_bmW_dotActive,html[data-ds-dark-theme] .v5_bmW_dotActive,[data-theme=dark] .v5_bmW_dotActive{background:#6e9be8;box-shadow:0 0 8px #6e9be8d9}.v5_bmW_range{-webkit-appearance:none;appearance:none;cursor:pointer;z-index:5;background:0 0;outline:none;width:100%;height:100%;margin:0;padding:0;position:absolute;inset:0}.v5_bmW_range::-webkit-slider-thumb{-webkit-appearance:none;cursor:grab;background:linear-gradient(145deg,#fff 0%,#dce7f7 55%,#c9d9f0 100%);border:none;border-radius:9px;width:26px;height:26px;transition:box-shadow .25s,transform .2s cubic-bezier(.34,1.56,.64,1);box-shadow:0 2px 8px #132d5340,0 0 0 1px #3f76d847,inset 0 1px #fffc}.v5_bmW_range::-webkit-slider-thumb:active{cursor:grabbing;transform:scale(.92)}.v5_bmW_rangeGlow::-webkit-slider-thumb{box-shadow:0 2px 8px #132d534d,0 0 0 1px #3f76d873,0 0 18px #3f76d866,0 0 36px #3f76d82e,inset 0 1px #fffc}.v5_bmW_range::-moz-range-thumb{cursor:grab;background:linear-gradient(145deg,#fff 0%,#dce7f7 55%,#c9d9f0 100%);border:none;border-radius:8px;width:24px;height:24px;box-shadow:0 2px 8px #132d5340,0 0 0 1px #3f76d847}.v5_bmW_range::-moz-range-thumb:active{cursor:grabbing;transform:scale(.95)}.v5_bmW_range::-moz-range-track{background:0 0;border:none;height:32px}.v5_bmW_pointLight{pointer-events:none;z-index:3;opacity:0;background:radial-gradient(circle,#3f76d838 0%,#3f76d812 30%,#3f76d805 55%,#0000 70%);border-radius:50%;width:150px;height:150px;transition:opacity .25s;position:absolute;transform:translate(-50%,-50%)}.v5_bmW_pointLightOn{opacity:1}.v5_bmW_emptyOverlay{color:var(--dsw-alias-label-caption,#132d5373);letter-spacing:.02em;text-align:center;padding:10px 0 2px;font-size:13px;font-weight:600}.v5_bmW_failedBox{flex-direction:column;align-items:center;gap:8px;display:flex}.v5_bmW_retry{border:1px solid var(--dsw-alias-border-l2,#132d5333);background:var(--dsw-alias-interactive-bg-hover,#132d530f);color:var(--dsw-alias-label-primary,#132d53);cursor:pointer;border-radius:8px;padding:3px 12px;font-size:12px;font-weight:600}.v5_bmW_retry:hover{background:var(--dsw-alias-interactive-bg-hover-accent,#132d531f)}.v5_bmW_inlinePanel{box-sizing:border-box;border-top:1px solid var(--dsw-alias-border-l2,#132d531f);user-select:none;width:100%;padding:8px 10px 10px;position:relative}body[data-ds-dark-theme] .v5_bmW_inlinePanel,html[data-ds-dark-theme] .v5_bmW_inlinePanel,[data-theme=dark] .v5_bmW_inlinePanel{border-top-color:var(--dsw-alias-border-l2,#94b4dc24)}.v5_bmW_inlinePanel .v5_bmW_head{margin-bottom:4px}";
+		//#region \0dsh-css:C:\Users\19161\Documents\dsh-work\packages\dsh-effort-slider\src\client\effort.module.css.mjs
+		const css$1 = ".D49L8q_panel{user-select:none;z-index:10;pointer-events:auto;width:280px;position:absolute;top:0;left:0}.D49L8q_glow{opacity:.55;filter:blur(10px);z-index:0;pointer-events:none;background:linear-gradient(135deg,#6e9be847,#3f76d81f,#6e9be82e);border-radius:22px;position:absolute;inset:-3px}.D49L8q_inner{z-index:1;border:1px solid var(--dsw-alias-border-l2,#132d5342);background:linear-gradient(180deg, var(--dsw-alias-bg-layer-1,#ffffffb8), var(--dsw-alias-bg-layer-2,#ffffff94));backdrop-filter:blur(var(--dsh-aqua-blur,14px));border-radius:20px;padding:14px 16px 12px;position:relative;box-shadow:inset 0 1px #ffffff80,0 12px 32px #132d5324}body[data-ds-dark-theme] .D49L8q_inner,html[data-ds-dark-theme] .D49L8q_inner,[data-theme=dark] .D49L8q_inner{border-color:var(--dsw-alias-border-l2,#94b4dc52);background:linear-gradient(#2a2e38d1,#161922d1);box-shadow:inset 0 1px #ffffff12,0 12px 32px #02060e80}.D49L8q_head{justify-content:space-between;align-items:center;margin-bottom:2px;display:flex}.D49L8q_headLeft{align-items:center;gap:7px;font-size:14px;font-weight:500;display:inline-flex;overflow:hidden}.D49L8q_labelText{color:var(--dsw-alias-label-secondary,#132d539e);letter-spacing:.03em;font-weight:600}.D49L8q_status{color:var(--dsw-alias-label-caption,#132d5373);text-transform:uppercase;letter-spacing:.04em;vertical-align:middle;font-weight:700;transition:color .25s,text-shadow .25s;display:inline-block}.D49L8q_statusError{color:var(--dsw-alias-state-error-primary,#c93a3a)}.D49L8q_statusUnknown{color:var(--dsw-alias-label-tertiary,#132d5373)}.D49L8q_statusGlow{color:#3f76d8;text-shadow:0 0 14px #3f76d88c}body[data-ds-dark-theme] .D49L8q_statusGlow,html[data-ds-dark-theme] .D49L8q_statusGlow,[data-theme=dark] .D49L8q_statusGlow{color:#6e9be8;text-shadow:0 0 14px #6e9be899}.D49L8q_level0{color:#132d5366}.D49L8q_level1{color:#3f76d88c}.D49L8q_level2{color:#3f76d8bf}.D49L8q_level3{color:#3f76d8;text-shadow:0 0 10px #3f76d873}.D49L8q_level4{color:#2f62c4;text-shadow:0 0 12px #3f76d899}body[data-ds-dark-theme] .D49L8q_level0,html[data-ds-dark-theme] .D49L8q_level0,[data-theme=dark] .D49L8q_level0{color:#94b4dc59}body[data-ds-dark-theme] .D49L8q_level1,html[data-ds-dark-theme] .D49L8q_level1,[data-theme=dark] .D49L8q_level1{color:#6e9be880}body[data-ds-dark-theme] .D49L8q_level2,html[data-ds-dark-theme] .D49L8q_level2,[data-theme=dark] .D49L8q_level2{color:#6e9be8b3}body[data-ds-dark-theme] .D49L8q_level3,html[data-ds-dark-theme] .D49L8q_level3,[data-theme=dark] .D49L8q_level3{color:#6e9be8;text-shadow:0 0 10px #6e9be880}body[data-ds-dark-theme] .D49L8q_level4,html[data-ds-dark-theme] .D49L8q_level4,[data-theme=dark] .D49L8q_level4{color:#9dbcf0;text-shadow:0 0 12px #6e9be8a6}.D49L8q_close{border:1px solid var(--dsw-alias-border-l2,#132d5329);background:var(--dsw-alias-interactive-bg-hover,#ffffff59);color:var(--dsw-alias-label-secondary,#132d539e);cursor:pointer;border-radius:8px;justify-content:center;align-items:center;width:24px;height:24px;font-size:13px;line-height:1;display:inline-flex}.D49L8q_close:hover{color:var(--dsw-alias-label-primary,#132d53);border-color:var(--dsw-alias-border-l3,#132d5357);background:var(--dsw-alias-interactive-bg-hover-accent,#ffffff8c)}body[data-ds-dark-theme] .D49L8q_close,html[data-ds-dark-theme] .D49L8q_close,[data-theme=dark] .D49L8q_close{border-color:var(--dsw-alias-border-l2,#94b4dc33);color:#94b4dcbf;background:#94b4dc14}body[data-ds-dark-theme] .D49L8q_close:hover,html[data-ds-dark-theme] .D49L8q_close:hover,[data-theme=dark] .D49L8q_close:hover{color:#dbe7f7;background:#94b4dc29;border-color:#94b4dc66}.D49L8q_levelLabels{height:15px;margin-bottom:4px;position:relative}.D49L8q_levelLabel{color:var(--dsw-alias-label-caption,#132d5373);letter-spacing:.04em;text-transform:uppercase;font-size:10px;font-weight:700;transition:color .15s;position:absolute;top:0;transform:translate(-50%)}.D49L8q_levelLabelActive{color:#3f76d8}body[data-ds-dark-theme] .D49L8q_levelLabelActive,html[data-ds-dark-theme] .D49L8q_levelLabelActive,[data-theme=dark] .D49L8q_levelLabelActive{color:#6e9be8}.D49L8q_trackWrapper{border:1px solid var(--dsw-alias-border-l2,#132d531f);background:var(--dsw-alias-interactive-bg-hover,#132d530d);isolation:isolate;border-radius:10px;height:32px;position:relative;overflow:hidden}body[data-ds-dark-theme] .D49L8q_trackWrapper,html[data-ds-dark-theme] .D49L8q_trackWrapper,[data-theme=dark] .D49L8q_trackWrapper{border-color:var(--dsw-alias-border-l2,#94b4dc24);background:#0a0e1680}.D49L8q_trackBg{z-index:0;position:absolute;inset:0}.D49L8q_fill{z-index:1;pointer-events:none;background:linear-gradient(90deg,#3f76d838,#3f76d880);border-radius:9px 0 0 9px;transition:width 80ms linear;position:absolute;top:0;bottom:0;left:0;box-shadow:inset 0 1px #ffffff40}body[data-ds-dark-theme] .D49L8q_fill,html[data-ds-dark-theme] .D49L8q_fill,[data-theme=dark] .D49L8q_fill{background:linear-gradient(90deg,#6e9be82e,#6e9be873);box-shadow:inset 0 1px #ffffff1f}.D49L8q_dotsLayer{pointer-events:none;z-index:2;position:absolute;inset:0}.D49L8q_dot{background:#3f76d84d;border-radius:50%;width:4px;height:4px;transition:background .15s,box-shadow .15s;position:absolute;top:50%;transform:translate(-50%,-50%)}.D49L8q_dotActive{background:#3f76d8;box-shadow:0 0 8px #3f76d8cc}body[data-ds-dark-theme] .D49L8q_dot,html[data-ds-dark-theme] .D49L8q_dot,[data-theme=dark] .D49L8q_dot{background:#6e9be84d}body[data-ds-dark-theme] .D49L8q_dotActive,html[data-ds-dark-theme] .D49L8q_dotActive,[data-theme=dark] .D49L8q_dotActive{background:#6e9be8;box-shadow:0 0 8px #6e9be8d9}.D49L8q_range{-webkit-appearance:none;appearance:none;cursor:pointer;z-index:5;background:0 0;outline:none;width:100%;height:100%;margin:0;padding:0;position:absolute;inset:0}.D49L8q_range::-webkit-slider-thumb{-webkit-appearance:none;cursor:grab;background:linear-gradient(145deg,#fff 0%,#dce7f7 55%,#c9d9f0 100%);border:none;border-radius:9px;width:26px;height:26px;transition:box-shadow .25s,transform .2s cubic-bezier(.34,1.56,.64,1);box-shadow:0 2px 8px #132d5340,0 0 0 1px #3f76d847,inset 0 1px #fffc}.D49L8q_range::-webkit-slider-thumb:active{cursor:grabbing;transform:scale(.92)}.D49L8q_rangeGlow::-webkit-slider-thumb{box-shadow:0 2px 8px #132d534d,0 0 0 1px #3f76d873,0 0 18px #3f76d866,0 0 36px #3f76d82e,inset 0 1px #fffc}.D49L8q_range::-moz-range-thumb{cursor:grab;background:linear-gradient(145deg,#fff 0%,#dce7f7 55%,#c9d9f0 100%);border:none;border-radius:8px;width:24px;height:24px;box-shadow:0 2px 8px #132d5340,0 0 0 1px #3f76d847}.D49L8q_range::-moz-range-thumb:active{cursor:grabbing;transform:scale(.95)}.D49L8q_range::-moz-range-track{background:0 0;border:none;height:32px}.D49L8q_pointLight{pointer-events:none;z-index:3;opacity:0;background:radial-gradient(circle,#3f76d838 0%,#3f76d812 30%,#3f76d805 55%,#0000 70%);border-radius:50%;width:150px;height:150px;transition:opacity .25s;position:absolute;transform:translate(-50%,-50%)}.D49L8q_pointLightOn{opacity:1}.D49L8q_emptyOverlay{color:var(--dsw-alias-label-caption,#132d5373);letter-spacing:.02em;text-align:center;padding:10px 0 2px;font-size:13px;font-weight:600}.D49L8q_failedBox{flex-direction:column;align-items:center;gap:8px;display:flex}.D49L8q_retry{border:1px solid var(--dsw-alias-border-l2,#132d5333);background:var(--dsw-alias-interactive-bg-hover,#132d530f);color:var(--dsw-alias-label-primary,#132d53);cursor:pointer;border-radius:8px;padding:3px 12px;font-size:12px;font-weight:600}.D49L8q_retry:hover{background:var(--dsw-alias-interactive-bg-hover-accent,#132d531f)}.D49L8q_inlinePanel{box-sizing:border-box;border-top:1px solid var(--dsw-alias-border-l2,#132d531f);user-select:none;width:100%;padding:8px 10px 10px;position:relative}body[data-ds-dark-theme] .D49L8q_inlinePanel,html[data-ds-dark-theme] .D49L8q_inlinePanel,[data-theme=dark] .D49L8q_inlinePanel{border-top-color:var(--dsw-alias-border-l2,#94b4dc24)}.D49L8q_inlinePanel .D49L8q_head{margin-bottom:4px}";
 		const tagId$1 = "@captain1275/dsh-effort-slider/effort.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId$1) + "]") === null) {
 			const tag = document.createElement("style");
@@ -17,39 +17,39 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var effort_module_css_default = {
-			"close": "v5_bmW_close",
-			"dot": "v5_bmW_dot",
-			"dotActive": "v5_bmW_dotActive",
-			"dotsLayer": "v5_bmW_dotsLayer",
-			"emptyOverlay": "v5_bmW_emptyOverlay",
-			"failedBox": "v5_bmW_failedBox",
-			"fill": "v5_bmW_fill",
-			"glow": "v5_bmW_glow",
-			"head": "v5_bmW_head",
-			"headLeft": "v5_bmW_headLeft",
-			"inlinePanel": "v5_bmW_inlinePanel",
-			"inner": "v5_bmW_inner",
-			"labelText": "v5_bmW_labelText",
-			"level0": "v5_bmW_level0",
-			"level1": "v5_bmW_level1",
-			"level2": "v5_bmW_level2",
-			"level3": "v5_bmW_level3",
-			"level4": "v5_bmW_level4",
-			"levelLabel": "v5_bmW_levelLabel",
-			"levelLabelActive": "v5_bmW_levelLabelActive",
-			"levelLabels": "v5_bmW_levelLabels",
-			"panel": "v5_bmW_panel",
-			"pointLight": "v5_bmW_pointLight",
-			"pointLightOn": "v5_bmW_pointLightOn",
-			"range": "v5_bmW_range",
-			"rangeGlow": "v5_bmW_rangeGlow",
-			"retry": "v5_bmW_retry",
-			"status": "v5_bmW_status",
-			"statusError": "v5_bmW_statusError",
-			"statusGlow": "v5_bmW_statusGlow",
-			"statusUnknown": "v5_bmW_statusUnknown",
-			"trackBg": "v5_bmW_trackBg",
-			"trackWrapper": "v5_bmW_trackWrapper"
+			"close": "D49L8q_close",
+			"dot": "D49L8q_dot",
+			"dotActive": "D49L8q_dotActive",
+			"dotsLayer": "D49L8q_dotsLayer",
+			"emptyOverlay": "D49L8q_emptyOverlay",
+			"failedBox": "D49L8q_failedBox",
+			"fill": "D49L8q_fill",
+			"glow": "D49L8q_glow",
+			"head": "D49L8q_head",
+			"headLeft": "D49L8q_headLeft",
+			"inlinePanel": "D49L8q_inlinePanel",
+			"inner": "D49L8q_inner",
+			"labelText": "D49L8q_labelText",
+			"level0": "D49L8q_level0",
+			"level1": "D49L8q_level1",
+			"level2": "D49L8q_level2",
+			"level3": "D49L8q_level3",
+			"level4": "D49L8q_level4",
+			"levelLabel": "D49L8q_levelLabel",
+			"levelLabelActive": "D49L8q_levelLabelActive",
+			"levelLabels": "D49L8q_levelLabels",
+			"panel": "D49L8q_panel",
+			"pointLight": "D49L8q_pointLight",
+			"pointLightOn": "D49L8q_pointLightOn",
+			"range": "D49L8q_range",
+			"rangeGlow": "D49L8q_rangeGlow",
+			"retry": "D49L8q_retry",
+			"status": "D49L8q_status",
+			"statusError": "D49L8q_statusError",
+			"statusGlow": "D49L8q_statusGlow",
+			"statusUnknown": "D49L8q_statusUnknown",
+			"trackBg": "D49L8q_trackBg",
+			"trackWrapper": "D49L8q_trackWrapper"
 		};
 		/** 轮询/写入基准间隔（ms）。 */
 		const POLL_BASE_MS = 1e3;
@@ -168,7 +168,7 @@ window.__ModuleLoader__.load({
 		* 才替换（条目 1）；失败（传输错误或 result.ok=false）进入 error 态（条目 5），
 		* 挂起超过 DIRECTORY_TIMEOUT_MS（10s）视为失败。
 		*/
-		function useDirectory(connection, sessionId, options) {
+		function useDirectory(wire, sessionId, options) {
 			const { reloadTick = 0, enabled = true } = options ?? {};
 			const [state, setState] = (0, react.useState)({
 				status: "idle",
@@ -204,7 +204,7 @@ window.__ModuleLoader__.load({
 						errorAt: Date.now()
 					});
 				}, DIRECTORY_TIMEOUT_MS);
-				connection.api.sessions.models({ sessionId }).then((response) => {
+				wire.models({ sessionId }).then((response) => {
 					if (!alive) return;
 					window.clearTimeout(hangTimer);
 					if (response.result.ok) setState({
@@ -230,7 +230,7 @@ window.__ModuleLoader__.load({
 					window.clearTimeout(hangTimer);
 				};
 			}, [
-				connection,
+				wire,
 				sessionId,
 				reloadTick,
 				internalTick,
@@ -249,9 +249,9 @@ window.__ModuleLoader__.load({
 		* @returns the panel element.
 		*/
 		function EffortPanel(props) {
-			const { sessionId, connection, onClose, inline = false, onResolved, inputRef } = props;
+			const { sessionId, wire, onClose, inline = false, onResolved, inputRef } = props;
 			const externalDirectory = props.directory ?? null;
-			const ownDirectory = useDirectory(connection, sessionId, { enabled: externalDirectory === null });
+			const ownDirectory = useDirectory(wire, sessionId, { enabled: externalDirectory === null });
 			const directory = externalDirectory ?? ownDirectory;
 			const [dragging, setDragging] = (0, react.useState)(false);
 			const [rawValue, setRawValue] = (0, react.useState)(0);
@@ -313,7 +313,7 @@ window.__ModuleLoader__.load({
 					settledIdxRef.current = idx;
 					return;
 				}
-				connection.api.sessions.selectModel({
+				wire.selectModel({
 					sessionId,
 					provider: current.provider,
 					model: current.model,
@@ -480,8 +480,8 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
-		//#region \0dsh-css:C:\Users\19161\Documents\dsh-work\dsh-ui-web\packages\dsh-effort-slider\src\client\effort-trigger.module.css.mjs
-		const css = ".JZLxAW_root{align-items:center;display:inline-flex;position:relative}.JZLxAW_trigger{color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border:none;border-radius:999px;align-items:center;gap:3px;padding:2px 8px;font-size:13px;font-weight:500;line-height:20px;display:inline-flex}.JZLxAW_trigger:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.JZLxAW_trigger:focus-visible{outline:2px solid var(--dsw-alias-label-secondary);outline-offset:2px}.JZLxAW_label{text-overflow:ellipsis;white-space:nowrap;max-width:120px;overflow:hidden}.JZLxAW_chevron{color:var(--dsw-alias-label-caption);flex:none}.JZLxAW_popup{z-index:40;position:absolute;bottom:calc(100% + 8px);right:0}.JZLxAW_popup [data-effort-panel=true]{position:relative;top:auto;left:auto}";
+		//#region \0dsh-css:C:\Users\19161\Documents\dsh-work\packages\dsh-effort-slider\src\client\effort-trigger.module.css.mjs
+		const css = ".XR-sWq_root{align-items:center;display:inline-flex;position:relative}.XR-sWq_trigger{color:var(--dsw-alias-label-secondary);cursor:pointer;background:0 0;border:none;border-radius:999px;align-items:center;gap:3px;padding:2px 8px;font-size:13px;font-weight:500;line-height:20px;display:inline-flex}.XR-sWq_trigger:hover:not(:disabled){background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.XR-sWq_trigger:focus-visible{outline:2px solid var(--dsw-alias-label-secondary);outline-offset:2px}.XR-sWq_label{text-overflow:ellipsis;white-space:nowrap;max-width:120px;overflow:hidden}.XR-sWq_chevron{color:var(--dsw-alias-label-caption);flex:none}.XR-sWq_popup{z-index:40;position:absolute;bottom:calc(100% + 8px);right:0}.XR-sWq_popup [data-effort-panel=true]{position:relative;top:auto;left:auto}";
 		const tagId = "@captain1275/dsh-effort-slider/effort-trigger.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -491,11 +491,11 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var effort_trigger_module_css_default = {
-			"chevron": "JZLxAW_chevron",
-			"label": "JZLxAW_label",
-			"popup": "JZLxAW_popup",
-			"root": "JZLxAW_root",
-			"trigger": "JZLxAW_trigger"
+			"chevron": "XR-sWq_chevron",
+			"label": "XR-sWq_label",
+			"popup": "XR-sWq_popup",
+			"root": "XR-sWq_root",
+			"trigger": "XR-sWq_trigger"
 		};
 		//#endregion
 		//#region src/client/EffortTrigger.tsx
@@ -520,17 +520,17 @@ window.__ModuleLoader__.load({
 		*/
 		/**
 		* 渲染档位触发器 + 弹层。
-		* @param props - connection 与会话 id（框架注入）。
+		* @param props - wire 与会话 id（框架注入）。
 		* @returns 触发器元素；不支持多档或无会话时为 null。
 		*/
-		function EffortTrigger({ connection, sessionId }) {
+		function EffortTrigger({ wire, sessionId }) {
 			const [open, setOpen] = (0, react.useState)(false);
 			const rootRef = (0, react.useRef)(null);
 			const triggerRef = (0, react.useRef)(null);
 			const sliderRef = (0, react.useRef)(null);
 			const wasOpenRef = (0, react.useRef)(false);
 			const [reloadTick, setReloadTick] = (0, react.useState)(0);
-			const directoryState = useDirectory(connection, sessionId, { reloadTick });
+			const directoryState = useDirectory(wire, sessionId, { reloadTick });
 			const directory = directoryState.value;
 			const current = directory?.current ?? null;
 			const efforts = ((current === null ? void 0 : directory?.groups.find((entry) => entry.id === current.provider))?.models.find((entry) => entry.id === current?.model))?.reasoning?.efforts ?? [];
@@ -606,7 +606,7 @@ window.__ModuleLoader__.load({
 				if (writtenKeyRef.current === key) return;
 				if (pendingWriteKeyRef.current === key) return;
 				pendingWriteKeyRef.current = key;
-				connection.api.sessions.selectModel({
+				wire.selectModel({
 					sessionId,
 					provider: current.provider,
 					model: current.model,
@@ -633,7 +633,7 @@ window.__ModuleLoader__.load({
 				directory,
 				usable,
 				sessionId,
-				connection,
+				wire,
 				open
 			]);
 			if (sessionId === void 0) return null;
@@ -683,7 +683,7 @@ window.__ModuleLoader__.load({
 					"aria-label": "推理等级",
 					children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)(EffortPanel, {
 						sessionId,
-						connection,
+						wire,
 						directory: directoryState,
 						inputRef: sliderRef,
 						onClose: () => setOpen(false)
@@ -692,23 +692,76 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
+		//#region src/client/wire.ts
+		/**
+		* 把目录快照投影成组件消费的形状。
+		* @param state - 官方每会话目录的快照。
+		* @returns 只含组件实际读取字段的目录值。
+		*/
+		function project(state) {
+			return {
+				current: state.current === null ? null : {
+					provider: state.current.provider,
+					model: state.current.model,
+					...state.current.reasoningEffort === void 0 ? {} : { reasoningEffort: state.current.reasoningEffort }
+				},
+				groups: state.groups
+			};
+		}
+		/**
+		* 用 0.1.5 的 `ctx.modelDirectories` 实现 {@link EffortWire}。
+		* @param directories - 官方每会话模型目录服务。
+		* @returns 组件可用的读写接口。
+		*/
+		function createEffortWire(directories) {
+			const directoryFor = (sessionId) => directories.directoryFor(sessionId);
+			return {
+				async models({ sessionId }) {
+					try {
+						const directory = directoryFor(sessionId);
+						await directory.load();
+						const state = directory.store.getSnapshot();
+						if (state.status === "error") return { result: { ok: false } };
+						return { result: {
+							ok: true,
+							value: project(state)
+						} };
+					} catch {
+						return { result: { ok: false } };
+					}
+				},
+				async selectModel({ sessionId, provider, model, reasoningEffort }) {
+					try {
+						await directoryFor(sessionId).select({
+							provider,
+							model,
+							reasoningEffort
+						});
+						return { result: { ok: true } };
+					} catch {
+						return { result: { ok: false } };
+					}
+				}
+			};
+		}
+		//#endregion
 		//#region src/client/index.ts
-		/** 需要的客户端服务：slots（插槽注册）、connection（模型目录读写）。 */
-		const inject = ["slots", "connection"];
+		/** 需要的客户端服务：slots（插槽注册）、modelDirectories（模型目录读写）。 */
+		const inject = ["slots", "modelDirectories"];
 		/**
 		* 在 composer 工具条注册档位触发器，紧贴模型选择器（视觉上在模型按钮左侧）。
-		* @param ctx - 宿主上下文（slots/connection 服务）。
+		* @param ctx - 宿主上下文（slots/modelDirectories 服务）。
 		*/
 		function apply(ctx) {
 			const slots = ctx.get("slots");
-			const connection = ctx.get("connection");
+			const wire = createEffortWire(ctx.get("modelDirectories"));
 			slots.inject("conversation.input.right", () => ctx.get("slots").register({
 				name: "conversation.input.right",
 				id: "effort-slider",
 				order: 100,
 				label: "推理等级",
 				inject: (sessionId) => ({
-					connection,
+					wire,
 					...sessionId === void 0 ? {} : { sessionId }
 				})
 			}, EffortTrigger));

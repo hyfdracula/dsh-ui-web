@@ -18,7 +18,7 @@
  * - 会话 effort 在目录中找不到时，显示 effort id 原文而不是"默认"（条目 6）。
  */
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import type { EffortWire } from './wire.ts'
 import { EffortPanel, useDirectory } from './EffortPanel.tsx'
 import {
   isEffortUnset,
@@ -32,7 +32,7 @@ import css from './effort-trigger.module.css'
 
 /** 注入面：由注册时的 inject(sessionId) 提供。 */
 export interface EffortTriggerInjected {
-  connection: ConnectionHandle
+  wire: EffortWire
   sessionId?: string
 }
 
@@ -40,14 +40,14 @@ export interface EffortTriggerInjected {
 export type EffortTriggerProps = EffortTriggerInjected
 
 /** 与 EffortPanel 同款品牌收窄：宿主注入的 sessionId 即合法 SessionId。 */
-type SessionIdBrand = Parameters<ConnectionHandle['api']['sessions']['models']>[0]['sessionId']
+type SessionIdBrand = string
 
 /**
  * 渲染档位触发器 + 弹层。
- * @param props - connection 与会话 id（框架注入）。
+ * @param props - wire 与会话 id（框架注入）。
  * @returns 触发器元素；不支持多档或无会话时为 null。
  */
-export function EffortTrigger({ connection, sessionId }: EffortTriggerProps): ReactNode {
+export function EffortTrigger({ wire, sessionId }: EffortTriggerProps): ReactNode {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement | null>(null)
   const triggerRef = useRef<HTMLButtonElement | null>(null)
@@ -55,7 +55,7 @@ export function EffortTrigger({ connection, sessionId }: EffortTriggerProps): Re
   const wasOpenRef = useRef(false)
   const [reloadTick, setReloadTick] = useState(0)
 
-  const directoryState = useDirectory(connection, sessionId, { reloadTick })
+  const directoryState = useDirectory(wire, sessionId, { reloadTick })
   const directory = directoryState.value
   const current = directory?.current ?? null
   const group = current === null ? undefined : directory?.groups.find((entry) => entry.id === current.provider)
@@ -135,7 +135,7 @@ export function EffortTrigger({ connection, sessionId }: EffortTriggerProps): Re
     if (writtenKeyRef.current === key) return // 已成功写过的 key 不重复写
     if (pendingWriteKeyRef.current === key) return // 在途请求防重
     pendingWriteKeyRef.current = key
-    void connection.api.sessions
+    void wire
       .selectModel({
         sessionId: sessionId as SessionIdBrand,
         provider: current.provider,
@@ -156,7 +156,7 @@ export function EffortTrigger({ connection, sessionId }: EffortTriggerProps): Re
         autoWriteStateRef.current = { key, attempts: (record?.attempts ?? 0) + 1, lastFailureAt: Date.now() }
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [directory, usable, sessionId, connection, open])
+  }, [directory, usable, sessionId, wire, open])
 
   if (sessionId === undefined) return null
   if (!usable) return null
@@ -195,7 +195,7 @@ export function EffortTrigger({ connection, sessionId }: EffortTriggerProps): Re
         <div className={css.popup} role="dialog" aria-modal={false} aria-label="推理等级">
           <EffortPanel
             sessionId={sessionId}
-            connection={connection}
+            wire={wire}
             directory={directoryState}
             inputRef={sliderRef}
             onClose={() => setOpen(false)}

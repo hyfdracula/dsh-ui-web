@@ -62,10 +62,12 @@ export const inject = ['slots', 'locale']
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register('web-ui-plugins', { zh, en }), 'web-ui-settings: dictionaries')
 
+  // `settings.plugin.item` is a KEYED slot: the card is looked up by its
+  // namespace, so 0.1.5 accepts no `order` here (the official registrations pass
+  // only name/key/locale/inject). Card position follows the shell's own order.
   ctx.slots.inject('settings.plugin.item', () => ctx.slots.register({
     name: 'settings.plugin.item',
     key: 'web-ui-plugins',
-    order: 90,
     locale: 'web-ui-plugins',
     children: { 'web-ui.plugin.item': { kind: 'list', scope: 'root' } },
   }, WebUIPluginsCard))

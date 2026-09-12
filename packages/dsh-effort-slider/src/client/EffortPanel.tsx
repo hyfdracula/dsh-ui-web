@@ -28,7 +28,9 @@ import {
   type RefObject,
   type SyntheticEvent,
 } from 'react'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import type { DirectoryValue, EffortWire } from './wire.ts'
+
+export type { DirectoryValue, EffortLevel } from './wire.ts'
 import css from './effort.module.css'
 import {
   DIRECTORY_TIMEOUT_MS,
@@ -43,7 +45,7 @@ import {
 /** Panel props: owning session, wire face, layout mode, resolve/close verbs. */
 export interface EffortPanelProps {
   sessionId: string
-  connection: ConnectionHandle
+  wire: EffortWire
   /** 内联模式：菜单内嵌，无边框、无关闭钮。 */
   inline?: boolean
   /** 目录解析结果回调（inline 宿主用它决定隐藏/还原官方行）。 */
@@ -56,27 +58,8 @@ export interface EffortPanelProps {
   inputRef?: RefObject<HTMLInputElement>
 }
 
-/** One reasoning level as returned by the directory API. */
-export interface EffortLevel {
-  id: string
-  name: string
-  description?: string
-}
-
-/** The advisory directory value (`sessions.models` response). */
-export interface DirectoryValue {
-  current: { provider: string; model: string; reasoningEffort?: string } | null
-  groups: Array<{
-    id: string
-    models: Array<{
-      id: string
-      reasoning?: { efforts?: EffortLevel[]; defaultEffort?: string }
-    }>
-  }>
-}
-
-/** 座位注入的 sessionId 字符串在宿主侧即合法 SessionId；此处收窄到品牌类型。 */
-type SessionIdBrand = Parameters<ConnectionHandle['api']['sessions']['models']>[0]['sessionId']
+/** 座位注入的 sessionId 字符串在宿主侧即合法 SessionId；适配器内部再收窄。 */
+type SessionIdBrand = string
 
 /** 目录加载状态：value 始终尽量保留最近一次成功数据（stale-while-revalidate）。 */
 export interface DirectoryState {
@@ -109,7 +92,7 @@ export interface UseDirectoryOptions {
  * 挂起超过 DIRECTORY_TIMEOUT_MS（10s）视为失败。
  */
 export function useDirectory(
-  connection: ConnectionHandle,
+  wire: EffortWire,
   sessionId: string | undefined,
   options?: UseDirectoryOptions,
 ): DirectoryState {
@@ -136,7 +119,7 @@ export function useDirectory(
       if (!alive) return
       setState((prev) => (prev.status === 'ready' ? prev : { status: 'error', value: prev.value, errorAt: Date.now() }))
     }, DIRECTORY_TIMEOUT_MS)
-    void connection.api.sessions
+    void wire
       .models({ sessionId: sessionId as SessionIdBrand })
       .then((response) => {
         if (!alive) return
@@ -157,7 +140,7 @@ export function useDirectory(
       alive = false
       window.clearTimeout(hangTimer)
     }
-  }, [connection, sessionId, reloadTick, internalTick, enabled])
+  }, [wire, sessionId, reloadTick, internalTick, enabled])
 
   return { value: state.value, status: state.status, errorAt: state.errorAt, retry }
 }
@@ -168,9 +151,9 @@ export function useDirectory(
  * @returns the panel element.
  */
 export function EffortPanel(props: EffortPanelProps): ReactNode {
-  const { sessionId, connection, onClose, inline = false, onResolved, inputRef } = props
+  const { sessionId, wire, onClose, inline = false, onResolved, inputRef } = props
   const externalDirectory = props.directory ?? null
-  const ownDirectory = useDirectory(connection, sessionId, { enabled: externalDirectory === null })
+  const ownDirectory = useDirectory(wire, sessionId, { enabled: externalDirectory === null })
   const directory = externalDirectory ?? ownDirectory
   const [dragging, setDragging] = useState(false)
   // Continuous 0..100 slider position; snaps to an effort level on release.
@@ -258,7 +241,7 @@ export function EffortPanel(props: EffortPanelProps): ReactNode {
       settledIdxRef.current = idx
       return
     }
-    void connection.api.sessions
+    void wire
       .selectModel({
         sessionId: sessionId as SessionIdBrand,
         provider: current.provider,
