@@ -62,12 +62,14 @@ describe('live-stats estimator', () => {
     expect(() => estimateContentTokens([block], SPEC)).not.toThrow()
   })
 
-  it('prices header framing for system text and tool schemas', () => {
+  it('prices header framing for tool schemas, and no longer for system text', () => {
     expect(estimateHeaderTokens(undefined, SPEC)).toBe(0)
+    // 0.1.5 moved the system prompt out of the request header into a surface node
+    // (system/message), so a header carrying config alone prices nothing here;
+    // its tokens arrive through the surface map instead.
     expect(estimateHeaderTokens({
       config: { provider: 'mock', model: 'mock' },
-      system: 'abcd',
-    }, SPEC)).toBe(5)
+    }, SPEC)).toBe(0)
     expect(estimateHeaderTokens({
       config: { provider: 'mock', model: 'mock' },
       tools: [{ name: 'tool', description: 'd', parameters: {} }],

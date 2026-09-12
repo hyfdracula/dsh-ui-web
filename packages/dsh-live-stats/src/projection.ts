@@ -17,6 +17,18 @@ import {
 } from './estimator.ts'
 import type { EstimatorSpec } from './estimator.ts'
 
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionStateMap {
+    /** This plugin's own fold state (the official token-meter declares tokenUsage only). */
+    liveTokenUsage: State
+  }
+
+  interface SessionProjectionMap {
+    /** The browser-visible view TpsLine reads through the session projection face. */
+    liveTokenUsage: LiveTokenUsageProjection
+  }
+}
+
 export type { LiveTokenUsageProjection } from '@deepseek-ai/dsh-token-meter/client'
 
 const zeroBuckets = (): TokenUsageProjection => ({
@@ -53,6 +65,35 @@ const projectionSchema = z.object({
   tokensPerSecond: z.number().nonnegative().optional(),
 }).strict() as unknown as z.ZodType<LiveTokenUsageProjection>
 
+/** Tokens-by-class shape shared by the settled totals and one step's buckets. */
+const bucketsSchema = z.object({
+  uncachedInputTokens: z.number().int().nonnegative(),
+  outputTokens: z.number().int().nonnegative(),
+  cacheReadTokens: z.number().int().nonnegative(),
+  cacheWriteTokens: z.number().int().nonnegative(),
+}).strict()
+
+/**
+ * Schema of the persisted fold state. The request header and the in-flight step
+ * are rebuilt on each replay pass from the raw events and pass through untouched;
+ * everything the view is computed from is validated.
+ */
+const stateSchema = z.object({
+  settled: bucketsSchema,
+  settledEstimates: z.number().int().nonnegative(),
+  last: z.object({
+    turn: z.number().int(),
+    step: z.number().int(),
+    buckets: bucketsSchema,
+    estimated: z.boolean(),
+    tokensPerSecond: z.number().nonnegative().optional(),
+  }).strict().nullable(),
+  surface: z.array(z.tuple([z.number(), z.number()])),
+  surfaceTokens: z.number().nonnegative(),
+  header: z.unknown().optional(),
+  active: z.unknown().nullable(),
+}).strict() as unknown as z.ZodType<State>
+
 type OutputBlock =
   | { kind: 'text'; characters: number }
   | { kind: 'reasoning'; characters: number }
@@ -69,6 +110,14 @@ interface ActiveStep {
   pricedTokens: number
   /** Count of non-undefined blocks (guards the role overhead and zero case). */
   pricedBlocks: number
+  /**
+   * Step start instant: the rate window's baseline.
+   *
+   * 0.1.5 keeps stream chunks out of the durable log, so the only output
+   * timestamp a fold can see is the settle event; measuring from the step start
+   * is what keeps the rate meaningful instead of collapsing to a zero window.
+   */
+  startedAt?: number
   firstOutputTime?: number
   latestOutputTime?: number
 }
@@ -86,20 +135,29 @@ interface State {
   settled: TokenUsageProjection
   settledEstimates: number
   last: SettledSample | null
-  /** Surface message seq -> estimated tokens, kept in increasing seq order. */
-  surface: Map<number, number>
+  /**
+   * Surface message seq -> estimated tokens, in increasing seq order.
+   *
+   * An ordered array rather than a Map: 0.1.5 rehydrates projection state through
+   * `stateSchema.parse`, and a Map does not survive JSON (it stringifies to {}).
+   */
+  surface: Array<readonly [number, number]>
   surfaceTokens: number
   header: EpochHeader | undefined
   active: ActiveStep | null
 }
 
-function surfaceMessage(event: SurfaceEvent): Message {
+function surfaceMessage(event: SurfaceEvent): Message | undefined {
   switch (event.type) {
     case 'user/message':
       return event.data
     case 'assistant/message':
     case 'tool/result':
       return event.data.message
+    default:
+      // A surface kind this estimator does not price (the system/message envelope
+      // v3 added): no message means no contribution, not a failed projection.
+      return undefined
   }
 }
 
@@ -108,31 +166,40 @@ function applySurface(
   event: SurfaceEvent,
   spec: EstimatorSpec,
 ): Pick<State, 'surface' | 'surfaceTokens'> {
-  const tokens = estimateMessageTokens(surfaceMessage(event), spec)
+  const message = surfaceMessage(event)
+  if (message === undefined) {
+    return { surface: state.surface, surfaceTokens: state.surfaceTokens }
+  }
+  const tokens = estimateMessageTokens(message, spec)
   if (event.surfaceOp === 'append') {
-    state.surface.set(event.seq, tokens)
+    state.surface.push([event.seq, tokens])
     return {
       surface: state.surface,
       surfaceTokens: state.surfaceTokens + tokens,
     }
   }
   const operation = event.surfaceOp
-  if (!state.surface.has(operation.start) || !state.surface.has(operation.end) || operation.start > operation.end) {
+  const hasSeq = (seq: number): boolean => state.surface.some(([at]) => at === seq)
+  if (!hasSeq(operation.startSeq) || !hasSeq(operation.endSeq) || operation.startSeq > operation.endSeq) {
     throw new Error(
-      'live-stats: replace at seq ' + event.seq + ' has invalid current range ' + operation.start + '-' + operation.end,
+      'live-stats: replace at seq ' + event.seq + ' has invalid current range '
+      + operation.startSeq + '-' + operation.endSeq,
     )
   }
   // Keys enter in increasing seq order (appends grow, and a replace's own
   // seq is always the newest), so one pass with an early exit removes the
   // exact range. Deleting entries while iterating a Map is safe.
   let removed = 0
-  for (const [seq, nodeTokens] of state.surface) {
-    if (seq < operation.start) continue
-    if (seq > operation.end) break
+  // Iterate a copy: entries leave the array in place.
+  for (const [seq, nodeTokens] of [...state.surface]) {
+    if (seq < operation.startSeq) continue
+    if (seq > operation.endSeq) break
     removed += nodeTokens
-    state.surface.delete(seq)
+    const at = state.surface.findIndex(([candidate]) => candidate === seq)
+    if (at >= 0) state.surface.splice(at, 1)
   }
-  state.surface.set(event.seq, tokens)
+  // The replacement's own seq is the newest, so appending keeps the order.
+  state.surface.push([event.seq, tokens])
   return {
     surface: state.surface,
     surfaceTokens: state.surfaceTokens - removed + tokens,
@@ -230,7 +297,7 @@ function exactStep(step: ActiveStep, usage: TokenUsage, time: number): ActiveSte
     pricedTokens: 0,
     pricedBlocks: 0,
     ...(usage.outputTokens > 0
-      ? { firstOutputTime: step.firstOutputTime ?? time, latestOutputTime: time }
+      ? { firstOutputTime: step.firstOutputTime ?? step.startedAt ?? time, latestOutputTime: time }
       : {}),
   }
 }
@@ -263,20 +330,27 @@ function view(state: State): LiveTokenUsageProjection {
 }
 
 /** Create the replayable live usage projection consumed by DSH Web and the TPS row.
+ *
+ * The return type spells the WIRE requirement out rather than leaning on
+ * `ProjectionDefinition`'s optional `wire`: the registration overload needs a
+ * definition that certainly carries the client view, and an optional member can
+ * never prove that.
  * @param spec - resolved estimator settings for the fold.
  * @returns the replayable `liveTokenUsage` projection definition.
  */
 export function createLiveTokenUsageProjectionDefinition(
   spec: EstimatorSpec,
-): ProjectionDefinition<'liveTokenUsage', State> {
+): Omit<ProjectionDefinition<'liveTokenUsage', State>, 'wire'> & {
+  wire: { viewSchema: z.ZodType<LiveTokenUsageProjection>; view(state: State): LiveTokenUsageProjection }
+} {
   return {
     key: 'liveTokenUsage',
-    schema: projectionSchema,
+    stateSchema,
     init: () => ({
       settled: zeroBuckets(),
       settledEstimates: 0,
       last: null,
-      surface: new Map(),
+      surface: [],
       surfaceTokens: 0,
       header: undefined,
       active: null,
@@ -288,6 +362,7 @@ export function createLiveTokenUsageProjectionDefinition(
           ...next,
           active: {
             ...event.data,
+            startedAt: event.time,
             buckets: {
               ...zeroBuckets(),
               uncachedInputTokens: estimateHeaderTokens(state.header, spec) + state.surfaceTokens,
@@ -312,32 +387,10 @@ export function createLiveTokenUsageProjectionDefinition(
             },
           }),
         }
-      } else if (event.type === 'assistant/chunk' && next.active !== null) {
-        const { chunk } = event.data
-        if (chunk.type === 'usage') {
-          next = { ...next, active: exactStep(next.active, chunk.usage, event.time) }
-        } else if (!next.active.exact) {
-          const active = { ...next.active }
-          if (applyOutputChunk(active, chunk, spec)) {
-            const tokens = active.pricedBlocks === 0 ? 0 : active.pricedTokens + spec.roleOverhead
-            next = {
-              ...next,
-              active: {
-                ...active,
-                buckets: { ...active.buckets, outputTokens: tokens },
-                /* v8 ignore next -- every mutating chunk prices at least one
-                 * non-empty block, so outputTokens is always positive here */
-                ...(tokens > 0
-                  ? {
-                    firstOutputTime: active.firstOutputTime ?? event.time,
-                    latestOutputTime: event.time,
-                  }
-                  : {}),
-              },
-            }
-          }
-        }
       } else if (event.type === 'assistant/message' && next.active !== null) {
+        // 0.1.5 streams chunks outside the durable log (SessionAssistantStreamFrame),
+        // so this fold settles from the message and its usage instead of counting
+        // mid-stream chunks. The rate stays meaningful; it lands at settle.
         next = {
           ...next,
           active: event.data.usage === undefined
@@ -385,7 +438,7 @@ export function createLiveTokenUsageProjectionDefinition(
       if (isSurfaceEvent(event)) next = { ...next, ...applySurface(next, event, spec) }
       return next
     },
-    view,
+    wire: { viewSchema: projectionSchema, view },
     stateVersion: 2,
   }
 }
