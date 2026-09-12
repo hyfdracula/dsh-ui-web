@@ -27,11 +27,6 @@ interface Seam {
 const SEAMS: readonly Seam[] = [
   // The layout frame: the sidebar column's direct parent (0.1.5 class `frame`).
   { attribute: 'data-dsh-frame', selector: ':has(> [class*="sidebarCol"])' },
-  // The sidebar COLUMN box itself (the bubble the shell insets by 12px and
-  // rounds to 20px). Stamped so the stylesheet can line its top row up with the
-  // conversation header card and the right column without keying off the
-  // hashed module class.
-  { attribute: 'data-dsh-sidebar-col', selector: '[class*="sidebarCol"]', first: true },
   // The sidebar content root (topmost `root` under the column — settings
   // internals also carry a `root` class but sit deeper, so first match wins).
   { attribute: 'data-dsh-sidebar-root', selector: '[class*="sidebarCol"] [class*="root"]', first: true },

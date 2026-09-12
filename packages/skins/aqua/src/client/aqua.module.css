@@ -819,43 +819,28 @@
   }
 }
 
-/* ---------- Right column (the suite's `rightbar`): the panel paints its own
-   OPAQUE base fill, so the ambient fluid never reaches it and the column reads
-   as a flat slab next to the glass panes. Lift it onto the same card recipe the
-   transcript, composer and menus use — translucent fill, backdrop blur, one
-   hairline on the seam — and give the panel the card corner radius on the edge
-   that faces the conversation. The tab strip keeps its own hairline so the
-   tabs stay legible on the glass. ---------- */
-[data-dsh-aqua] [data-sidebar-right-panel] {
-  background: var(--dsh-aqua-glass-card-light);
-  border-left: 1px solid rgba(19, 45, 83, 0.26);
-  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.4);
-  backdrop-filter: blur(var(--dsh-aqua-blur, 14px));
-  border-radius: 18px 0 0 18px;
+/* ---------- Material for the shape layer. The three-pane SHAPE (12px insets, 24px
+   corners, which boxes stay transparent, the seam/divider hairlines, the top-row
+   alignment, and the modal guard on the sidebar column's frost) now lives in the
+   cross-skin `dsh-pane-shape` plugin, so every skin gets it. This skin keeps the
+   MATERIAL: the glass gradient fill, the frost slider, the hairline alphas and the
+   highlight/shadow recipe. It hands them over through the plugin's knobs instead of
+   re-declaring the same properties — two attributes on <html> (0-2-0) beat the
+   plugin's own `[data-dsh-pane-shape]` defaults, so the skin wins regardless of
+   which bundle is listed first. Typography stays below. ---------- */
+[data-dsh-aqua][data-dsh-pane-shape] {
+  --dsh-pane-blur: var(--dsh-aqua-blur, 14px);
+  --dsh-pane-fill: var(--dsh-aqua-glass-card-light);
+  --dsh-pane-hairline: rgba(19, 45, 83, 0.26);
+  --dsh-pane-divider: rgba(19, 45, 83, 0.12);
+  --dsh-pane-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 8px 32px rgba(19, 45, 83, 0.12);
 }
 
-[data-dsh-aqua] body[data-ds-dark-theme] [data-sidebar-right-panel] {
-  background: var(--dsh-aqua-glass-card-dark);
-  border-left: 1px solid rgba(148, 180, 220, 0.32);
-  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.07);
-}
-
-/* The panel's own surfaces must stay transparent, or the fill above is hidden
-   again by the pane/surface boxes stacked inside it. */
-[data-dsh-aqua] [data-sidebar-right-panel] [data-dockkit-surface],
-[data-dsh-aqua] [data-sidebar-right-panel] [data-dockkit-pane] {
-  background: transparent;
-}
-
-/* Tab strip: one hairline under the chips, matching the header rule the
-   conversation side draws, and the chips themselves get the small radius the
-   rest of the skin's controls use. */
-[data-dsh-aqua] [data-sidebar-right-panel] [data-dockkit-strip] {
-  border-bottom: 1px solid rgba(19, 45, 83, 0.12);
-}
-
-[data-dsh-aqua] body[data-ds-dark-theme] [data-sidebar-right-panel] [data-dockkit-strip] {
-  border-bottom: 1px solid rgba(148, 180, 220, 0.16);
+[data-dsh-aqua][data-dsh-pane-shape] body[data-ds-dark-theme] {
+  --dsh-pane-fill: var(--dsh-aqua-glass-card-dark);
+  --dsh-pane-hairline: rgba(148, 180, 220, 0.32);
+  --dsh-pane-divider: rgba(148, 180, 220, 0.16);
+  --dsh-pane-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 8px 32px rgba(2, 6, 14, 0.4);
 }
 
 /* Typography: the column follows the conversation's body size instead of the
@@ -868,62 +853,26 @@
   font-size: 0.8125rem;
 }
 
-/* ---------- Three columns, one shape. The sidebar column and the conversation
-   header card are bubbles (12px inset, 20px corners, frosted glass); the right
-   column was the odd one out — flush to the ceiling and floor with a square
-   bottom. Give it the same inset and corner radius so all three read as panes
-   of the same material, and lift the sidebar's brand row so the three top rows
-   start at the same height instead of the sidebar's sitting ~35px down. ---------- */
-/* The right column's own track does not inset the panel, so the bubble carries
-   the same 12px inset the sidebar column and the conversation header card use.
-   Scoped to the docked `push` presentation: the suite's own fullscreen/
-   overlay modes must keep covering the window exactly as they were designed. */
-[data-dsh-aqua] [data-sidebar-right-panel='push'] {
-  margin: 0;
-  inset: 12px 12px 12px auto;
-  height: auto;
-  border-radius: 24px;
-  border-left-width: 1px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 8px 32px rgba(19, 45, 83, 0.12);
+/* The one material property the docked bubble does not need: in the suite's
+   float / fullscreen presentations the panel is flush to the window, so its
+   highlight sits on the seam as an inset line rather than as a raised card. */
+[data-dsh-aqua] [data-sidebar-right-panel]:not([data-sidebar-right-panel='push']) {
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.4);
 }
 
-[data-dsh-aqua] body[data-ds-dark-theme] [data-sidebar-right-panel] {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 8px 32px rgba(2, 6, 14, 0.4);
+[data-dsh-aqua] body[data-ds-dark-theme] [data-sidebar-right-panel]:not([data-sidebar-right-panel='push']) {
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.07);
 }
 
-/* The sidebar column already carries the shell's glass gradient; it is the one
-   pane missing the backdrop blur, which is what made it read as flat paint. */
-[data-dsh-aqua] [data-dsh-sidebar-col] {
-  backdrop-filter: blur(var(--dsh-aqua-blur, 14px));
-  padding-top: 0;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 8px 32px rgba(19, 45, 83, 0.12);
-}
-
-/* WHY a modal inside the column turns the frost off: a backdrop-filter makes the
-   element a CONTAINING BLOCK for its fixed-position descendants. The settings
-   dialog is registered into this very column (`sidebar.settings`), and its
-   overlay is `position: fixed; inset: 0` — so with the frost on, that overlay
-   resolved against the 256px column instead of the viewport and the whole panel
-   was squeezed into the sidebar (measured: dialog 254x802 in a 1500x950
-   viewport, nav labels overlapping in a vertical strip). The panel's own rules
-   document the same hazard for its dropdowns; they keep the blur on a ::before
-   child, which cannot become an ancestor. Here the cheapest correct answer is to
-   drop the column's own filter for as long as a modal lives inside it. */
-[data-dsh-aqua] [data-dsh-sidebar-col]:has([aria-modal='true']) {
-  backdrop-filter: none;
-}
-
-[data-dsh-aqua] body[data-ds-dark-theme] [data-dsh-sidebar-col] {
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 8px 32px rgba(2, 6, 14, 0.4);
-}
-
-/* Top-row alignment: the brand row sits ~23px below the card edge while the
-   conversation header card and the right strip start at ~10px. Pull the row up
-   so the three top rows share one line. */
-[data-dsh-aqua] [data-dsh-sidebar-col] > * > *:first-child {
-  padding-top: 0;
-}
-
-[data-dsh-aqua] [data-dsh-wordmark] {
-  margin-top: -13px;
+/* The sidebar column's card shadow follows the layer's knob, so it always matches
+   the right column's. WHY this rule is written with a `body` type selector and must
+   stay BELOW the float-card recipes above: the skin's own dark float-card rule
+   (`[data-dsh-float] body[data-ds-dark-theme] [class*='sidebarCol']`) is 0-3-1 — its
+   `body` type selector outranks the layer's 0-3-0 column rule — so in dark mode the
+   column kept the smaller float-card shadow instead (measured: column
+   `0 6px 24px rgba(2,6,14,0.22)` vs panel `0 8px 32px rgba(2,6,14,0.4)`). Matching
+   0-3-1 and coming later in the sheet wins in both themes; `pane-shape-verify.mjs`
+   asserts the dark pair so a reorder cannot silently undo it. */
+[data-dsh-aqua][data-dsh-pane-shape] body [data-dsh-pane-shape-col] {
+  box-shadow: var(--dsh-pane-shadow);
 }
