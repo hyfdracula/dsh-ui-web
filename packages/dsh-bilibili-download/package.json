@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "@captain1275/dsh-bilibili-download",
   "description": "B 站视频下载插件：在 dsh web GUI 输入视频链接与登录 Cookie（SESSDATA/bili_jct/DedeUserID），选择画质，调用本机 yt-dlp + ffmpeg 下载并实时显示进度，完成后给出本地文件路径。",
   "version": "0.1.0",
