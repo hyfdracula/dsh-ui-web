@@ -1,0 +1,16 @@
+# dsh-file-attachment bundle patch: 文件附件存储 provider（host 插件，可选 insert）。
+#
+# 本包从 DSH fork 源码 attachment-local/file-store.ts 迁移，提供通用文件附件
+# 的 fileLimits/validateFile/saveFile/readFile（sha256 内容寻址，DSH_HOME/
+# attachments/v1）。
+#
+# 接入方式（方案A，源码补丁暂留）：
+# - 本包当前是**独立 provider 库**（可独立构建/测试），默认不 insert。
+# - 要让宿主真正使用它，二选一：
+#   1) 在本包的 node apply 里把 FileAttachmentStore 注入到宿主附件服务
+#      （需要 DSH 侧 attachment seam 支持外部 file provider）；
+#   2) 由 DSH fork 的 attachment-local 补丁 import 本包、把 file 面委托给它。
+# - 若后续确认宿主可直接组合本插件，取消下面注释即可：
+# - insert:
+#     - id: ui-file-attachment
+#       name: '@captain1275/dsh-file-attachment'

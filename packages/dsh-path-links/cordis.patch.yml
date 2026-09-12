@@ -1,0 +1,11 @@
+# dsh-path-links bundle patch: 纯函数库包（无 apply，不 insert 进 profile）。
+#
+# 本包从 DSH fork 源码 ui-conversation/path-links.ts 迁移，导出 splitPathTokens
+# 等纯函数，供其它 client bundle（如 ui-conversation fork 补丁）通过 loader 表
+# import 复用，也可独立发布为 npm 库。因其无 client apply 副作用，**不需要**
+# 在 ~/.dsh/profiles/web/cordis.patch.yml 登记 insert —— 若未来要作为独立
+# client 插件挂载（例如通过 slot 渲染可点击路径），再按 dsh-effort-slider
+# 的方式加 insert。
+# - insert:
+#     - id: ui-path-links
+#       name: '@captain1275/dsh-path-links'

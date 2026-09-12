@@ -1,0 +1,13 @@
+# dsh-file-limits-projection bundle patch: fileLimits 会话投影插件（host，可选 insert）。
+#
+# 本包从 DSH fork 源码 host/apiproxy 的 fileLimits projection unit 迁移：
+# 把附件服务的 fileLimits（maxFileBytes/maxFilesPerMessage/maxMessageFileBytes）
+# 作为每次启动恒定的投影值发布，客户端在 intake 前预检文件配额。
+#
+# 接入方式（方案A，源码补丁暂留）：
+# - 默认不 insert（避免与 DSH fork 040 补丁里已注册的同 key unit 双份冲突）。
+# - 生效路径：先在宿主组合本插件（取消下面注释），验证投影等效后，从 DSH
+#   源码 040 补丁里删除源码侧 fileLimits 注册，仅保留本插件。
+# - insert:
+#     - id: ui-file-limits-projection
+#       name: '@captain1275/dsh-file-limits-projection'
