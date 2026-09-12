@@ -463,6 +463,17 @@ window.__ModuleLoader__.load({
 			(0, react.useEffect)(() => {
 				load();
 			}, [load]);
+			(0, react.useEffect)(() => {
+				const onKeyDown = (event) => {
+					if (event.key !== "Escape" || event.defaultPrevented) return;
+					event.preventDefault();
+					props.onClose();
+				};
+				document.addEventListener("keydown", onKeyDown);
+				return () => {
+					document.removeEventListener("keydown", onKeyDown);
+				};
+			}, [props.onClose]);
 			const hasData = summary !== null && (summary.total?.calls ?? 0) > 0;
 			const totalTokens = summary === null ? 0 : bucketTokens(summary.total);
 			return (0, react_dom.createPortal)(/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {

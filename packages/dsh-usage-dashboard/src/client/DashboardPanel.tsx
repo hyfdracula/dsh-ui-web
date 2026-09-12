@@ -233,6 +233,21 @@ export function DashboardPanel(props: { onClose: () => void }): ReactElement {
     load()
   }, [load])
 
+  // Escape closes the dashboard, like every official dialog in the shell. The
+  // listener lives on the document because the overlay is portalled into
+  // document.body and nothing inside it takes focus; `defaultPrevented` keeps a
+  // nested control (for example an open native select) that already consumed the
+  // key from closing the whole panel.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      event.preventDefault()
+      props.onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => { document.removeEventListener('keydown', onKeyDown) }
+  }, [props.onClose])
+
   const hasData = summary !== null && (summary.total?.calls ?? 0) > 0
   const totalTokens = summary === null ? 0 : bucketTokens(summary.total)
 
