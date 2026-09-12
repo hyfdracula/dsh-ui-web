@@ -14,7 +14,7 @@
 | packages/dsh-remote-web-ui | @captain1275/dsh-remote-web-ui | 0.1.1 | true |
 | packages/dsh-live-stats | @captain1275/dsh-live-stats | 0.1.1 | true |
 | packages/dsh-ssh | @captain1275/dsh-ssh | 0.1.1 | true |
-| packages/dsh-aionui-panel | @captain1275/dsh-client-ui-aionui-panel | 0.1.1 | true |
+| ~~packages/dsh-aionui-panel~~ | ~~@captain1275/dsh-client-ui-aionui-panel~~ | 0.1.1 | retired (0.1.5, not built/published) |
 | packages/dsh-web-ui-settings | @captain1275/dsh-client-ui-web-ui-settings | 0.1.1 | true |
 | packages/dsh-skins | @captain1275/dsh-skins（聚合） | 0.1.1 | true |
 | packages/dsh-web-ui-all | @captain1275/dsh-web-ui-all（聚合） | 0.1.1 | true |

@@ -9,7 +9,6 @@
 patchFrom:
   - ../dsh-bilibili-download
   - ../dsh-web-ui-settings
-  - ../dsh-aionui-panel
   - ../dsh-task-board
   - ../dsh-git-graph
   - ../dsh-pet
@@ -22,7 +21,6 @@ self:
   - ui-web-ui-compat
 deps:
   - ../dsh-bilibili-download
-  - ../dsh-aionui-panel
   - ../dsh-task-board
   - ../dsh-git-graph
   - ../dsh-pet

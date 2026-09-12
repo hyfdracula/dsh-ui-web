@@ -8,7 +8,7 @@
 
 - [ ] 任务看板 `packages/dsh-task-board`
 - [ ] Git 图谱 `packages/dsh-git-graph`
-- [ ] 右侧面板 `packages/dsh-aionui-panel`
+,
 - [ ] 远程 Web UI `packages/dsh-remote-web-ui`
 - [ ] SSH 远程运维 `packages/dsh-ssh`
 - [ ] 实时令牌统计 `packages/dsh-live-stats`

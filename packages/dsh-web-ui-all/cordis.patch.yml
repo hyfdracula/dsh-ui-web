@@ -17,11 +17,6 @@
     - id: ui-web-ui-settings
       name: '@captain1275/dsh-client-ui-web-ui-settings'
 
-# from ../dsh-aionui-panel
-- insert:
-    - id: ui-dsh-aionui-panel
-      name: '@captain1275/dsh-client-ui-aionui-panel'
-
 # from ../dsh-task-board
 - insert:
     - id: ui-task-board

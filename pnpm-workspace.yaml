@@ -1,6 +1,12 @@
 packages:
   - 'packages/*'
   - 'packages/skins/*'
+  # Retired with the 0.1.5 migration (decision D2=a): the official
+  # ui-sidebar-right / ui-sidebar-files / ui-sidebar-document trio replaces
+  # this self-built panel, and its client half cannot survive the retired
+  # slots/SessionStore merge or the deleted ApiProxy surface. Source stays in
+  # git; it is neither built nor published.
+  - '!packages/dsh-aionui-panel'
 
 # Peer APIs (@deepseek-ai/dsh-*, cordis, react) resolve at runtime from the
 # dsh profile tree, never from this repo's own install — matching the

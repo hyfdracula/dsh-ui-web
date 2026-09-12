@@ -80,7 +80,7 @@ once through the aggregate package.
 | --- | --- |
 | **dsh-task-board** | Sidebar kanban: multi-column board, real execution via agent sessions, cron scheduling |
 | **dsh-ssh** | SSH ops: host store, remote exec, SFTP, tunnels, cluster runs, web terminal |
-| **dsh-aionui-panel** | Right-side preview/file/change panel: file tree, multi-format preview, git ops, file drag |
+| ~~**dsh-aionui-panel**~~ | Retired (0.1.5): the official `ui-sidebar-right` + `ui-sidebar-files` + `ui-sidebar-document` trio replaces it |
 | **dsh-git-graph** | Git branch selector + commit graph in the conversation header |
 | **dsh-remote-web-ui** | Mobile remote control: QR pairing, device caps, cloudflared tunnel, phone SPA |
 | **dsh-live-stats** | Live token estimates and generation throughput |
@@ -153,7 +153,7 @@ node scripts/link-profile.mjs
 
 ```
 packages/
-├─ dsh-task-board / dsh-ssh / dsh-aionui-panel / dsh-git-graph
+├─ dsh-task-board / dsh-ssh / dsh-git-graph
 ├─ dsh-pet / dsh-remote-web-ui / dsh-live-stats / dsh-full-stats
 ├─ dsh-web-ui-settings / dsh-web-ui-all / dsh-skins
 └─ skins/            # skin sources (aurora, miku, ths, etc.)

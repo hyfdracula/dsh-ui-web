@@ -15,7 +15,7 @@ body:
       options:
         - 任务看板 (dsh-task-board)
         - Git 图谱 (dsh-git-graph)
-        - 右侧面板 (dsh-aionui-panel)
+,
         - 远程 Web UI (dsh-remote-web-ui)
         - SSH 远程运维 (dsh-ssh)
         - 实时令牌统计 (dsh-live-stats)
