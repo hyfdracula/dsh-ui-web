@@ -21,6 +21,8 @@
  */
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+// Type-only: pulls the workspace controller client's service seat (ctx.workspaces).
+import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import css from './trading.module.css'
 import {
   DEFAULT_INDEX_CELLS,
@@ -286,6 +288,17 @@ export function apply(ctx: Context): void {
     }
   })()
 
+  // 0.1.5 removed the workspace.list RPC: Workspace rows are a Host-authoritative
+  // client snapshot now (the same store the sidebar and the picker render from),
+  // so the terminal reads the service instead of round-tripping a request.
+  const workspaces = (() => {
+    try {
+      return ctx.get('workspaces') as IWorkspaces | undefined
+    } catch {
+      return undefined
+    }
+  })()
+
   /** One quote cycle: fun-ticker watchlist first, standalone feeds second. */
   const refreshQuotes = async (): Promise<void> => {
     if (disposed) return
@@ -318,17 +331,13 @@ export function apply(ctx: Context): void {
   }
 
   /** Workspace-count cell: how many workspaces the terminal is watching.
-   *  Live data rides the workspace.list RPC when the connection handle is
-   *  available; failures degrade to the dash — the stock chrome must never
-   *  crash the terminal. */
-  const refreshWorkspaces = async (): Promise<void> => {
-    if (connection === undefined || disposed) return
+   *  Reads the Host-authoritative snapshot; failures degrade to the dash — the
+   *  stock chrome must never crash the terminal. */
+  const refreshWorkspaces = (): void => {
+    if (disposed) return
     try {
-      const list = await connection.api.workspace.list({})
-      if (!list.result.ok) return
-      if (disposed) return
-      const count = list.result.value.items.length
-      codeIndexCell.textContent = `工作区 ${count}`
+      const count = workspaces?.list.getSnapshot().items.length
+      codeIndexCell.textContent = count === undefined ? '工作区 --' : `工作区 ${count}`
     } catch {
       codeIndexCell.textContent = '工作区 --'
     }
@@ -341,10 +350,10 @@ export function apply(ctx: Context): void {
   renderSessions(new Date())
   void refreshQuotes()
   void refreshLongbridge()
-  void refreshWorkspaces()
+  refreshWorkspaces()
   const quotesTimer = setInterval(() => { void refreshQuotes(); void refreshLongbridge() }, QUOTES_REFRESH_MS)
   const sessionTimer = setInterval(() => renderSessions(new Date()), SESSION_REFRESH_MS)
-  const workspacesTimer = setInterval(() => { void refreshWorkspaces() }, WORKSPACES_REFRESH_MS)
+  const workspacesTimer = setInterval(() => { refreshWorkspaces() }, WORKSPACES_REFRESH_MS)
 
   ctx.effect(() => () => {
     disposed = true

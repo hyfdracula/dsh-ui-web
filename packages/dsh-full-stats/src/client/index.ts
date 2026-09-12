@@ -16,6 +16,28 @@ import { FullStatsSettingsCard, FULL_STATS_EVENT, type FullStatsConfig } from '.
 // Type-only: 0.1.5 declares `ctx.slots` in ui-renderer's Context merge (ui-slots
 // keeps the slot contracts).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+// Type-only: pulls the conversation slot map (the 'conversation.composer.dock'
+// entry this plugin overrides by id) — without it the typed `slots.inject`
+// overload only knows 'root' and rejects the call.
+import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+
+/** Owner share of a plugin card (the section supplies nothing). */
+export interface SettingsPluginItemOwnerProps {
+  /** Marker field: card owner props are intentionally empty. */
+  children?: never
+}
+
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface SlotMap {
+    /**
+     * The child slot the Web UI plugin group declares; this card registers into
+     * the group instead of the top-level `settings.plugin.item` list. Spelled
+     * here with the same shape so this package registers without depending on
+     * the sibling UI package.
+     */
+    'web-ui.plugin.item': { kind: 'list'; scope: 'root'; owner: SettingsPluginItemOwnerProps }
+  }
+}
 
 /** 需要的客户端服务：插槽（覆盖注册 + 配置卡片）。 */
 export const inject = ['slots']

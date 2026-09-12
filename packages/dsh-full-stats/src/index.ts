@@ -11,6 +11,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
+// Type-only: pulls the webServer service seat (ctx.webServer) this host half
+// registers its /api routes on.
+import type {} from '@deepseek-ai/dsh-host-webserver'
 
 /** 稳定插件名（对应 cordis.patch.yml 的 insert id）。 */
 export const name = 'ui-full-stats'

@@ -1,4 +1,3 @@
-import { installSettingsSection, settingsNamespace } from "@deepseek-ai/dsh-settings";
 import { execSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -1362,7 +1361,8 @@ const name = "ui-bilibili-download";
 /** Required services (settings optional: installSettingsSection degrades gracefully). */
 const inject = ["webServer"];
 /** The remembered-cookie namespace (spelled here AND in the browser half). */
-const BILI_SETTINGS_NAMESPACE = settingsNamespace("bili-download");
+/** The remembered-cookie namespace (spelled here AND in the browser half). */
+const BILI_SETTINGS_NAMESPACE = "bili-download";
 const Config = import_lib.default.object({
 	sessdata: import_lib.default.string().default(""),
 	biliJct: import_lib.default.string().default(""),
@@ -1388,9 +1388,11 @@ function apply(ctx) {
 	} catch (error) {
 		console.warn("[dsh-bilibili-download] route registration failed:", error);
 	}
-	installSettingsSection(ctx, BILI_SETTINGS_NAMESPACE, Config, ENTRY, {
-		setSource: () => {},
-		onChange: () => {}
+	ctx.inject(["settings"], (settingsCtx) => {
+		settingsCtx.settings.installSection(ctx, BILI_SETTINGS_NAMESPACE, Config, ENTRY, {
+			setSource: () => {},
+			onChange: () => {}
+		});
 	});
 	ctx.effect(() => () => {
 		for (const dispose of disposers.splice(0)) dispose();

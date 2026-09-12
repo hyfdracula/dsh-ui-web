@@ -9,6 +9,10 @@
     "esModuleInterop": true,
     "allowImportingTsExtensions": true,
     "strict": true,
+    // Node globals and `node:` builtins resolve only through this seat: without
+    // it every `import ... from 'node:fs'` reports TS2591 (the "install
+    // @types/node" hint) even when @types/node is installed. Matches dsh-pet.
+    "types": ["node"],
     "noEmit": true
   },
   "include": ["src"]
