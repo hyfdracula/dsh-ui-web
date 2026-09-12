@@ -17,6 +17,7 @@ import {
   readUsage,
   recentDays,
   sessionRanking,
+  sessionCost,
   UNATTRIBUTED_DAY,
   usagePath,
   writeUsage,
@@ -24,6 +25,7 @@ import {
   type UsageRecord,
   type UsageStore,
 } from './index.ts'
+import { estimateCost } from './cost.ts'
 import { mergeFreshSnapshot } from './pricing.ts'
 
 /** 一个会话归属表（days）各桶之和：用于校验「会话行合计 == 归属合计」不变量。 */
@@ -431,6 +433,58 @@ describe('v1 -> v2 迁移', () => {
       delete process.env.DSH_HOME
       rmSync(home, { recursive: true, force: true })
     }
+  })
+})
+
+describe('会话模型与费用口径（逐模型）', () => {
+  it('上报里的 unknown 不会把扫描折叠出的真实模型降级', () => {
+    const store = emptyUsage()
+    const day = dayKey(base.ts)
+    applyRecord(store, {
+      ...base,
+      model: 'deepseek-flash',
+      reset: true,
+      steps: 3,
+      inputTokens: 100,
+      outputTokens: 10,
+      cacheReadTokens: 5,
+      cacheWriteTokens: 0,
+      days: { [day]: { 'deepseek-flash': { inputTokens: 100, outputTokens: 10, cacheReadTokens: 5, cacheWriteTokens: 0, calls: 3 } } },
+    })
+    expect(store.bySession['s1']?.lastModel).toBe('deepseek-flash')
+    // 客户端模型轮询失败时会报 model:'unknown'：不能因此把真实模型降级
+    //（否则会话显示 unknown 并按通用档计价）。
+    applyRecord(store, { ...base, model: 'unknown', inputTokens: 10, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 })
+    expect(store.bySession['s1']?.lastModel).toBe('deepseek-flash')
+  })
+
+  it('会话费用按归属表逐模型计价，而不是行上的单一 lastModel', () => {
+    const store = emptyUsage()
+    const day = dayKey(base.ts)
+    applyRecord(store, {
+      ...base,
+      model: 'unknown',
+      reset: true,
+      steps: 2,
+      inputTokens: 4_000_000,
+      outputTokens: 1_500_000,
+      cacheReadTokens: 1_000_000_000,
+      cacheWriteTokens: 0,
+      days: {
+        [day]: {
+          'deepseek-flash': { inputTokens: 1_000_000, outputTokens: 500_000, cacheReadTokens: 900_000_000, cacheWriteTokens: 0, calls: 1 },
+          'deepseek-v4-pro': { inputTokens: 3_000_000, outputTokens: 1_000_000, cacheReadTokens: 100_000_000, cacheWriteTokens: 0, calls: 1 },
+        },
+      },
+    })
+    const row = store.bySession['s1']
+    expect(row).toBeDefined()
+    // flash 高峰 2/8/0.04 => 1M*2 + 0.5M*8 + 900M*0.04 = 42
+    // pro   高峰 9/27/0.3 => 3M*9 + 1M*27 + 100M*0.3   = 84
+    expect(sessionCost(row!)).toBeCloseTo(126, 6)
+    // 按行上的 lastModel（unknown -> 通用档 1/2/0.02）只有 27，明显偏低。
+    expect(estimateCost('unknown', row!.inputTokens, row!.outputTokens, row!.cacheReadTokens, 0)).toBeCloseTo(27, 6)
+    expect(sessionCost(row!)).toBeGreaterThan(100)
   })
 })
 

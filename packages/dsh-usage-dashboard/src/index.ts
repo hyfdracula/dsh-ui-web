@@ -449,7 +449,11 @@ export async function runScan(persistence: PersistenceLike | undefined, limit = 
 export function applyRecord(store: UsageStore, record: UsageRecord): void {
   const sessionId = record.sessionId || 'default'
   const existing = store.bySession[sessionId]
-  const model = record.model || existing?.lastModel || 'unknown'
+  // 上报里的空串/'unknown' 视为「这次没有模型信息」：客户端模型轮询失败时会这么
+  // 报，若直接采信就会把扫描 fold 出来的真实模型降级成 unknown —— 会话行显示
+  // unknown，且按通用档计价（实测某会话 1050M tokens 只算成 ¥28）。
+  const reported = record.model === '' || record.model === 'unknown' ? undefined : record.model
+  const model = reported ?? existing?.lastModel ?? 'unknown'
   const prev = {
     inputTokens: existing?.inputTokens ?? 0,
     outputTokens: existing?.outputTokens ?? 0,
@@ -620,6 +624,24 @@ export function dayCosts(days: DayModelBuckets): Record<string, number> {
   return out
 }
 
+/**
+ * 单个会话的费用（元）：按该会话归属表**逐模型**计价。
+ *
+ * 不能用行上的单一 `lastModel` 计价：一个会话经常跨模型（实测某会话 1996 次
+ * deepseek-flash + 421 次 deepseek-v4-flash），而 `lastModel` 只是最后一条记录的
+ * 模型，甚至可能是 unknown —— 那样整段会话会被按通用档估价（1050M tokens 算成
+ * ¥28，真值近 ¥70）。逐模型计价与会话排行、模型分布、按天费用口径完全一致。
+ */
+export function sessionCost(row: SessionEntry): number {
+  let sum = 0
+  for (const models of Object.values(row.days ?? {})) {
+    for (const [model, b] of Object.entries(models)) {
+      sum += estimateCost(model, b.inputTokens, b.outputTokens, b.cacheReadTokens, b.cacheWriteTokens)
+    }
+  }
+  return sum
+}
+
 /** 发送 JSON 响应（防御：连接已关/已结束时静默跳过，避免写已销毁 socket 抛错，H7）。 */
 function sendJson(res: ServerResponse, status: number, data: unknown): void {
   if (res.destroyed || res.writableEnded) return
@@ -729,9 +751,8 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
     const perDay = dayCosts(dayModelBuckets(store))
     const totalCost = Object.values(perModel).reduce((a, b) => a + b, 0)
     const sessions = sessionRanking(store, 20).map((s) => {
-      const bucket = store.bySession[s.id]
-      const cost = estimateCost(s.model, bucket?.inputTokens ?? 0, bucket?.outputTokens ?? 0, bucket?.cacheReadTokens ?? 0, bucket?.cacheWriteTokens ?? 0)
-      return { ...s, cost: round4(cost) }
+      const row = store.bySession[s.id]
+      return { ...s, cost: round4(row === undefined ? 0 : sessionCost(row)) }
     })
     // 近 14 天：token 序列 + 当天费用（面板据此显示"今日费用"）。
     const recent = recentDays(store, 14).map((d) => ({ ...d, cost: round4(perDay[d.day] ?? 0) }))

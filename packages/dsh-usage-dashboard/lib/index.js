@@ -1150,7 +1150,7 @@ async function runScan(persistence, limit = 0) {
 function applyRecord(store, record) {
 	const sessionId = record.sessionId || "default";
 	const existing = store.bySession[sessionId];
-	const model = record.model || existing?.lastModel || "unknown";
+	const model = (record.model === "" || record.model === "unknown" ? void 0 : record.model) ?? existing?.lastModel ?? "unknown";
 	const prev = {
 		inputTokens: existing?.inputTokens ?? 0,
 		outputTokens: existing?.outputTokens ?? 0,
@@ -1271,6 +1271,19 @@ function dayCosts(days) {
 	}
 	return out;
 }
+/**
+* 单个会话的费用（元）：按该会话归属表**逐模型**计价。
+*
+* 不能用行上的单一 `lastModel` 计价：一个会话经常跨模型（实测某会话 1996 次
+* deepseek-flash + 421 次 deepseek-v4-flash），而 `lastModel` 只是最后一条记录的
+* 模型，甚至可能是 unknown —— 那样整段会话会被按通用档估价（1050M tokens 算成
+* ¥28，真值近 ¥70）。逐模型计价与会话排行、模型分布、按天费用口径完全一致。
+*/
+function sessionCost(row) {
+	let sum = 0;
+	for (const models of Object.values(row.days ?? {})) for (const [model, b] of Object.entries(models)) sum += estimateCost(model, b.inputTokens, b.outputTokens, b.cacheReadTokens, b.cacheWriteTokens);
+	return sum;
+}
 /** 发送 JSON 响应（防御：连接已关/已结束时静默跳过，避免写已销毁 socket 抛错，H7）。 */
 function sendJson(res, status, data) {
 	if (res.destroyed || res.writableEnded) return;
@@ -1371,11 +1384,10 @@ function handle(req, res) {
 		const perDay = dayCosts(dayModelBuckets(store));
 		const totalCost = Object.values(perModel).reduce((a, b) => a + b, 0);
 		const sessions = sessionRanking(store, 20).map((s) => {
-			const bucket = store.bySession[s.id];
-			const cost = estimateCost(s.model, bucket?.inputTokens ?? 0, bucket?.outputTokens ?? 0, bucket?.cacheReadTokens ?? 0, bucket?.cacheWriteTokens ?? 0);
+			const row = store.bySession[s.id];
 			return {
 				...s,
-				cost: round4(cost)
+				cost: round4(row === void 0 ? 0 : sessionCost(row))
 			};
 		});
 		const recent = recentDays(store, 14).map((d) => ({
@@ -1501,4 +1513,4 @@ function apply(ctx) {
 	});
 }
 //#endregion
-export { UNATTRIBUTED_DAY, USAGE_API_PREFIX, USAGE_PRICING_API_PREFIX, USAGE_STORE_VERSION, apply, applyRecord, dayCosts, dayKey, dayModelBuckets, emptyUsage, migrateStore, modelCosts, name, normalizeRecord, readScanWatermark, readUsage, recentDays, recomputeAggregates, runScan, sessionRanking, unattributedCost, usagePath, usageScanPath, writeScanWatermark, writeUsage };
+export { UNATTRIBUTED_DAY, USAGE_API_PREFIX, USAGE_PRICING_API_PREFIX, USAGE_STORE_VERSION, apply, applyRecord, dayCosts, dayKey, dayModelBuckets, emptyUsage, migrateStore, modelCosts, name, normalizeRecord, readScanWatermark, readUsage, recentDays, recomputeAggregates, runScan, sessionCost, sessionRanking, unattributedCost, usagePath, usageScanPath, writeScanWatermark, writeUsage };
