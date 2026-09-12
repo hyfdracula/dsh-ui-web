@@ -6,13 +6,16 @@
 # 顺序注意：ui-web-ui-settings 排在最前（self 之后），先声明
 # web-ui.plugin.item 子槽位，其余插件的设置卡再注入（slots.inject 声明感知，
 # 但更早的声明让设置组在任何卡片之前就位，避免观感上的注册顺序歧义）。
+# 已下线：dsh-remote-web-ui（手机端远程控制）。0.1.5 的鉴权栅栏
+# （HostConnectionService.requestRejection + 令牌换 cookie）没有公开路径豁免缝，
+# 配对链接只能落到 401 页面上，因此不再随全家桶安装；源码仍保留在
+# packages/dsh-remote-web-ui，需要时可单独 `dsh plugin add` 装回。
 patchFrom:
   - ../dsh-bilibili-download
   - ../dsh-web-ui-settings
   - ../dsh-task-board
   - ../dsh-git-graph
   - ../dsh-pet
-  - ../dsh-remote-web-ui
   - ../dsh-live-stats
   - ../dsh-usage-dashboard
   - ../dsh-ssh
@@ -24,7 +27,6 @@ deps:
   - ../dsh-task-board
   - ../dsh-git-graph
   - ../dsh-pet
-  - ../dsh-remote-web-ui
   - ../dsh-live-stats
   - ../dsh-usage-dashboard
   - ../dsh-ssh
