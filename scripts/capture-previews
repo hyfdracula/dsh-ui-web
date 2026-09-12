@@ -96,16 +96,16 @@ async function main() {
       fs.mkdirSync(dir, { recursive: true })
       const url = `${base}/preview.html?skin=${skin.id}&theme=${theme}&chrome=0`
       await page.goto(url, { waitUntil: 'networkidle' })
-      // 等皮肤 bundle 执行完（chrome 栏注入 + 样式生效）：等待该皮肤自己的
-      // body 属性出现（取 manifest/skin.json 的 bodyAttr，缺省按 id 推导）。
-      const bodyAttr = skin.bodyAttr || `data-dsh-${skin.id}`
-      // dataset 键形式：data-dsh-retro -> dshRetro
-      const datasetKey = bodyAttr.replace(/^data-/, '').replace(/-([a-z])/g, (_, c) => c.toUpperCase())
-      await page.waitForFunction((key) => {
+      // 等皮肤 bundle 执行完（chrome 栏注入 + 样式生效）：等待该皮肤自己的作用域
+      // 属性出现（取 manifest/skin.json 的 bodyAttr，缺省按 id 推导）。
+      // 皮肤把属性打在 <html> 还是 <body> 取决于它自己（aqua 打 html、retro 系
+      // 打 body），两边都要看，否则 aqua 会等到超时。
+      const scopeAttr = skin.bodyAttr || `data-dsh-${skin.id}`
+      await page.waitForFunction((attr) => {
         const err = document.getElementById('skinErr')
         if (err && err.style.display === 'block') return true
-        return document.body.dataset[key] !== undefined
-      }, datasetKey, { timeout: 10000 })
+        return document.documentElement.hasAttribute(attr) || document.body.hasAttribute(attr)
+      }, scopeAttr, { timeout: 10000 })
       const errText = await page.evaluate(() => {
         const el = document.getElementById('skinErr')
         return el && el.style.display === 'block' ? el.textContent : null

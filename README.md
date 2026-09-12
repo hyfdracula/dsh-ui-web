@@ -98,7 +98,8 @@ trading / whale-song），支持皮肤启用互斥管理与一键切换。
 - **玻璃 Aqua（aqua）**：全局玻璃拟态——云母（悬浮磨砂卡片）/ 兼容（原版排版换材质）双模式、
   WebGL 流体背景或自定义壁纸、深海鲸鱼粒子、字标徽章，深浅两套深海调色板，
   模糊 / 磨砂 / 色相 / 亮度全部可调；设置项落在「外观」行下方与插件卡片里。
-  该皮肤客户端包依赖 react/react-dom，无法在在线画廊的模拟器里试穿，预览图取自真实 GUI。
+  依赖 react / react-dom 的皮肤（aqua、aurora）也能在在线画廊的模拟器里真实渲染——
+  模拟器加载 `gallery/vendor.js`（`node scripts/gallery-build-vendor` 生成）作为模块表。
 - 其余皮肤（ths / xp / blue-fantasy / dragon-heir / minecraft / miku / trading / whale-song）
   为上游 dsh-web-ui 自带皮肤。
 
