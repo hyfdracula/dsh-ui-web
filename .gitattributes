@@ -1,0 +1,9 @@
+# Fork patch files must stay LF in the WORKING TREE as well as in the object
+# store. The patches are replayed with `git apply` against a DSH checkout whose
+# own .gitattributes enforces `* text=auto eol=lf`, and a context line carrying a
+# trailing CR never matches an LF working tree -- measured 2026-09-12: with CRLF
+# the whole set failed 0/8 even against its own baseline, with LF it applies 8/8.
+#
+# Without this rule `core.autocrlf=true` rewrites them to CRLF on checkout, so the
+# fix would survive exactly until the next fresh clone.
+*.patch text eol=lf
