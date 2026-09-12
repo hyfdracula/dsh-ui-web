@@ -281,7 +281,7 @@ window.__ModuleLoader__.load({
 			if (summary === null) throw new Error("usage summary: unexpected payload shape");
 			return summary;
 		}
-		/** 彩色统计卡片。 */
+		/** 彩色统计卡片（副标题可选：不传就只渲染数值 + 标签）。 */
 		function StatCard(props) {
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: usage_module_css_default.statCard,
@@ -299,10 +299,10 @@ window.__ModuleLoader__.load({
 						className: usage_module_css_default.statLabel,
 						children: props.label
 					}),
-					/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+					props.sub !== void 0 && props.sub !== "" ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 						className: usage_module_css_default.statSub,
 						children: props.sub
-					})
+					}) : null
 				]
 			});
 		}
@@ -540,19 +540,16 @@ window.__ModuleLoader__.load({
 										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(StatCard, {
 											label: t("usage.total"),
 											value: fmt(totalTokens),
-											sub: `${fmt(summary.total.inputTokens)} in / ${fmt(summary.total.outputTokens)} out`,
 											color: PALETTE[0]
 										}),
 										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(StatCard, {
 											label: t("usage.costToday"),
 											value: fmtCost(summary.cost.today ?? 0),
-											sub: t("usage.costTodayHint"),
 											color: PALETTE[5]
 										}),
 										/* @__PURE__ */ (0, react_jsx_runtime.jsx)(StatCard, {
 											label: t("usage.cost"),
 											value: fmtCost(summary.cost?.total ?? 0),
-											sub: t("usage.costHint"),
 											color: PALETTE[3]
 										})
 									]

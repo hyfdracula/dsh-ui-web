@@ -85,13 +85,13 @@ async function fetchSummary(): Promise<UsageSummary> {
   return summary
 }
 
-/** 彩色统计卡片。 */
-function StatCard(props: { label: string; value: string; sub: string; color: string }): ReactElement {
+/** 彩色统计卡片（副标题可选：不传就只渲染数值 + 标签）。 */
+function StatCard(props: { label: string; value: string; sub?: string; color: string }): ReactElement {
   return (
     <div className={css.statCard} style={{ background: `linear-gradient(135deg, ${hexToRgba(props.color, 0.22)}, ${hexToRgba(props.color, 0.05)})`, borderColor: hexToRgba(props.color, 0.4) }}>
       <div className={css.statValue} style={{ color: props.color }}>{props.value}</div>
       <div className={css.statLabel}>{props.label}</div>
-      <div className={css.statSub}>{props.sub}</div>
+      {props.sub !== undefined && props.sub !== '' ? <div className={css.statSub}>{props.sub}</div> : null}
     </div>
   )
 }
@@ -279,9 +279,9 @@ export function DashboardPanel(props: { onClose: () => void }): ReactElement {
         {summary !== null && hasData && (
           <div className={css.body}>
             <div className={css.statGrid}>
-              <StatCard label={t('usage.total')} value={fmt(totalTokens)} sub={`${fmt(summary.total.inputTokens)} in / ${fmt(summary.total.outputTokens)} out`} color={PALETTE[0]} />
-              <StatCard label={t('usage.costToday')} value={fmtCost(summary.cost.today ?? 0)} sub={t('usage.costTodayHint')} color={PALETTE[5]} />
-              <StatCard label={t('usage.cost')} value={fmtCost(summary.cost?.total ?? 0)} sub={t('usage.costHint')} color={PALETTE[3]} />
+              <StatCard label={t('usage.total')} value={fmt(totalTokens)} color={PALETTE[0]} />
+              <StatCard label={t('usage.costToday')} value={fmtCost(summary.cost.today ?? 0)} color={PALETTE[5]} />
+              <StatCard label={t('usage.cost')} value={fmtCost(summary.cost?.total ?? 0)} color={PALETTE[3]} />
             </div>
 
             <div className={css.section}>
