@@ -899,6 +899,20 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 8px 32px rgba(19, 45, 83, 0.12);
 }
 
+/* WHY a modal inside the column turns the frost off: a backdrop-filter makes the
+   element a CONTAINING BLOCK for its fixed-position descendants. The settings
+   dialog is registered into this very column (`sidebar.settings`), and its
+   overlay is `position: fixed; inset: 0` — so with the frost on, that overlay
+   resolved against the 256px column instead of the viewport and the whole panel
+   was squeezed into the sidebar (measured: dialog 254x802 in a 1500x950
+   viewport, nav labels overlapping in a vertical strip). The panel's own rules
+   document the same hazard for its dropdowns; they keep the blur on a ::before
+   child, which cannot become an ancestor. Here the cheapest correct answer is to
+   drop the column's own filter for as long as a modal lives inside it. */
+[data-dsh-aqua] [data-dsh-sidebar-col]:has([aria-modal='true']) {
+  backdrop-filter: none;
+}
+
 [data-dsh-aqua] body[data-ds-dark-theme] [data-dsh-sidebar-col] {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 8px 32px rgba(2, 6, 14, 0.4);
 }
