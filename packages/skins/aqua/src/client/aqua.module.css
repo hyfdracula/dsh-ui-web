@@ -867,3 +867,49 @@
 [data-dsh-aqua] [data-sidebar-right-panel] [data-dockkit-strip] {
   font-size: 0.8125rem;
 }
+
+/* ---------- Three columns, one shape. The sidebar column and the conversation
+   header card are bubbles (12px inset, 20px corners, frosted glass); the right
+   column was the odd one out — flush to the ceiling and floor with a square
+   bottom. Give it the same inset and corner radius so all three read as panes
+   of the same material, and lift the sidebar's brand row so the three top rows
+   start at the same height instead of the sidebar's sitting ~35px down. ---------- */
+/* The right column's own track does not inset the panel, so the bubble carries
+   the same 12px inset the sidebar column and the conversation header card use.
+   Scoped to the docked `push` presentation: the suite's own fullscreen/
+   overlay modes must keep covering the window exactly as they were designed. */
+[data-dsh-aqua] [data-sidebar-right-panel='push'] {
+  margin: 0;
+  inset: 12px 12px 12px auto;
+  height: auto;
+  border-radius: 20px;
+  border-left-width: 1px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 8px 32px rgba(19, 45, 83, 0.12);
+}
+
+[data-dsh-aqua] body[data-ds-dark-theme] [data-sidebar-right-panel] {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 8px 32px rgba(2, 6, 14, 0.4);
+}
+
+/* The sidebar column already carries the shell's glass gradient; it is the one
+   pane missing the backdrop blur, which is what made it read as flat paint. */
+[data-dsh-aqua] [data-dsh-sidebar-col] {
+  backdrop-filter: blur(var(--dsh-aqua-blur, 14px));
+  padding-top: 0;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 8px 32px rgba(19, 45, 83, 0.12);
+}
+
+[data-dsh-aqua] body[data-ds-dark-theme] [data-dsh-sidebar-col] {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 8px 32px rgba(2, 6, 14, 0.4);
+}
+
+/* Top-row alignment: the brand row sits ~23px below the card edge while the
+   conversation header card and the right strip start at ~10px. Pull the row up
+   so the three top rows share one line. */
+[data-dsh-aqua] [data-dsh-sidebar-col] > * > *:first-child {
+  padding-top: 0;
+}
+
+[data-dsh-aqua] [data-dsh-wordmark] {
+  margin-top: -13px;
+}
