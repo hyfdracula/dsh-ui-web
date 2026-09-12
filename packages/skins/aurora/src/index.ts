@@ -7,6 +7,8 @@
  * @module @captain1275/dsh-client-ui-skin-aurora
  */
 import type { Context } from '@deepseek-ai/cordis'
+// Type-only: pulls the webserver service seat (ctx.webServer) into this program.
+import type {} from '@deepseek-ai/dsh-host-webserver'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'

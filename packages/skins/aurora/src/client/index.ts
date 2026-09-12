@@ -6,20 +6,13 @@
  * `~/.dsh/skin-aurora.json`）；皮肤中心卡片的修改会派发 `dshc-aurora-config`
  * 窗口事件，本半区监听后重新拉取配置并重绘背景层。
  *
+ * 本半区只写 DOM，不声明任何客户端服务：apply() 只依赖 ctx.effect()。
+ *
  * CSS 走 bundle 的 CSS-modules 自动注入；token 覆盖在 aurora.module.css 里以
  * body[data-dsh-aurora] 作用域声明。
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
-import { createEffortWire } from './effort/wire.ts'
-import { createRoot, type Root } from 'react-dom/client'
-import { createElement } from 'react'
-import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import { EffortPanel } from './effort/EffortPanel.tsx'
 import css from './aurora.module.css'
-
-/** 需要的客户端服务：connection（模型目录读写）、sessions（当前会话）。 */
-export const inject: string[] = ['modelDirectories', 'sessions']
 
 /** 配置变更事件（皮肤中心卡片写入后派发，本半区监听重绘）。 */
 export const AURORA_EVENT = 'dshc-aurora-config'
@@ -87,7 +80,7 @@ function auroraGradient(dark: boolean): string {
  * 所有写入由 ctx.effect 的 disposer 在卸载时回收。
  * @param ctx - 宿主上下文（effect 生命周期负责回收）。
  */
-export function apply(ctx: ClientContext): void {
+export function apply(ctx: Context): void {
   const body = document.body
   body.dataset.dshAurora = ''
 
@@ -154,72 +147,14 @@ export function apply(ctx: ClientContext): void {
 
   refresh()
 
-  // Effort 推理等级：点击官方模型菜单里的「推理等级」行时，拦截官方级别
-  // 列表，改为弹出 aurora 滑块面板（只写 reasoningEffort，不动模型选择）。
-  const host = document.createElement('div')
-  host.dataset.auroraEffortHost = ''
-  host.style.cssText = 'position: fixed; z-index: 10000; top: 0; left: 0; width: 0; height: 0; pointer-events: none;'
-  body.appendChild(host)
-  let root: Root | null = null
-
-  const hidePanel = (): void => {
-    root?.unmount()
-    root = null
-  }
-  const showPanel = (sessionId: string, anchor: HTMLElement): void => {
-    const rect = anchor.getBoundingClientRect()
-    // 面板 280 宽、约 150 高；视口内定位，下方不够时弹到锚点上方。
-    const PANEL_W = 280
-    const PANEL_H = 150
-    const left = Math.max(8, Math.min(rect.right - PANEL_W, window.innerWidth - PANEL_W - 8))
-    const spaceBelow = window.innerHeight - rect.bottom
-    const top = spaceBelow >= PANEL_H + 16
-      ? rect.bottom + 8
-      : Math.max(8, rect.top - PANEL_H - 8)
-    host.style.left = `${left}px`
-    host.style.top = `${top}px`
-    if (root === null) root = createRoot(host)
-    root.render(createElement(EffortPanel, {
-      sessionId,
-      wire: createEffortWire(ctx.get('modelDirectories') as ModelDirectoryResolver),
-      onClose: hidePanel,
-    }))
-  }
-
-  const onDocClick = (event: MouseEvent): void => {
-    const target = event.target as HTMLElement
-    // 面板内部交互不处理。
-    if (host.contains(target)) return
-    const row = target.closest?.('button[role="menuitem"]')
-    if (row instanceof HTMLElement) {
-      const text = (row.textContent ?? '').trim()
-      // 官方 root 菜单的第二行：label「推理等级」/「Effort」。
-      if (text.startsWith('推理等级') || text.startsWith('Effort')) {
-        console.log('[aurora-effort] intercept row:', JSON.stringify(text))
-        event.preventDefault()
-        event.stopPropagation()
-        const current = (ctx.get('sessions') as { list: { getSnapshot(): { current?: string } } }).list.getSnapshot().current
-        console.log('[aurora-effort] session:', current)
-        if (current !== undefined) showPanel(current, row)
-        else console.warn('[aurora-effort] no session id')
-        return
-      }
-    }
-    if (!host.contains(target)) hidePanel()
-  }
-  document.addEventListener('click', onDocClick, true)
-
   ctx.effect(
     () => () => {
       delete body.dataset.dshAurora
       observer.disconnect()
       window.removeEventListener(AURORA_EVENT, onConfig)
-      document.removeEventListener('click', onDocClick, true)
-      hidePanel()
-      host.remove()
       backdrop?.remove()
       backdrop = null
     },
-    'ui-skin-aurora: backdrop + effort panel',
+    'ui-skin-aurora: backdrop',
   )
 }
