@@ -16,7 +16,7 @@
  * @module @captain1275/dsh-client-ui-skin-center/skin-switch
  */
 
-import { readdirSync, readFileSync, readlinkSync, lstatSync, mkdirSync, rmdirSync, statSync, symlinkSync, unlinkSync, writeFileSync, renameSync, realpathSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, readlinkSync, lstatSync, mkdirSync, rmdirSync, rmSync, statSync, symlinkSync, unlinkSync, writeFileSync, renameSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join as joinPath } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -89,8 +89,68 @@ export const SKINS_DIR = resolveSkinsDir()
 export const MANAGED_START = '# --- dsh-skin managed (auto-generated; do not edit) ---'
 export const MANAGED_END = '# --- end dsh-skin managed ---'
 
-/** The GUI profile this machine runs (dsh web); overridable via DSH_SKIN_PROFILE. */
-const DEFAULT_PROFILE = process.env.DSH_SKIN_PROFILE ?? 'web'
+/** Directory name of the profiles tree under the DSH home. */
+const PROFILES_DIRNAME = 'profiles'
+
+/** The user-layer patch filename (0.1.5's `PROFILE_PATCH_FILENAME`). */
+const PROFILE_PATCH_FILENAME = 'cordis.patch.yml'
+
+/** Suffix of the user-patch backup a trial keeps while it is running. */
+export const TRIAL_BACKUP_SUFFIX = '.skin-center-trial.bak'
+
+/**
+ * The profile this process actually serves.
+ *
+ * 0.1.5 resolves the profile from the CLI invocation and never exports it, so
+ * the flag is read back off this process's own argv. Hard-coding `web` (as this
+ * module used to) links a skin into the wrong profile's node_modules — the bug
+ * the migration hit as soon as the same machine started serving `web-next`.
+ * @param argv - process argv (injectable for tests).
+ * @param env - environment (injectable for tests).
+ * @returns the profile name; `DSH_SKIN_PROFILE`, then `web`, are the fallbacks.
+ */
+export function resolveActiveProfile(
+  argv: readonly string[] = process.argv,
+  env: Record<string, string | undefined> = process.env,
+): string {
+  for (let index = 0; index < argv.length; index++) {
+    const argument = argv[index]
+    if (argument === '--profile') {
+      const next = argv[index + 1]
+      if (typeof next === 'string' && next !== '' && !next.startsWith('-')) return next
+    }
+    const prefix = '--profile='
+    if (argument.startsWith(prefix)) {
+      const value = argument.slice(prefix.length)
+      if (value !== '') return value
+    }
+  }
+  const fromEnv = env.DSH_SKIN_PROFILE
+  return fromEnv !== undefined && fromEnv !== '' ? fromEnv : 'web'
+}
+
+/**
+ * Package names a profile's own manifest bundles (`dsh.profile.bundles`).
+ * A skin listed there is wired by the bundle layer — its own
+ * `cordis.patch.yml` insert row is applied on every boot — so the managed
+ * section must NOT add a second insert row (that is the duplicate-loader-entry
+ * crash the migration hit twice).
+ * @param profile - profile name.
+ * @param home - DSH home (defaults to the process home).
+ * @returns the bundled package names (empty when the manifest is unreadable).
+ */
+export function profileBundleNames(profile: string, home: string = homedir()): string[] {
+  try {
+    const manifest: unknown = JSON.parse(
+      readFileSync(joinPath(home, '.dsh', PROFILES_DIRNAME, profile, 'package.json'), 'utf8'),
+    )
+    if (typeof manifest !== 'object' || manifest === null) return []
+    const bundles = (manifest as { dsh?: { profile?: { bundles?: unknown } } }).dsh?.profile?.bundles
+    return Array.isArray(bundles) ? bundles.filter((name): name is string => typeof name === 'string') : []
+  } catch {
+    return []
+  }
+}
 
 /** One skin's switch metadata, derived from its packages/skins/<id>/skin.json. */
 export interface SkinSwitchEntry {
@@ -240,18 +300,22 @@ export function loadRegistry(skinsDir: string = SKINS_DIR): Record<string, SkinS
 
 /**
  * The skins the bundle layer already wires (no insert row needed) —derived
- * from each skin.json wiring.bundleWired (the repo's static truth, e.g. xp).
- *
- * TODO: the CLI also detects skins wired via the active profile's
- * dsh.profile.bundles (bundleWiredFromProfile). A skin installed from the
- * web profile's manifest is still represented by skin.json's flag in this
- * repo; wire further profile-based detection here if ever needed.
+ * The skins the bundle layer already wires: skin.json's static flag (the
+ * repo's own truth, e.g. xp) OR the profile's `dsh.profile.bundles` list.
+ * The second half is what makes an installed-from-profile skin (aqua in
+ * `web-next`) resolvable without a managed insert row — and what keeps the
+ * managed section from inserting a row the bundle layer already provides.
  * @param registry - the derived registry (or a partial override in tests).
+ * @param bundles - package names the profile bundles (see {@link profileBundleNames}).
  */
-export function wiredNames(registry: Record<string, SkinSwitchEntry>): Set<string> {
+export function wiredNames(
+  registry: Record<string, SkinSwitchEntry>,
+  bundles: readonly string[] = [],
+): Set<string> {
+  const bundled = new Set(bundles)
   const out = new Set<string>()
   for (const [name, skin] of Object.entries(registry)) {
-    if (skin.bundleWired) out.add(name)
+    if (skin.bundleWired || bundled.has(skin.pkg)) out.add(name)
   }
   return out
 }
@@ -289,11 +353,22 @@ export function stripManaged(patch: string): string {
  * Render the managed section for a target skin (null = official stock look:
  * every skin disabled, no insert row). A wired active skin also needs no
  * insert row —the bundle layer already provides it.
+ *
+ * CRITICAL: a skin the profile already bundles must never get an insert row
+ * here. The bundle layer applies the skin's own `cordis.patch.yml` on every
+ * boot, so a second insert of the same id crashes the boot with
+ * `duplicate loader entry id` (this repository hit it twice during the 0.1.5
+ * migration). {@link wiredNames} therefore folds the profile's manifest in.
  * @param active - skin id, or null for the official stock look.
  * @param registry - registry to render against (defaults to the repo registry).
+ * @param bundles - package names the profile bundles (see {@link profileBundleNames}).
  */
-export function renderManaged(active: string | null, registry: Record<string, SkinSwitchEntry> = loadRegistry()): string {
-  const wired = wiredNames(registry)
+export function renderManaged(
+  active: string | null,
+  registry: Record<string, SkinSwitchEntry> = loadRegistry(),
+  bundles: readonly string[] = [],
+): string {
+  const wired = wiredNames(registry, bundles)
   const lines = [MANAGED_START]
   for (const name of Object.keys(registry)) {
     if (name === active) continue
@@ -313,13 +388,18 @@ export function renderManaged(active: string | null, registry: Record<string, Sk
  * (last non-disabled skin row) remains for pre-bundle layouts.
  * @param patch - raw patch file text.
  * @param registry - registry to read against (defaults to the repo registry).
+ * @param bundles - package names the profile bundles (see {@link profileBundleNames}).
  */
-export function currentActive(patch: string, registry: Record<string, SkinSwitchEntry> = loadRegistry()): string | null {
+export function currentActive(
+  patch: string,
+  registry: Record<string, SkinSwitchEntry> = loadRegistry(),
+  bundles: readonly string[] = [],
+): string | null {
   const disabled = new Set<string>()
   for (const m of patch.matchAll(/^- id: (ui-skin-[a-z0-9-]+)\n  disabled: true/gm)) {
     disabled.add(m[1])
   }
-  const wired = wiredNames(registry)
+  const wired = wiredNames(registry, bundles)
   for (const [name, skin] of Object.entries(registry)) {
     if (wired.has(name) && !disabled.has(skin.id)) return name
   }
@@ -333,22 +413,26 @@ export function currentActive(patch: string, registry: Record<string, SkinSwitch
 
 /** Layout of the DSH home + profile the CLI switches against. */
 export interface SkinSwitchPaths {
-  /** ~/.dsh/cordis.patch.yml */
+  /** ~/.dsh/cordis.patch.yml — the HOME-level user layer 0.1.5 applies over every profile. */
   patchPath: string
   /** ~/.dsh/profiles/<profile>/node_modules */
   profileModulesDir: string
+  /** ~/.dsh/profiles/<profile>/package.json — the profile manifest (bundle list). */
+  profileManifestPath: string
 }
 
 /**
  * Resolve the DSH paths under a HOME. home/profile are injectable so tests
  * can point at a throwaway HOME (mirrors scripts/dsh-skin.test.mjs).
  * @param home - home dir (defaults to the process HOME).
- * @param profile - profile name (defaults to DSH_SKIN_PROFILE or 'web').
+ * @param profile - profile name (defaults to the profile this process serves).
  */
-export function resolvePaths(home: string = homedir(), profile: string = DEFAULT_PROFILE): SkinSwitchPaths {
+export function resolvePaths(home: string = homedir(), profile: string = resolveActiveProfile()): SkinSwitchPaths {
+  const profileDir = joinPath(home, '.dsh', PROFILES_DIRNAME, profile)
   return {
-    patchPath: joinPath(home, '.dsh', 'cordis.patch.yml'),
-    profileModulesDir: joinPath(home, '.dsh', 'profiles', profile, 'node_modules'),
+    patchPath: joinPath(home, '.dsh', PROFILE_PATCH_FILENAME),
+    profileModulesDir: joinPath(profileDir, 'node_modules'),
+    profileManifestPath: joinPath(profileDir, 'package.json'),
   }
 }
 
@@ -543,6 +627,12 @@ function checkResolvable(entry: SkinSwitchEntry, profileModulesDir: string): str
  *   1. makes the profile node_modules symlink for a non-official skin,
  *   2. rewrites the managed section of the boot patch atomically.
  * Returns the same stdout the CLI would print (drives the GUI message).
+ *
+ * The patch it rewrites is the HOME-level user layer (`$DSH_HOME/cordis.patch.yml`),
+ * which 0.1.5 applies over every profile — so this is the one place a skin
+ * switch can land for any profile. The profile name only selects where the
+ * package must be resolvable from, and it defaults to the profile this
+ * process actually serves (see {@link resolveActiveProfile}).
  * @param name - skin id, or 'official' for the stock look.
  * @param opts - injectable HOME/profile/registry (tests use a throwaway HOME).
  * @returns the human-facing confirmation string.
@@ -553,7 +643,8 @@ export function useSkin(name: string, opts: { home?: string; profile?: string; r
   if (!official && registry[name] === undefined) {
     throw new Error(`unknown skin "${name}". Known: ${Object.keys(registry).join(', ')} (or "official" for the stock look)`)
   }
-  const paths = resolvePaths(opts.home, opts.profile)
+  const profile = opts.profile ?? resolveActiveProfile()
+  const paths = resolvePaths(opts.home, profile)
   if (!official) {
     const entry = registry[name]
     symlinkFriendly(`switching to "${name}"`, () => { ensureSymlink(entry, paths.profileModulesDir) })
@@ -565,8 +656,12 @@ export function useSkin(name: string, opts: { home?: string; profile?: string; r
     if (problem !== null) throw new Error(problem)
   }
 
-  const patch = stripLegacySkinRows(stripManaged(readPatch(paths.patchPath)))
-  const next = `${patch.replace(/\s+$/, '')}\n\n${renderManaged(official ? null : name, registry)}\n`
+  const bundles = readProfileBundles(paths.profileManifestPath)
+  // A pending trial's backup must not survive a deliberate switch: the switch
+  // itself is the new baseline.
+  clearTrialBackup(paths.patchPath)
+  const patch = appendableBase(readPatch(paths.patchPath))
+  const next = `${patch.replace(/\s+$/, '')}\n\n${renderManaged(official ? null : name, registry, bundles)}\n`
   writePatchAtomic(paths.patchPath, next)
 
   const core = official
@@ -584,7 +679,150 @@ export function useSkin(name: string, opts: { home?: string; profile?: string; r
  * @returns the active skin id, or 'none' for the stock look.
  */
 export function currentSkin(patch: string | undefined, opts: { home?: string; profile?: string; registry?: Record<string, SkinSwitchEntry> } = {}): string {
-  const paths = resolvePaths(opts.home, opts.profile)
+  const paths = resolvePaths(opts.home, opts.profile ?? resolveActiveProfile())
   const registry = opts.registry ?? loadRegistry()
-  return currentActive(patch ?? readPatch(paths.patchPath), registry) ?? 'none'
+  const bundles = readProfileBundles(paths.profileManifestPath)
+  return currentActive(patch ?? readPatch(paths.patchPath), registry, bundles) ?? 'none'
+}
+
+// --- trial (live try-on on 0.1.5) --------------------------------------
+//
+// The 0.1.1 try-on engine mounted a skin's bundle in the page through the
+// kernel's module-system handle. 0.1.5 does not expose one (the page only has
+// the `__ModuleLoader__` registration facade and `__DSH_BOOT__`), so a skin can
+// only be mounted through the real boot graph. A trial therefore writes the
+// managed section with the trial skin enabled, backs the previous patch up
+// first, and asks the browser to reload; exiting restores the backup.
+
+/** Backup path a running trial keeps next to the user patch. */
+export function trialBackupPath(patchPath: string): string {
+  return `${patchPath}${TRIAL_BACKUP_SUFFIX}`
+}
+
+/** Read the profile manifest's bundle list (empty when unreadable). */
+function readProfileBundles(manifestPath: string): string[] {
+  try {
+    const manifest: unknown = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    if (typeof manifest !== 'object' || manifest === null) return []
+    const bundles = (manifest as { dsh?: { profile?: { bundles?: unknown } } }).dsh?.profile?.bundles
+    return Array.isArray(bundles) ? bundles.filter((name): name is string => typeof name === 'string') : []
+  } catch {
+    return []
+  }
+}
+
+/** Drop a leftover trial backup (a deliberate switch supersedes it). */
+function clearTrialBackup(patchPath: string): void {
+  try {
+    rmSync(trialBackupPath(patchPath), { force: true })
+  } catch {
+    /* nothing to clean */
+  }
+}
+
+/**
+ * The user patch with the managed section and legacy rows stripped, ready to
+ * have a fresh managed section appended.
+ *
+ * A bare `[]` (an empty YAML list) must NOT be appended to: the list is already
+ * closed, so the appended `- id:` rows land outside it and the whole file stops
+ * parsing — the Host then refuses to boot with
+ * `failed to parse patches … YAMLException: end of the stream or a document
+ * separator is expected`. An empty file and an absent file both mean the same
+ * thing (no user patches), so the base collapses to empty.
+ * @param patch - raw patch text.
+ * @returns the appendable base text.
+ */
+export function appendableBase(patch: string): string {
+  const stripped = stripLegacySkinRows(stripManaged(patch))
+  return stripped.trim() === '[]' ? '' : stripped
+}
+
+/** The trial currently recorded on disk, if any. */
+export interface TrialState {
+  /** Skin id being tried on. */
+  skin: string
+  /** Absolute path of the user patch the trial will restore on exit. */
+  backupPath: string
+}
+
+/**
+ * Start (or replace) a trial: back the user patch up once, then write the
+ * managed section with the trial skin enabled. The previous active skin keeps
+ * its own disable/insert state in the backup, so exiting restores exactly what
+ * the user had.
+ * @param name - skin id to try on.
+ * @param opts - injectable HOME/profile/registry.
+ * @returns the message for the GUI plus the skin now being tried.
+ */
+export function beginTrial(name: string, opts: { home?: string; profile?: string; registry?: Record<string, SkinSwitchEntry> } = {}): { message: string; trial: TrialState } {
+  const registry = opts.registry ?? loadRegistry()
+  const entry = registry[name]
+  if (entry === undefined) {
+    throw new Error(`unknown skin "${name}". Known: ${Object.keys(registry).join(', ')}`)
+  }
+  const profile = opts.profile ?? resolveActiveProfile()
+  const paths = resolvePaths(opts.home, profile)
+  symlinkFriendly(`trying on "${name}"`, () => { ensureSymlink(entry, paths.profileModulesDir) })
+  const problem = checkResolvable(entry, paths.profileModulesDir)
+  if (problem !== null) throw new Error(problem)
+
+  const current = readPatch(paths.patchPath)
+  const backupPath = trialBackupPath(paths.patchPath)
+  // Only the FIRST trial backs up: a second try-on from inside a running trial
+  // must still restore the user's pre-trial patch on exit.
+  if (!existsSync(backupPath)) writePatchAtomic(backupPath, current)
+
+  const bundles = readProfileBundles(paths.profileManifestPath)
+  const patch = appendableBase(current)
+  const next = `${patch.replace(/\s+$/, '')}\n\n${renderManaged(name, registry, bundles)}\n`
+  writePatchAtomic(paths.patchPath, next)
+  return {
+    message: `trying on "${name}" — the page reloads into the trial; exiting restores your previous skin.`,
+    trial: { skin: name, backupPath },
+  }
+}
+
+/**
+ * The running trial, if the backup file exists.
+ * @param opts - injectable HOME/profile/registry.
+ * @returns the trial state, or null when no trial is running.
+ */
+export function readTrial(opts: { home?: string; profile?: string; registry?: Record<string, SkinSwitchEntry> } = {}): TrialState | null {
+  const paths = resolvePaths(opts.home, opts.profile ?? resolveActiveProfile())
+  const backupPath = trialBackupPath(paths.patchPath)
+  if (!existsSync(backupPath)) return null
+  const backup = readPatch(backupPath)
+  const registry = opts.registry ?? loadRegistry()
+  const bundles = readProfileBundles(paths.profileManifestPath)
+  const current = currentActive(readPatch(paths.patchPath), registry, bundles)
+  // The trial's skin is the one the current patch enables but the backup does
+  // not; when they agree (or nothing is active) the trial is moot.
+  const previous = currentActive(backup, registry, bundles)
+  if (current === null || current === previous) return null
+  return { skin: current, backupPath }
+}
+
+/**
+ * End a trial by restoring the backed-up user patch.
+ * @param opts - injectable HOME/profile.
+ * @returns the message for the GUI.
+ */
+export function endTrial(opts: { home?: string; profile?: string } = {}): string {
+  const paths = resolvePaths(opts.home, opts.profile ?? resolveActiveProfile())
+  const backupPath = trialBackupPath(paths.patchPath)
+  if (!existsSync(backupPath)) {
+    return 'no trial is running.'
+  }
+  const backup = readPatch(backupPath)
+  if (backup.trim() === '') {
+    // The user had no home patch before the trial: remove the file instead of
+    // leaving an empty one behind. An empty `cordis.patch.yml` is not a patch
+    // list, so the loader would fail the whole boot on the next reload.
+    rmSync(paths.patchPath, { force: true })
+  } else {
+    writePatchAtomic(paths.patchPath, backup)
+  }
+  rmSync(backupPath, { force: true })
+  return 'trial ended — your previous skin is restored; refresh the page to see it.'
 }

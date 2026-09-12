@@ -22,7 +22,7 @@ import { readFileSync, statSync } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { join as joinPath } from 'node:path'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
-import { currentSkin, useSkin, SKINS_DIR, listSkinDirCandidates } from './skin-switch.ts'
+import { currentSkin, useSkin, beginTrial, endTrial, readTrial, resolveActiveProfile, SKINS_DIR, listSkinDirCandidates } from './skin-switch.ts'
 
 /** Browser-facing base path of the skin-center API. */
 export const SKIN_CENTER_API_PREFIX = '/api/skin-center'
@@ -162,6 +162,17 @@ function postRoute(path: string, run: (body: Record<string, unknown>) => Promise
 export interface SkinCenterRoutesDeps {
   /** Run `['use', <name>]` / `['current']`, resolving the CLI-equivalent stdout. */
   run?: (args: string[]) => Promise<string>
+  /**
+   * Read the running trial's skin id (null when none). Injectable because the
+   * default reads the real `$DSH_HOME` patch tree, which a test must not touch.
+   */
+  readTrialState?: () => string | null
+  /** Start a trial for a skin id. */
+  startTrial?: (skin: string) => { message: string; skin: string }
+  /** End the running trial, restoring the backed-up patch. */
+  stopTrial?: () => string
+  /** The profile this host serves (shown in the panel; injectable for tests). */
+  activeProfile?: () => string
 }
 
 /**
@@ -254,10 +265,24 @@ function bundleRoute(): WebRoute {
 export function makeSkinCenterRoutes(deps: SkinCenterRoutesDeps = {}): WebRoute[] {
   const run = deps.run ?? runDshSkin
   const current = (): Promise<string> => run(['current']).then(out => out.trim() || 'none')
+  const activeProfile = deps.activeProfile ?? resolveActiveProfile
+  /** Skin id being tried on, when a trial is running. */
+  const trialSkin = (): string | null => {
+    try {
+      return deps.readTrialState !== undefined ? deps.readTrialState() : readTrial()?.skin ?? null
+    } catch {
+      return null
+    }
+  }
   return [
     getRoute(`${SKIN_CENTER_API_PREFIX}/state`, async () => ({
       ok: true,
       active: await current(),
+      // The profile this host serves decides where a switch has to be
+      // resolvable from, and 0.1.5 never tells a plugin — the panel shows it so
+      // a wrong-profile link is visible instead of silent.
+      profile: activeProfile(),
+      trial: trialSkin(),
     })),
     bundleRoute(),
     postRoute(`${SKIN_CENTER_API_PREFIX}/apply`, async (body) => {
@@ -274,7 +299,35 @@ export function makeSkinCenterRoutes(deps: SkinCenterRoutesDeps = {}): WebRoute[
       return {
         ok: true,
         active: await current(),
+        trial: trialSkin(),
         message: out.trim(),
+      }
+    }),
+    // Live try-on on 0.1.5: the skin can only mount through the real boot
+    // graph, so a trial writes the managed section (backing the previous patch
+    // up first) and the browser reloads into it. `trial/exit` restores.
+    postRoute(`${SKIN_CENTER_API_PREFIX}/trial`, async (body) => {
+      const skin = body.skin
+      if (typeof skin !== 'string' || skin === '') {
+        throw new Error('invalid-skin: pass a skin name')
+      }
+      const started = deps.startTrial !== undefined
+        ? deps.startTrial(skin)
+        : (() => { const result = beginTrial(skin); return { message: result.message, skin: result.trial.skin } })()
+      return {
+        ok: true,
+        active: await current(),
+        trial: started.skin,
+        message: started.message,
+      }
+    }),
+    postRoute(`${SKIN_CENTER_API_PREFIX}/trial/exit`, async () => {
+      const message = deps.stopTrial !== undefined ? deps.stopTrial() : endTrial()
+      return {
+        ok: true,
+        active: await current(),
+        trial: trialSkin(),
+        message,
       }
     }),
   ]

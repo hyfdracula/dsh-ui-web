@@ -206,7 +206,7 @@ window.__ModuleLoader__.load({
 		];
 		//#endregion
 		//#region \0dsh-css:C:\Users\19161\Documents\dsh-work\packages\skins\skin-center\src\client\skin-center.module.css.mjs
-		const css = "body[data-dsh-skin-center] .sBYwVG_pluginCard{border:1px solid var(--dsw-alias-border-l1,#e2e8f0);background:var(--dsw-alias-bg-layer-2,#fff);border-radius:8px;list-style:none;overflow:hidden}body[data-dsh-skin-center] .sBYwVG_cardHeader{width:100%;color:inherit;font:inherit;text-align:left;cursor:pointer;background:0 0;border:0;align-items:center;padding:11px 14px;transition:background .12s;display:flex}body[data-dsh-skin-center] .sBYwVG_cardHeader:hover{background:var(--dsw-alias-bg-layer-1,#f1f5f9)}body[data-dsh-skin-center] .sBYwVG_cardHeader:active{background:var(--dsw-alias-bg-layer-3,#e6ecf4)}body[data-dsh-skin-center] .sBYwVG_cardHeader:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#2b7cd9);outline-offset:2px}body[data-dsh-skin-center] .sBYwVG_headText{flex-direction:column;flex:1;gap:3px;min-width:0;display:flex}body[data-dsh-skin-center] .sBYwVG_pluginName{color:var(--dsw-alias-label-primary,#172a45);align-items:baseline;gap:8px;font-size:13.5px;font-weight:600;display:flex}body[data-dsh-skin-center] .sBYwVG_cardDescription{color:var(--dsw-alias-label-secondary,#6b7280);font-size:12px;line-height:1.4}body[data-dsh-skin-center] .sBYwVG_chevron,body[data-dsh-skin-center] .sBYwVG_chevronOpen{color:var(--dsw-alias-label-secondary,#6b7280);flex:none;margin-left:10px;font-size:12px;transition:transform .12s}body[data-dsh-skin-center] .sBYwVG_chevronOpen{transform:rotate(180deg)}body[data-dsh-skin-center] .sBYwVG_cardBody{border-top:1px solid var(--dsw-alias-border-l1,#e2e8f0);flex-direction:column;gap:12px;padding:12px 14px 14px;display:flex}body[data-dsh-skin-center] .sBYwVG_head{flex-direction:column;gap:6px;display:flex}body[data-dsh-skin-center] .sBYwVG_titleBadge{color:var(--dsw-alias-label-secondary,#6b7280);font-size:11px;font-weight:500}body[data-dsh-skin-center] .sBYwVG_intro{color:var(--dsw-alias-label-secondary,#6b7280);font-size:12.5px;line-height:1.55}body[data-dsh-skin-center] .sBYwVG_themeRow{align-items:center;gap:8px;margin-top:2px;display:flex}body[data-dsh-skin-center] .sBYwVG_themeLabel{color:var(--dsw-alias-label-secondary,#6b7280);margin-right:2px;font-size:12px}body[data-dsh-skin-center] .sBYwVG_themeButton{border:1px solid var(--dsw-alias-border-l3,#cbd5e1);background:var(--dsw-alias-bg-layer-2,#fff);color:var(--dsw-alias-label-primary,#172a45);cursor:pointer;border-radius:6px;padding:5px 10px;font-size:12px;line-height:1;transition:background .12s,border-color .12s,color .12s}body[data-dsh-skin-center] .sBYwVG_themeButton:hover{border-color:var(--dsw-alias-border-l4,#94a3b8)}body[data-dsh-skin-center] .sBYwVG_themeButton:active{border-color:var(--dsw-alias-brand-primary,#2b7cd9);background:var(--dsw-alias-button-primary-dimmed,#e8f1fc);color:var(--dsw-alias-brand-primary,#1e63b8)}body[data-dsh-skin-center] .sBYwVG_themeButton:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#2b7cd9);outline-offset:2px}body[data-dsh-skin-center] .sBYwVG_themeButtonActive{border-color:var(--dsw-alias-brand-primary,#2b7cd9);background:var(--dsw-alias-button-primary-dimmed,#e8f1fc);color:var(--dsw-alias-brand-primary,#1e63b8)}body[data-dsh-skin-center] .sBYwVG_list{flex-direction:column;gap:10px;display:flex}body[data-dsh-skin-center] .sBYwVG_card{border:1px solid var(--dsw-alias-border-l1,#e2e8f0);background:var(--dsw-alias-bg-layer-2,#fff);border-radius:10px;flex-direction:column;gap:8px;padding:12px 14px;display:flex}body[data-dsh-skin-center] .sBYwVG_cardHead{align-items:center;gap:10px;min-width:0;display:flex}body[data-dsh-skin-center] .sBYwVG_swatch{width:14px;height:14px;box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l4,#0f172a1f);border-radius:50%;flex:none}body[data-dsh-skin-center] .sBYwVG_cardName{text-overflow:ellipsis;white-space:nowrap;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden}body[data-dsh-skin-center] .sBYwVG_cardTagline{color:var(--dsw-alias-label-secondary,#6b7280);font-size:12px;line-height:1.45}body[data-dsh-skin-center] .sBYwVG_badge{letter-spacing:.02em;border-radius:999px;flex:none;min-width:0;margin-left:auto;padding:2px 8px;font-size:11px;font-weight:600}body[data-dsh-skin-center] .sBYwVG_badgeActive{color:var(--dsw-alias-state-success-primary,#0f6b3a);background:var(--dsw-alias-state-success-tertiary,#dcf3e5)}body[data-dsh-skin-center] .sBYwVG_badgeTrying{color:var(--dsw-alias-brand-primary,#1e63b8);background:var(--dsw-alias-button-primary-dimmed,#e2edfc)}body[data-dsh-skin-center] .sBYwVG_actions{flex-wrap:wrap;align-items:center;gap:8px;display:flex}body[data-dsh-skin-center] .sBYwVG_button{border:1px solid var(--dsw-alias-border-l3,#cbd5e1);background:var(--dsw-alias-bg-layer-2,#fff);color:var(--dsw-alias-label-primary,#172a45);cursor:pointer;border-radius:7px;padding:6px 12px;font-size:12px;line-height:1;transition:background .12s,border-color .12s,color .12s}body[data-dsh-skin-center] .sBYwVG_button:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary,#2b7cd9);color:var(--dsw-alias-brand-primary,#1e63b8)}body[data-dsh-skin-center] .sBYwVG_button:active:not(:disabled){border-color:var(--dsw-alias-button-primary-hover,#1e63b8);background:var(--dsw-alias-button-primary-dimmed,#e8f1fc);color:var(--dsw-alias-brand-primary,#1e63b8)}body[data-dsh-skin-center] .sBYwVG_button:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#2b7cd9);outline-offset:2px}body[data-dsh-skin-center] .sBYwVG_buttonPrimary{border-color:var(--dsw-alias-brand-primary,#2b7cd9);background:var(--dsw-alias-button-primary-fill,#2b7cd9);color:var(--dsw-alias-label-primary-foreground,#fff)}body[data-dsh-skin-center] .sBYwVG_buttonPrimary:hover:not(:disabled){border-color:var(--dsw-alias-button-primary-hover,#1e63b8);background:var(--dsw-alias-button-primary-hover,#1e63b8);color:var(--dsw-alias-label-primary-foreground,#fff)}body[data-dsh-skin-center] .sBYwVG_buttonPrimary:active:not(:disabled),body[data-dsh-skin-center] .sBYwVG_buttonPrimary:focus-visible:not(:disabled){border-color:var(--dsw-alias-button-primary-hover,#1e63b8);background:var(--dsw-alias-button-primary-hover,#1e63b8)}body[data-dsh-skin-center] .sBYwVG_buttonGhost{background:0 0;border-color:#0000}body[data-dsh-skin-center] .sBYwVG_button:disabled{opacity:.55;cursor:default}body[data-dsh-skin-center] .sBYwVG_error{color:var(--dsw-alias-state-error-primary,#b42318);font-size:12px}body[data-dsh-skin-center] .sBYwVG_backgroundRow{flex-direction:column;gap:6px;padding:8px 0;display:flex}body[data-dsh-skin-center] .sBYwVG_backgroundHead{align-items:center;gap:8px;display:flex}body[data-dsh-skin-center] .sBYwVG_backgroundLabel{color:var(--dsw-alias-label-primary,#172a45);font-size:12.5px;font-weight:600}body[data-dsh-skin-center] .sBYwVG_backgroundValue{font-variant-numeric:tabular-nums;color:var(--dsw-alias-brand-primary,#2b7cd9);flex:none;margin-left:auto;font-size:12px}body[data-dsh-skin-center] .sBYwVG_backgroundRange{background:var(--dsw-alias-bg-layer-3,#e2e8f0);-webkit-appearance:none;appearance:none;cursor:pointer;border-radius:999px;width:100%;height:4px;margin:0}body[data-dsh-skin-center] .sBYwVG_backgroundRange::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;border:2px solid var(--dsw-alias-label-primary-foreground,#fff);background:var(--dsw-alias-brand-primary,#2b7cd9);width:14px;height:14px;box-shadow:0 0 0 1px var(--dsw-alias-border-l4,#0f172a1f);cursor:pointer;border-radius:50%}body[data-dsh-skin-center] .sBYwVG_backgroundRange::-moz-range-thumb{border:2px solid var(--dsw-alias-label-primary-foreground,#fff);background:var(--dsw-alias-brand-primary,#2b7cd9);width:12px;height:12px;box-shadow:0 0 0 1px var(--dsw-alias-border-l4,#0f172a1f);cursor:pointer;border-radius:50%}body[data-dsh-skin-center] .sBYwVG_backgroundRange:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#2b7cd9);outline-offset:2px}body[data-dsh-skin-center] .sBYwVG_backgroundHint{color:var(--dsw-alias-label-secondary,#6b7280);font-size:12px;line-height:1.5}body[data-dsh-skin-center] .sBYwVG_backgroundHintMuted{color:var(--dsw-alias-label-tertiary,#9aa4b5);font-size:12px;line-height:1.5}body[data-dsh-skin-center] .sBYwVG_auroraSection{border:1px solid var(--dsw-alias-border-l1,#80808038);background:var(--dsw-alias-bg-layer-1,#80808014);border-radius:8px;flex-direction:column;gap:8px;margin-top:8px;padding:8px 10px;display:flex}body[data-dsh-skin-center] .sBYwVG_auroraSectionTitle{color:var(--dsw-alias-label-secondary,#6b7280);font-size:12px;font-weight:600}body[data-dsh-skin-center] .sBYwVG_auroraField{flex-wrap:wrap;align-items:center;gap:8px;display:flex}body[data-dsh-skin-center] .sBYwVG_auroraFieldLabel{color:var(--dsw-alias-label-secondary,#6b7280);min-width:96px;font-size:12px}body[data-dsh-skin-center] .sBYwVG_auroraFileBtn{border:1px solid var(--dsw-alias-border-l2,#80808059);background:var(--dsw-alias-bg-layer-2,#80808026);color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;border-radius:6px;padding:4px 10px;font-size:12px}body[data-dsh-skin-center] .sBYwVG_auroraFileBtn:hover{background:var(--dsw-alias-interactive-bg-hover,#80808033);color:var(--dsw-alias-label-primary,#111827)}body[data-dsh-skin-center] .sBYwVG_auroraThumb{border:1px solid var(--dsw-alias-border-l2,#80808059);background-position:50%;background-size:cover;border-radius:6px;flex:none;width:64px;height:36px}body[data-dsh-skin-center] .sBYwVG_auroraUrl{border:1px solid var(--dsw-alias-border-l2,#80808059);background:var(--dsw-alias-bg-layer-2,#80808026);min-width:160px;color:var(--dsw-alias-label-primary,#111827);border-radius:6px;flex:1;padding:4px 8px;font-size:12px}body[data-dsh-skin-center] .sBYwVG_auroraRange{min-width:120px;accent-color:var(--dsw-alias-brand-primary,#2b7cd9);flex:1}@media (prefers-reduced-motion:reduce){body[data-dsh-skin-center] .sBYwVG_cardHeader,body[data-dsh-skin-center] .sBYwVG_themeButton,body[data-dsh-skin-center] .sBYwVG_button,body[data-dsh-skin-center] .sBYwVG_chevron,body[data-dsh-skin-center] .sBYwVG_chevronOpen{transition:none}}";
+		const css = "body[data-dsh-skin-center] .sBYwVG_pluginCard{border:1px solid var(--dsw-alias-border-l1,#e2e8f0);background:var(--dsw-alias-bg-layer-2,#fff);border-radius:8px;list-style:none;overflow:hidden}body[data-dsh-skin-center] .sBYwVG_cardHeader{width:100%;color:inherit;font:inherit;text-align:left;cursor:pointer;background:0 0;border:0;align-items:center;padding:11px 14px;transition:background .12s;display:flex}body[data-dsh-skin-center] .sBYwVG_cardHeader:hover{background:var(--dsw-alias-bg-layer-1,#f1f5f9)}body[data-dsh-skin-center] .sBYwVG_cardHeader:active{background:var(--dsw-alias-bg-layer-3,#e6ecf4)}body[data-dsh-skin-center] .sBYwVG_cardHeader:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#2b7cd9);outline-offset:2px}body[data-dsh-skin-center] .sBYwVG_headText{flex-direction:column;flex:1;gap:3px;min-width:0;display:flex}body[data-dsh-skin-center] .sBYwVG_pluginName{color:var(--dsw-alias-label-primary,#172a45);align-items:baseline;gap:8px;font-size:13.5px;font-weight:600;display:flex}body[data-dsh-skin-center] .sBYwVG_cardDescription{color:var(--dsw-alias-label-secondary,#6b7280);font-size:12px;line-height:1.4}body[data-dsh-skin-center] .sBYwVG_chevron,body[data-dsh-skin-center] .sBYwVG_chevronOpen{color:var(--dsw-alias-label-secondary,#6b7280);flex:none;margin-left:10px;font-size:12px;transition:transform .12s}body[data-dsh-skin-center] .sBYwVG_chevronOpen{transform:rotate(180deg)}body[data-dsh-skin-center] .sBYwVG_cardBody{border-top:1px solid var(--dsw-alias-border-l1,#e2e8f0);flex-direction:column;gap:12px;padding:12px 14px 14px;display:flex}body[data-dsh-skin-center] .sBYwVG_head{flex-direction:column;gap:6px;display:flex}body[data-dsh-skin-center] .sBYwVG_titleBadge{color:var(--dsw-alias-label-secondary,#6b7280);font-size:11px;font-weight:500}body[data-dsh-skin-center] .sBYwVG_intro{color:var(--dsw-alias-label-secondary,#6b7280);font-size:12.5px;line-height:1.55}body[data-dsh-skin-center] .sBYwVG_themeRow{align-items:center;gap:8px;margin-top:2px;display:flex}body[data-dsh-skin-center] .sBYwVG_themeLabel{color:var(--dsw-alias-label-secondary,#6b7280);margin-right:2px;font-size:12px}body[data-dsh-skin-center] .sBYwVG_themeButton{border:1px solid var(--dsw-alias-border-l3,#cbd5e1);background:var(--dsw-alias-bg-layer-2,#fff);color:var(--dsw-alias-label-primary,#172a45);cursor:pointer;border-radius:6px;padding:5px 10px;font-size:12px;line-height:1;transition:background .12s,border-color .12s,color .12s}body[data-dsh-skin-center] .sBYwVG_themeButton:hover{border-color:var(--dsw-alias-border-l4,#94a3b8)}body[data-dsh-skin-center] .sBYwVG_themeButton:active{border-color:var(--dsw-alias-brand-primary,#2b7cd9);background:var(--dsw-alias-button-primary-dimmed,#e8f1fc);color:var(--dsw-alias-brand-primary,#1e63b8)}body[data-dsh-skin-center] .sBYwVG_themeButton:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#2b7cd9);outline-offset:2px}body[data-dsh-skin-center] .sBYwVG_themeButtonActive{border-color:var(--dsw-alias-brand-primary,#2b7cd9);background:var(--dsw-alias-button-primary-dimmed,#e8f1fc);color:var(--dsw-alias-brand-primary,#1e63b8)}body[data-dsh-skin-center] .sBYwVG_list{flex-direction:column;gap:10px;display:flex}body[data-dsh-skin-center] .sBYwVG_card{border:1px solid var(--dsw-alias-border-l1,#e2e8f0);background:var(--dsw-alias-bg-layer-2,#fff);border-radius:10px;flex-direction:column;gap:8px;padding:12px 14px;display:flex}body[data-dsh-skin-center] .sBYwVG_cardHead{align-items:center;gap:10px;min-width:0;display:flex}body[data-dsh-skin-center] .sBYwVG_swatch{width:14px;height:14px;box-shadow:inset 0 0 0 1px var(--dsw-alias-border-l4,#0f172a1f);border-radius:50%;flex:none}body[data-dsh-skin-center] .sBYwVG_cardName{text-overflow:ellipsis;white-space:nowrap;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden}body[data-dsh-skin-center] .sBYwVG_cardTagline{color:var(--dsw-alias-label-secondary,#6b7280);font-size:12px;line-height:1.45}body[data-dsh-skin-center] .sBYwVG_badge{letter-spacing:.02em;border-radius:999px;flex:none;min-width:0;margin-left:auto;padding:2px 8px;font-size:11px;font-weight:600}body[data-dsh-skin-center] .sBYwVG_badgeActive{color:var(--dsw-alias-state-success-primary,#0f6b3a);background:var(--dsw-alias-state-success-tertiary,#dcf3e5)}body[data-dsh-skin-center] .sBYwVG_badgeTrying{color:var(--dsw-alias-brand-primary,#1e63b8);background:var(--dsw-alias-button-primary-dimmed,#e2edfc)}body[data-dsh-skin-center] .sBYwVG_actions{flex-wrap:wrap;align-items:center;gap:8px;display:flex}body[data-dsh-skin-center] .sBYwVG_button{border:1px solid var(--dsw-alias-border-l3,#cbd5e1);background:var(--dsw-alias-bg-layer-2,#fff);color:var(--dsw-alias-label-primary,#172a45);cursor:pointer;border-radius:7px;padding:6px 12px;font-size:12px;line-height:1;transition:background .12s,border-color .12s,color .12s}body[data-dsh-skin-center] .sBYwVG_button:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary,#2b7cd9);color:var(--dsw-alias-brand-primary,#1e63b8)}body[data-dsh-skin-center] .sBYwVG_button:active:not(:disabled){border-color:var(--dsw-alias-button-primary-hover,#1e63b8);background:var(--dsw-alias-button-primary-dimmed,#e8f1fc);color:var(--dsw-alias-brand-primary,#1e63b8)}body[data-dsh-skin-center] .sBYwVG_button:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#2b7cd9);outline-offset:2px}body[data-dsh-skin-center] .sBYwVG_buttonPrimary{border-color:var(--dsw-alias-brand-primary,#2b7cd9);background:var(--dsw-alias-button-primary-fill,#2b7cd9);color:var(--dsw-alias-label-primary-foreground,#fff)}body[data-dsh-skin-center] .sBYwVG_buttonPrimary:hover:not(:disabled){border-color:var(--dsw-alias-button-primary-hover,#1e63b8);background:var(--dsw-alias-button-primary-hover,#1e63b8);color:var(--dsw-alias-label-primary-foreground,#fff)}body[data-dsh-skin-center] .sBYwVG_buttonPrimary:active:not(:disabled),body[data-dsh-skin-center] .sBYwVG_buttonPrimary:focus-visible:not(:disabled){border-color:var(--dsw-alias-button-primary-hover,#1e63b8);background:var(--dsw-alias-button-primary-hover,#1e63b8)}body[data-dsh-skin-center] .sBYwVG_buttonGhost{background:0 0;border-color:#0000}body[data-dsh-skin-center] .sBYwVG_button:disabled{opacity:.55;cursor:default}body[data-dsh-skin-center] .sBYwVG_error{color:var(--dsw-alias-state-error-primary,#b42318);font-size:12px}body[data-dsh-skin-center] .sBYwVG_backgroundRow{flex-direction:column;gap:6px;padding:8px 0;display:flex}body[data-dsh-skin-center] .sBYwVG_backgroundHead{align-items:center;gap:8px;display:flex}body[data-dsh-skin-center] .sBYwVG_backgroundLabel{color:var(--dsw-alias-label-primary,#172a45);font-size:12.5px;font-weight:600}body[data-dsh-skin-center] .sBYwVG_backgroundValue{font-variant-numeric:tabular-nums;color:var(--dsw-alias-brand-primary,#2b7cd9);flex:none;margin-left:auto;font-size:12px}body[data-dsh-skin-center] .sBYwVG_backgroundRange{background:var(--dsw-alias-bg-layer-3,#e2e8f0);-webkit-appearance:none;appearance:none;cursor:pointer;border-radius:999px;width:100%;height:4px;margin:0}body[data-dsh-skin-center] .sBYwVG_backgroundRange::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;border:2px solid var(--dsw-alias-label-primary-foreground,#fff);background:var(--dsw-alias-brand-primary,#2b7cd9);width:14px;height:14px;box-shadow:0 0 0 1px var(--dsw-alias-border-l4,#0f172a1f);cursor:pointer;border-radius:50%}body[data-dsh-skin-center] .sBYwVG_backgroundRange::-moz-range-thumb{border:2px solid var(--dsw-alias-label-primary-foreground,#fff);background:var(--dsw-alias-brand-primary,#2b7cd9);width:12px;height:12px;box-shadow:0 0 0 1px var(--dsw-alias-border-l4,#0f172a1f);cursor:pointer;border-radius:50%}body[data-dsh-skin-center] .sBYwVG_backgroundRange:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#2b7cd9);outline-offset:2px}body[data-dsh-skin-center] .sBYwVG_backgroundHint{color:var(--dsw-alias-label-secondary,#6b7280);font-size:12px;line-height:1.5}body[data-dsh-skin-center] .sBYwVG_backgroundHintMuted{color:var(--dsw-alias-label-tertiary,#9aa4b5);font-size:12px;line-height:1.5}body[data-dsh-skin-center] .sBYwVG_auroraSection{border:1px solid var(--dsw-alias-border-l1,#80808038);background:var(--dsw-alias-bg-layer-1,#80808014);border-radius:8px;flex-direction:column;gap:8px;margin-top:8px;padding:8px 10px;display:flex}body[data-dsh-skin-center] .sBYwVG_auroraSectionTitle{color:var(--dsw-alias-label-secondary,#6b7280);font-size:12px;font-weight:600}body[data-dsh-skin-center] .sBYwVG_auroraField{flex-wrap:wrap;align-items:center;gap:8px;display:flex}body[data-dsh-skin-center] .sBYwVG_auroraFieldLabel{color:var(--dsw-alias-label-secondary,#6b7280);min-width:96px;font-size:12px}body[data-dsh-skin-center] .sBYwVG_auroraFileBtn{border:1px solid var(--dsw-alias-border-l2,#80808059);background:var(--dsw-alias-bg-layer-2,#80808026);color:var(--dsw-alias-label-secondary,#6b7280);cursor:pointer;border-radius:6px;padding:4px 10px;font-size:12px}body[data-dsh-skin-center] .sBYwVG_auroraFileBtn:hover{background:var(--dsw-alias-interactive-bg-hover,#80808033);color:var(--dsw-alias-label-primary,#111827)}body[data-dsh-skin-center] .sBYwVG_auroraThumb{border:1px solid var(--dsw-alias-border-l2,#80808059);background-position:50%;background-size:cover;border-radius:6px;flex:none;width:64px;height:36px}body[data-dsh-skin-center] .sBYwVG_auroraUrl{border:1px solid var(--dsw-alias-border-l2,#80808059);background:var(--dsw-alias-bg-layer-2,#80808026);min-width:160px;color:var(--dsw-alias-label-primary,#111827);border-radius:6px;flex:1;padding:4px 8px;font-size:12px}body[data-dsh-skin-center] .sBYwVG_auroraRange{min-width:120px;accent-color:var(--dsw-alias-brand-primary,#2b7cd9);flex:1}@media (prefers-reduced-motion:reduce){body[data-dsh-skin-center] .sBYwVG_cardHeader,body[data-dsh-skin-center] .sBYwVG_themeButton,body[data-dsh-skin-center] .sBYwVG_button,body[data-dsh-skin-center] .sBYwVG_chevron,body[data-dsh-skin-center] .sBYwVG_chevronOpen{transition:none}}body[data-dsh-skin-center] .sBYwVG_trialBanner{border:1px solid var(--dsw-alias-state-business-primary,#3f76d8);background:var(--dsw-alias-state-business-tertiary,#dce9fb);color:var(--dsw-alias-label-primary,#13243e);border-radius:7px;align-items:center;gap:10px;margin:0 0 10px;padding:9px 12px;font-size:12px;line-height:1.5;display:flex}body[data-dsh-skin-center] .sBYwVG_trialText{flex:1}body[data-dsh-skin-center] .sBYwVG_profileLine{color:var(--dsw-alias-label-caption,#7e93ac);margin:6px 0 0;font-size:11px}";
 		const tagId = "@captain1275/dsh-client-ui-skin-center/skin-center.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -254,12 +254,15 @@ window.__ModuleLoader__.load({
 			"list": "sBYwVG_list",
 			"pluginCard": "sBYwVG_pluginCard",
 			"pluginName": "sBYwVG_pluginName",
+			"profileLine": "sBYwVG_profileLine",
 			"swatch": "sBYwVG_swatch",
 			"themeButton": "sBYwVG_themeButton",
 			"themeButtonActive": "sBYwVG_themeButtonActive",
 			"themeLabel": "sBYwVG_themeLabel",
 			"themeRow": "sBYwVG_themeRow",
-			"titleBadge": "sBYwVG_titleBadge"
+			"titleBadge": "sBYwVG_titleBadge",
+			"trialBanner": "sBYwVG_trialBanner",
+			"trialText": "sBYwVG_trialText"
 		};
 		//#endregion
 		//#region src/client/AuroraBackgroundSection.tsx
@@ -527,292 +530,21 @@ window.__ModuleLoader__.load({
 			});
 		}
 		//#endregion
-		//#region src/client/try-on.ts
-		/**
-		* Try-on engine for the in-GUI skin center.
-		*
-		* A skin's client bundle is executed through the REAL module system, not a
-		* shim and not eval: the host route `/api/skin-center/bundle/<id>` serves
-		* the skin's prebuilt `lib/client.js` as a same-origin script (mirroring
-		* the kernel's own defaultLoadBundle — see dsh-client-modules), and its
-		* body calls `window.__ModuleLoader__.load({id, factory})`, which only
-		* REGISTERS the factory. `window.__DSH_MODULES__.import(package)` (the
-		* kernel's ClientModuleSystem, contract C5/C6) then materializes it — which
-		* auto-injects the skin's CSS `<style data-plugin>` tag — and
-		* `surface.apply(miniCtx)` mounts the skin exactly as the fiber system
-		* would, returning a full disposer. That makes try-on and its teardown the
-		* real code paths, with no CSP `unsafe-eval` dependence and no startup
-		* cost: the ~700KB of embedded art base64 is only parsed when a skin is
-		* actually tried on.
-		*
-		* Mutual exclusion: the GUI never hosts two skins at once. The currently
-		* ACTIVE skin is owned by its own cordis fiber (its disposer is not
-		* reachable), so try-on retracts the active skin's visual writes by recipe:
-		* remove its body attribute (its stylesheet goes inert), clear the
-		* body-level backdrop inline styles (blue-fantasy's whale art), detach only
-		* known skin chrome body children (title/status bars marked `data-skin-chrome`
-		* or carrying the skin's body attribute, leaving other plugins' portals and
-		* toasts in place), and neutralize known global-rule leaks (xp's sidebar
-		* taskbar/start). Everything is snapshotted and restored on exit in original
-		* order. The active skin's own fiber is never touched, so exiting try-on
-		* returns the page to exactly the pre-try-on state.
-		*
-		* A ghost MutationObserver may survive retraction (blue-fantasy re-writes
-		* its backdrop on theme flips), so during try-on a neutralizing observer
-		* re-clears the backdrop props whenever `data-ds-dark-theme` changes.
-		*/
-		/** Body-level backdrop properties skins may write inline (blue-fantasy). */
-		const BACKDROP_PROPS = [
-			"background-image",
-			"background-position",
-			"background-size",
-			"background-attachment",
-			"background-repeat"
-		];
-		/**
-		* Per-skin neutralization CSS: rules that hide visual leaks whose styles
-		* are NOT scoped under the skin's body attribute (they live on app elements
-		* the skin touches, so detaching chrome cannot remove them). Matched by
-		* css-module class substring, which is stable across rebuilds.
-		*/
-		const NEUTRALIZE_CSS = { xp: [`[data-pane='sidebar'] [class*='xpTaskbar']{background:transparent!important;border-top:none!important;box-shadow:none!important}`, `[data-pane='sidebar'] [class*='xpStart']{display:none!important}`].join("") };
-		/** Host base path of the skin bundle route (registered by src/routes.ts). */
-		const BUNDLE_ROUTE = "/api/skin-center/bundle";
-		/**
-		* Execute one skin's client bundle as a real same-origin script, mirroring
-		* the kernel's own defaultLoadBundle (dsh-client-modules): the script body
-		* calls `window.__ModuleLoader__.load({id, factory})`, which only registers
-		* the factory — materialization is the caller's separate `import` step. No
-		* eval: try-on works under any CSP that allows same-origin scripts (the
-		* shell itself loads plugin bundles this way), and a failed fetch rejects
-		* so the caller can restore the active skin instead of leaving it retracted.
-		* @param url - same-origin bundle URL.
-		* @returns a promise resolving once the script executed.
-		*/
-		function loadBundleScript(url) {
-			return new Promise((resolve, reject) => {
-				const el = document.createElement("script");
-				el.async = true;
-				el.src = url;
-				el.addEventListener("load", () => {
-					el.remove();
-					resolve();
-				}, { once: true });
-				el.addEventListener("error", () => {
-					el.remove();
-					reject(/* @__PURE__ */ new Error(`skin-center: bundle script ${url} failed to load`));
-				}, { once: true });
-				document.head.append(el);
-			});
-		}
-		/** Read the page's composed boot-graph entry ids (only enabled plugins appear). */
-		function bootEntryIds() {
-			return window.__DSH_BOOT__?.entries?.map((entry) => entry.id) ?? [];
-		}
-		/** The skin package currently ACTIVE in the boot graph, if it is one of ours. */
-		function activeSkinEntry() {
-			const ids = new Set(bootEntryIds());
-			return SKIN_CENTER_ENTRIES.find((entry) => ids.has(entry.package));
-		}
-		/**
-		* Whether a direct body child is skin chrome owned by `skin`: marked with the
-		* `data-skin-chrome` marker (minecraft/dragon-heir) or carrying the skin's
-		* scoping body attribute. Everything else — other plugins' portals, toasts and
-		* overlays appended to body — is left alone.
-		*/
-		function isSkinChrome(el, skin) {
-			if (el.hasAttribute("data-skin-chrome")) return true;
-			return skin !== null && el.hasAttribute(skin.bodyAttr);
-		}
-		function miniCtx() {
-			const disposers = [];
-			return {
-				effect(callback) {
-					disposers.push(callback());
-					return () => {};
-				},
-				get() {},
-				__disposeAll() {
-					for (const dispose of disposers.reverse()) dispose();
-				}
-			};
-		}
-		/**
-		* One live try-on session: owns the tried-on skin's disposer plus the
-		* captured active-skin visuals, and restores everything on exit.
-		*/
-		var TryOnController = class {
-			session = null;
-			/**
-			* Generation counter. A newer try-on or exit increments it, so an in-flight
-			* `tryOn` (awaiting the real bundle load) can detect it was superseded and
-			* drop only what it mounted instead of clobbering the newer session.
-			*/
-			epoch = 0;
-			/**
-			* Loads one skin's client bundle so its factory registers on the page's
-			* `__ModuleLoader__`. Defaults to a same-origin script tag from the host
-			* route `/api/skin-center/bundle/<id>`; tests inject a stub.
-			*/
-			loadBundle;
-			constructor(options = {}) {
-				this.loadBundle = options.loadBundle ?? ((entry) => loadBundleScript(`${BUNDLE_ROUTE}/${encodeURIComponent(entry.id)}`));
-			}
-			/** The skin currently being tried on, if any. */
-			get trying() {
-				return this.session?.entry ?? null;
-			}
-			/** Whether the official stock look (no skin) is being tried on. */
-			get tryingOfficial() {
-				return this.session !== null && this.session.entry === null;
-			}
-			/** Start trying on `entry` (replaces any live session). */
-			async tryOn(entry) {
-				if (entry.package === activeSkinEntry()?.package) return;
-				this.exit();
-				const epoch = ++this.epoch;
-				const active = this.captureAndRetractActive();
-				let dispose;
-				try {
-					dispose = await this.loadAndApply(entry);
-				} catch (error) {
-					if (epoch === this.epoch) this.restoreActive(active);
-					throw error;
-				}
-				if (epoch !== this.epoch) {
-					this.cleanupModule(entry);
-					dispose();
-					return;
-				}
-				this.session = {
-					entry,
-					dispose,
-					active
-				};
-			}
-			/**
-			* Try on the official stock look: retract the active skin's visual writes
-			* (same recipe as a skin try-on) and mount nothing. Exiting restores the
-			* active skin exactly like any other try-on session.
-			*/
-			tryOnOfficial() {
-				if (activeSkinEntry() === null) return;
-				this.exit();
-				this.epoch += 1;
-				const active = this.captureAndRetractActive();
-				this.session = {
-					entry: null,
-					dispose: () => {},
-					active
-				};
-			}
-			/** Exit the live session: dispose the tried-on skin, then restore the active skin. */
-			exit() {
-				const session = this.session;
-				if (session === null) return;
-				this.epoch += 1;
-				this.session = null;
-				session.dispose();
-				if (session.entry !== null) this.cleanupModule(session.entry);
-				this.restoreActive(session.active);
-			}
-			/** Execute + materialize + mount the target skin through the real loader. */
-			async loadAndApply(entry) {
-				const modules = window.__DSH_MODULES__;
-				if (modules === void 0) throw new Error("skin-center: window.__DSH_MODULES__ missing");
-				modules.invalidate(entry.package);
-				await this.loadBundle(entry);
-				const apply = (await modules.import(entry.package)).apply;
-				if (typeof apply !== "function") throw new Error(`skin-center: "${entry.package}" client bundle exports no apply`);
-				const ctx = miniCtx();
-				try {
-					apply(ctx);
-				} catch (error) {
-					this.cleanupModule(entry);
-					document.body.removeAttribute(entry.bodyAttr);
-					for (const el of [...document.body.children]) if (isSkinChrome(el, entry)) el.remove();
-					throw error;
-				}
-				return ctx.__disposeAll;
-			}
-			/** Drop the tried-on module record + its injected style tag. */
-			cleanupModule(entry) {
-				window.__DSH_MODULES__?.invalidate(entry.package);
-				for (const el of document.querySelectorAll(`style[data-plugin=${JSON.stringify(entry.package)}]`)) el.remove();
-			}
-			/**
-			* Snapshot the active skin's visual writes and retract them so the tried-on
-			* skin can take over the whole surface.
-			*/
-			captureAndRetractActive() {
-				const skin = activeSkinEntry() ?? null;
-				const body = document.body;
-				const bodyAttr = skin === null ? null : body.getAttribute(skin.bodyAttr);
-				if (skin !== null && bodyAttr !== null) body.removeAttribute(skin.bodyAttr);
-				const bodyStyle = body.getAttribute("style");
-				for (const prop of BACKDROP_PROPS) body.style.removeProperty(prop);
-				const children = [...body.children];
-				const chrome = /* @__PURE__ */ new Set();
-				for (const el of children) if (el.id !== "root" && isSkinChrome(el, skin)) chrome.add(el);
-				const detached = [];
-				for (let i = 0; i < children.length; i++) {
-					const el = children[i];
-					if (!chrome.has(el)) continue;
-					let anchor = null;
-					for (let j = i + 1; j < children.length; j++) if (!chrome.has(children[j])) {
-						anchor = children[j];
-						break;
-					}
-					detached.push({
-						el,
-						anchor
-					});
-				}
-				for (const { el } of detached) el.remove();
-				const clearObserver = new MutationObserver(() => {
-					for (const prop of BACKDROP_PROPS) body.style.removeProperty(prop);
-				});
-				clearObserver.observe(body, {
-					attributes: true,
-					attributeFilter: ["data-ds-dark-theme"]
-				});
-				const neutralizeCss = skin === null ? void 0 : NEUTRALIZE_CSS[skin.id];
-				return {
-					skin,
-					bodyAttr,
-					bodyStyle,
-					detached,
-					clearObserver,
-					neutralizeStyle: neutralizeCss === void 0 ? null : this.injectStyle(neutralizeCss)
-				};
-			}
-			/** Restore the active skin's captured visual state. */
-			restoreActive(active) {
-				const body = document.body;
-				if (active.skin !== null && active.bodyAttr !== null) body.setAttribute(active.skin.bodyAttr, active.bodyAttr);
-				if (active.bodyStyle !== null) body.setAttribute("style", active.bodyStyle);
-				else body.removeAttribute("style");
-				for (const { el, anchor } of active.detached) body.insertBefore(el, anchor !== null && anchor.parentNode === body ? anchor : null);
-				active.clearObserver?.disconnect();
-				active.neutralizeStyle?.remove();
-			}
-			injectStyle(css) {
-				const tag = document.createElement("style");
-				tag.dataset.skinCenterNeutralize = "";
-				tag.textContent = css;
-				document.head.append(tag);
-				return tag;
-			}
-		};
-		//#endregion
 		//#region src/client/SkinCenter.tsx
 		/**
 		* The skin-center plugin card: one disclosure card inside the Web UI plugin
 		* group (插件配置 → Web UI 插件), listing every installed skin plus the
-		* official stock look. Live try-on executes the real bundle inside the GUI
-		* (light/dark preview, full restore on exit); Apply is one click — the host
-		* half runs `dsh-skin use` through /api/skin-center/apply, the config
-		* watcher hot-reloads the patch, and the page reloads into the new skin.
+		* official stock look.
+		*
+		* 0.1.5 lowered what a plugin can do at runtime: the page no longer exposes the
+		* kernel module system the 0.1.1 try-on engine mounted bundles through, so a
+		* skin can only ever live in the boot graph. The card therefore works against
+		* the host's trial API — 试用 backs the user patch up, writes the trial skin
+		* into the managed section and reloads; 退出试用 restores the backup and
+		* reloads. 应用 persists a skin the same way, 恢复默认 goes back to the stock
+		* look. The panel also shows which profile this host serves, because a switch
+		* is only loadable when the skin resolves from that profile.
+		*
 		* Copy rides the standard `t` seat; the theme preview control drives the
 		* official theme service (persisted, same as the Appearance row).
 		*/
@@ -821,54 +553,69 @@ window.__ModuleLoader__.load({
 		/** Skin ids that read the background-scrim variable and paint a backdrop. */
 		const BACKDROP_SKIN_IDS = /* @__PURE__ */ new Set(["blue-fantasy", "whale-song"]);
 		/**
-		* Render the skin-center card: a disclosure header naming the plugin, with
-		* the skin list (official default + every installed skin; try-on / theme
-		* preview / one-click apply) inside its body.
+		* Render the skin-center card: a disclosure header naming the plugin, with the
+		* skin list (official default + every installed skin; trial / theme preview /
+		* one-click apply) inside its body.
 		* @param props - card props.
 		* @returns the plugin card.
 		*/
-		function SkinCenter({ t, controller, theme, background }) {
+		function SkinCenter({ t, theme, background }) {
 			const snapshot = (0, react.useSyncExternalStore)(theme.subscribe, theme.getTheme);
 			const opacity = (0, react.useSyncExternalStore)(background.subscribe, background.opacity);
-			const activePackage = activeSkinEntry()?.package;
-			const activeId = activeSkinEntry()?.id;
-			const backdropActive = activeId !== void 0 && BACKDROP_SKIN_IDS.has(activeId);
+			const [state, setState] = (0, react.useState)(null);
 			const [open, setOpen] = (0, react.useState)(false);
-			const [tryingId, setTryingId] = (0, react.useState)(null);
-			const [tryingOfficial, setTryingOfficial] = (0, react.useState)(false);
-			const [applying, setApplying] = (0, react.useState)(null);
+			const [busy, setBusy] = (0, react.useState)(null);
 			const [error, setError] = (0, react.useState)(null);
-			const tryOn = (entry) => {
-				setError(null);
-				controller.tryOn(entry).then(() => {
-					setTryingId(entry.id);
-					setTryingOfficial(false);
-				}).catch(() => {
-					setError(t("tryOnError"));
-					setTryingId(null);
-					setTryingOfficial(false);
-				});
-			};
-			const tryOnOfficial = () => {
-				setError(null);
+			const [notice, setNotice] = (0, react.useState)(null);
+			const activeId = state !== null && state.active !== "none" ? state.active : void 0;
+			const trialId = state?.trial ?? null;
+			const backdropActive = activeId !== void 0 && BACKDROP_SKIN_IDS.has(activeId);
+			/** Read the host state (active skin, trial, serving profile). */
+			const refresh = async () => {
 				try {
-					controller.tryOnOfficial();
-				} catch {
-					setError(t("tryOnError"));
-					setTryingOfficial(false);
-					return;
-				}
-				setTryingId(null);
-				setTryingOfficial(true);
+					const response = await fetch("/api/skin-center/state");
+					const payload = await response.json().catch(() => null);
+					if (response.ok && payload?.ok === true && typeof payload.active === "string") setState({
+						active: payload.active,
+						profile: typeof payload.profile === "string" ? payload.profile : "",
+						trial: typeof payload.trial === "string" ? payload.trial : null
+					});
+				} catch {}
 			};
-			const exitTryOn = () => {
-				controller.exit();
-				setTryingId(null);
-				setTryingOfficial(false);
+			(0, react.useEffect)(() => {
+				refresh();
+			}, []);
+			(0, react.useEffect)(() => {
+				if (trialId !== null) setOpen(true);
+			}, [trialId]);
+			/**
+			* One POST to the skin-center API.
+			* @param path - route suffix under `/api/skin-center`.
+			* @param body - JSON body.
+			* @returns the parsed response, or null when the request failed.
+			*/
+			const post = async (path, body) => {
+				try {
+					const response = await fetch(`/api/skin-center/${path}`, {
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify(body)
+					});
+					const payload = await response.json().catch(() => null);
+					if (!response.ok || payload?.ok !== true) {
+						setError(payload?.error ?? `HTTP ${response.status}`);
+						return null;
+					}
+					setError(null);
+					return payload;
+				} catch (cause) {
+					setError(cause instanceof Error ? cause.message : String(cause));
+					return null;
+				}
 			};
 			/**
-			* Poll the host state until the config watcher reports the target active
-			* (the patch write lands before the watcher re-applies it), or time out.
+			* Poll the host until it reports the target active (the config watcher
+			* applies the patch a moment after the write), or time out.
 			* @param target - skin id, or `official` for the stock look.
 			* @returns whether the target became active within the poll budget.
 			*/
@@ -893,38 +640,63 @@ window.__ModuleLoader__.load({
 				tick();
 			});
 			/**
-			* One-click apply: the host half runs `dsh-skin use <target>` (or
-			* `use official`), the config watcher hot-reloads the patch within
-			* seconds, then this page reloads to pick up the new boot graph.
+			* One-click apply: the host rewrites the managed section of the user patch.
+			* The client boot graph is composed at HOST BOOT (0.1.5 embeds it in the
+			* served index.html), so the new skin only reaches the page after a restart —
+			* the card says so instead of reloading into the old graph.
 			* @param target - skin id, or `official` for the stock look.
 			*/
 			const applySkin = (target) => {
 				setError(null);
-				setApplying(target);
-				fetch("/api/skin-center/apply", {
-					method: "POST",
-					headers: { "content-type": "application/json" },
-					body: JSON.stringify(target === OFFICIAL ? { official: true } : { skin: target })
-				}).then(async (response) => {
-					const payload = await response.json().catch(() => null);
-					if (!response.ok || payload?.ok !== true) throw new Error(payload?.error ?? `HTTP ${response.status}`);
-					setApplying(null);
+				setNotice(null);
+				setBusy(target);
+				post("apply", target === OFFICIAL ? { official: true } : { skin: target }).then((payload) => {
+					if (payload === null) {
+						setBusy(null);
+						return;
+					}
 					confirmActive(target).then((confirmed) => {
-						if (confirmed) window.location.reload();
+						setBusy(null);
+						refresh();
+						if (confirmed) setNotice(t("restartHint"));
 						else {
 							const command = target === OFFICIAL ? "dsh-skin use official" : `dsh-skin use ${target}`;
 							setError(`${t("appliedUnconfirmed")} — ${command}`);
 						}
 					});
-				}).catch((cause) => {
-					setApplying(null);
-					const detail = cause instanceof Error ? cause.message : String(cause);
-					const command = target === OFFICIAL ? "dsh-skin use official" : `dsh-skin use ${target}`;
-					setError(`${t("applyFailed")} (${detail}) — ${command}`);
+				});
+			};
+			/**
+			* Start a trial: the host backs the user patch up and writes the trial skin
+			* into the managed section. The skin mounts on the next host start (the client
+			* graph is boot-time), so the card records the trial and asks for a restart.
+			* @param entry - the skin to try on.
+			*/
+			const startTrial = (entry) => {
+				setError(null);
+				setNotice(null);
+				setBusy(entry.id);
+				post("trial", { skin: entry.id }).then((payload) => {
+					setBusy(null);
+					if (payload === null) return;
+					refresh();
+					setNotice(t("restartHint"));
+				});
+			};
+			/** Leave the trial: the host restores the backed-up patch, then a restart. */
+			const exitTrial = () => {
+				setError(null);
+				setNotice(null);
+				setBusy("exit-trial");
+				post("trial/exit", {}).then((payload) => {
+					setBusy(null);
+					if (payload === null) return;
+					refresh();
+					setNotice(t("restartHint"));
 				});
 			};
 			const dark = snapshot.active.colorScheme === "dark";
-			/** One row: try-on control + apply button. Shared by the official card and every skin card. */
+			/** One row: trial control + apply button. Shared by the official card and every skin card. */
 			const actionButtons = (opts) => /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 				className: skin_center_module_css_default.actions,
 				children: [opts.isActive ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
@@ -935,21 +707,22 @@ window.__ModuleLoader__.load({
 				}) : opts.isTrying ? /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 					type: "button",
 					className: `${skin_center_module_css_default.button} ${skin_center_module_css_default.buttonPrimary}`,
-					onClick: exitTryOn,
-					children: t("exitTryOn")
+					disabled: true,
+					children: t("tryingOn")
 				}) : /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 					type: "button",
 					className: `${skin_center_module_css_default.button} ${skin_center_module_css_default.buttonPrimary}`,
+					disabled: busy !== null,
 					onClick: opts.onTryOn,
 					children: t("tryOn")
 				}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
 					type: "button",
 					className: skin_center_module_css_default.button,
-					disabled: applying !== null,
+					disabled: busy !== null,
 					onClick: () => {
 						applySkin(opts.key);
 					},
-					children: applying === opts.key ? t("applying") : opts.applyLabel
+					children: busy === opts.key ? t("applying") : opts.applyLabel
 				})]
 			});
 			return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("li", {
@@ -984,36 +757,65 @@ window.__ModuleLoader__.load({
 					children: [
 						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							className: skin_center_module_css_default.head,
-							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
-								className: skin_center_module_css_default.intro,
-								title: t("intro"),
-								children: t("intro")
-							}), /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
-								className: skin_center_module_css_default.themeRow,
-								children: [
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-										className: skin_center_module_css_default.themeLabel,
-										children: t("theme")
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-										type: "button",
-										className: `${skin_center_module_css_default.themeButton} ${dark ? "" : skin_center_module_css_default.themeButtonActive}`,
-										onClick: () => {
-											theme.setTheme("light");
-										},
-										children: t("themeLight")
-									}),
-									/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
-										type: "button",
-										className: `${skin_center_module_css_default.themeButton} ${dark ? skin_center_module_css_default.themeButtonActive : ""}`,
-										onClick: () => {
-											theme.setTheme("dark");
-										},
-										children: t("themeDark")
-									})
-								]
-							})]
+							children: [
+								/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+									className: skin_center_module_css_default.intro,
+									title: t("intro"),
+									children: t("intro")
+								}),
+								/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+									className: skin_center_module_css_default.themeRow,
+									children: [
+										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+											className: skin_center_module_css_default.themeLabel,
+											children: t("theme")
+										}),
+										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+											type: "button",
+											className: `${skin_center_module_css_default.themeButton} ${dark ? "" : skin_center_module_css_default.themeButtonActive}`,
+											onClick: () => {
+												theme.setTheme("light");
+											},
+											children: t("themeLight")
+										}),
+										/* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+											type: "button",
+											className: `${skin_center_module_css_default.themeButton} ${dark ? skin_center_module_css_default.themeButtonActive : ""}`,
+											onClick: () => {
+												theme.setTheme("dark");
+											},
+											children: t("themeDark")
+										})
+									]
+								}),
+								state !== null && state.profile !== "" ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("p", {
+									className: skin_center_module_css_default.profileLine,
+									children: [
+										t("profile"),
+										": ",
+										state.profile
+									]
+								}) : null
+							]
 						}),
+						trialId !== null ? /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+							className: skin_center_module_css_default.trialBanner,
+							role: "status",
+							children: [/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("span", {
+								className: skin_center_module_css_default.trialText,
+								children: [
+									t("trialRunning"),
+									": ",
+									SKIN_CENTER_ENTRIES.find((entry) => entry.id === trialId)?.nameEn ?? trialId
+								]
+							}), /* @__PURE__ */ (0, react_jsx_runtime.jsx)("button", {
+								type: "button",
+								className: skin_center_module_css_default.button,
+								disabled: busy !== null,
+								onClick: exitTrial,
+								children: busy === "exit-trial" ? t("applying") : t("exitTryOn")
+							})]
+						}) : null,
 						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							className: skin_center_module_css_default.backgroundRow,
 							children: [
@@ -1048,6 +850,14 @@ window.__ModuleLoader__.load({
 								})
 							]
 						}),
+						notice !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
+							className: skin_center_module_css_default.trialBanner,
+							role: "status",
+							children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
+								className: skin_center_module_css_default.trialText,
+								children: notice
+							})
+						}),
 						error !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 							className: skin_center_module_css_default.error,
 							children: error
@@ -1055,9 +865,8 @@ window.__ModuleLoader__.load({
 						/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 							className: skin_center_module_css_default.list,
 							children: [(() => {
-								const isActive = activePackage === void 0;
-								const isTrying = tryingOfficial;
-								const badge = isActive ? t("active") : isTrying ? t("tryingOn") : null;
+								const isActive = activeId === void 0;
+								const badge = isActive ? t("active") : null;
 								return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 									className: skin_center_module_css_default.card,
 									children: [
@@ -1075,7 +884,7 @@ window.__ModuleLoader__.load({
 													children: t("official")
 												}),
 												badge !== null && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("span", {
-													className: `${skin_center_module_css_default.badge} ${isActive ? skin_center_module_css_default.badgeActive : skin_center_module_css_default.badgeTrying}`,
+													className: `${skin_center_module_css_default.badge} ${skin_center_module_css_default.badgeActive}`,
 													children: badge
 												})
 											]
@@ -1088,15 +897,17 @@ window.__ModuleLoader__.load({
 										actionButtons({
 											key: OFFICIAL,
 											isActive,
-											isTrying,
-											onTryOn: tryOnOfficial,
+											isTrying: false,
+											onTryOn: () => {
+												applySkin(OFFICIAL);
+											},
 											applyLabel: t("restore")
 										})
 									]
 								}, OFFICIAL);
 							})(), SKIN_CENTER_ENTRIES.map((entry) => {
-								const isActive = entry.package === activePackage;
-								const isTrying = entry.id === tryingId;
+								const isActive = entry.id === activeId;
+								const isTrying = entry.id === trialId;
 								const badge = isActive ? t("active") : isTrying ? t("tryingOn") : null;
 								return /* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
 									className: skin_center_module_css_default.card,
@@ -1130,7 +941,7 @@ window.__ModuleLoader__.load({
 											isActive,
 											isTrying,
 											onTryOn: () => {
-												tryOn(entry);
+												startTrial(entry);
 											},
 											applyLabel: t("apply")
 										}),
@@ -1206,16 +1017,19 @@ window.__ModuleLoader__.load({
 		//#region src/client/locales.ts
 		const en = {
 			title: "Skin Center",
-			cardDescription: "Try on any installed skin live in the GUI — exit restores instantly, applying persists in one click.",
+			cardDescription: "Try any installed skin on for real (the page reloads into it), apply in one click, exit restores your previous skin.",
 			expand: "Expand",
 			collapse: "Collapse",
-			intro: "Try on any skin live — it takes effect instantly, exit restores the current look. Apply persists it across restarts.",
+			intro: "Try on backs your current skin up, switches to the skin and reloads; exit restore puts your previous look back. Apply keeps the skin across restarts.",
 			official: "Official default",
 			officialTagline: "The stock DSH look with no skin applied.",
 			active: "Active",
 			tryingOn: "Trying on",
 			tryOn: "Try on",
 			exitTryOn: "Exit try-on",
+			trialRunning: "Trying on",
+			profile: "Profile",
+			restartHint: "Written. The client plugin graph is composed when the Host starts, so restart it to see the change: run /restart in the composer, or relaunch from the desktop shortcut.",
 			apply: "Apply",
 			applying: "Applying…",
 			restore: "Restore",
@@ -1231,16 +1045,19 @@ window.__ModuleLoader__.load({
 		};
 		const zh = {
 			title: "皮肤中心",
-			cardDescription: "在 GUI 内即时试穿任意皮肤，退出即完全还原；应用一键完成并自动刷新。",
+			cardDescription: "任意皮肤可真实试用（页面会重载进入该皮肤），应用一键持久化，退出试用即还原你原来的皮肤。",
 			expand: "展开",
 			collapse: "收起",
-			intro: "任意皮肤可即时试穿，退出即完全还原；「应用」一键持久化，页面自动刷新生效。",
+			intro: "「试用」会先备份当前配置、切到该皮肤并重载页面；「退出试用」把原来的皮肤还回来。「应用」跨重启保留。",
 			official: "官方默认",
 			officialTagline: "还原 DSH 官方默认外观，不应用任何皮肤。",
 			active: "当前激活",
-			tryingOn: "试穿中",
-			tryOn: "试穿",
-			exitTryOn: "退出试穿",
+			tryingOn: "试用中",
+			tryOn: "试用",
+			exitTryOn: "退出试用",
+			trialRunning: "试用中",
+			profile: "当前 profile",
+			restartHint: "已写入。客户端插件图是宿主启动时组装的，需要重启宿主才会生效：在输入框执行 /restart，或双击桌面图标重新打开。",
 			apply: "应用",
 			applying: "应用中…",
 			restore: "恢复默认",
@@ -1249,7 +1066,7 @@ window.__ModuleLoader__.load({
 			theme: "主题预览",
 			themeLight: "亮色",
 			themeDark: "暗色",
-			tryOnError: "试穿失败，详见控制台",
+			tryOnError: "试用失败，详见控制台",
 			backgroundOpacity: "背景遮挡",
 			backgroundHint: "即时为面板背后的背景加遮罩——数值越高越能弱化插画，帮你集中注意力。",
 			backgroundHintInert: "仅对带背景图插画的皮肤（蓝色幻想 / 鲸吟）生效；官方默认无背景图，该滑块对这些皮肤自动生效。"
@@ -1284,10 +1101,8 @@ window.__ModuleLoader__.load({
 				};
 			}, "ui-skin-center: body scope");
 			const theme = ctx.get("theme");
-			const controller = new TryOnController();
 			const background = new BackgroundController(ctx.settingsScope.bind({ namespace: SKIN_BACKGROUND_NS }));
 			const injected = () => ({
-				controller,
 				theme: {
 					getTheme: () => theme.getTheme(),
 					subscribe: (listener) => ctx.on("theme/change", listener),
@@ -1309,7 +1124,6 @@ window.__ModuleLoader__.load({
 		}
 		//#endregion
 		exports.NS = NS;
-		exports.TryOnController = TryOnController;
 		exports.apply = apply;
 		exports.inject = inject;
 		return module.exports;

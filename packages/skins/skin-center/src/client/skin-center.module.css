@@ -438,3 +438,31 @@ body[data-dsh-skin-center] .auroraRange {
     transition: none;
   }
 }
+
+/* Trial banner: shown while a trial skin is live in the boot graph. The trial
+   can only be entered/left by reloading (0.1.5 mounts plugins solely through
+   the boot graph), so the banner is the one place the exit lives. */
+body[data-dsh-skin-center] .trialBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--dsw-alias-state-business-primary, #3f76d8);
+  border-radius: 7px;
+  background: var(--dsw-alias-state-business-tertiary, #dce9fb);
+  color: var(--dsw-alias-label-primary, #13243e);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+body[data-dsh-skin-center] .trialText {
+  flex: 1;
+}
+
+/* The profile this host serves: a wrong-profile install used to be silent. */
+body[data-dsh-skin-center] .profileLine {
+  margin: 6px 0 0;
+  color: var(--dsw-alias-label-caption, #7e93ac);
+  font-size: 11px;
+}

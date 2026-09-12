@@ -9,7 +9,23 @@ import { describe, expect, it } from 'vitest'
 import type { AddressInfo } from 'node:net'
 import type { Server } from 'node:http'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
-import { makeSkinCenterRoutes, SKIN_CENTER_API_PREFIX } from '../src/routes.ts'
+import { makeSkinCenterRoutes, SKIN_CENTER_API_PREFIX, type SkinCenterRoutesDeps } from '../src/routes.ts'
+
+/**
+ * Build the route family with hermetic trial/profile probes. The production
+ * defaults read the real `$DSH_HOME` patch tree, which a test must never touch,
+ * so every test goes through this helper.
+ * @param run - the stubbed dsh-skin runner.
+ * @param extra - per-test overrides (trial hooks, profile name).
+ */
+function routes(run: (args: string[]) => Promise<string>, extra: SkinCenterRoutesDeps = {}): WebRoute[] {
+  return makeSkinCenterRoutes({
+    run,
+    readTrialState: () => null,
+    activeProfile: () => 'web-next',
+    ...extra,
+  })
+}
 
 /** One stubbed CLI invocation: the args received and the stdout to return. */
 interface StubStep {
@@ -105,25 +121,25 @@ async function call(
 describe('skin-center routes', () => {
   it('GET /state reports the active skin from the CLI', async () => {
     const { run } = stubRunner([{ args: ['current'], out: 'minecraft\n' }])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const response = await call(server.port, 'GET', `${SKIN_CENTER_API_PREFIX}/state`)
     await server.close()
     expect(response.status).toBe(200)
-    expect(response.body).toEqual({ ok: true, active: 'minecraft' })
+    expect(response.body).toEqual({ ok: true, active: 'minecraft', profile: 'web-next', trial: null })
   })
 
   it('GET /state maps an empty CLI answer to none (stock look)', async () => {
     const { run } = stubRunner([{ args: ['current'], out: '\n' }])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const response = await call(server.port, 'GET', `${SKIN_CENTER_API_PREFIX}/state`)
     await server.close()
     expect(response.status).toBe(200)
-    expect(response.body).toEqual({ ok: true, active: 'none' })
+    expect(response.body).toEqual({ ok: true, active: 'none', profile: 'web-next', trial: null })
   })
 
   it('GET /state surfaces a failing CLI as 500', async () => {
     const { run } = stubRunner([{ args: ['current'], fail: 'boom' }])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const response = await call(server.port, 'GET', `${SKIN_CENTER_API_PREFIX}/state`)
     await server.close()
     expect(response.status).toBe(500)
@@ -135,11 +151,11 @@ describe('skin-center routes', () => {
       { args: ['use', 'ths'], out: 'wrote patch\n' },
       { args: ['current'], out: 'ths\n' },
     ])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const response = await call(server.port, 'POST', `${SKIN_CENTER_API_PREFIX}/apply`, { body: { skin: 'ths' } })
     await server.close()
     expect(response.status).toBe(200)
-    expect(response.body).toEqual({ ok: true, active: 'ths', message: 'wrote patch' })
+    expect(response.body).toEqual({ ok: true, active: 'ths', message: 'wrote patch', trial: null })
     expect(calls).toEqual([['use', 'ths'], ['current']])
   })
 
@@ -148,17 +164,17 @@ describe('skin-center routes', () => {
       { args: ['use', 'official'], out: 'restored\n' },
       { args: ['current'], out: '\n' },
     ])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const response = await call(server.port, 'POST', `${SKIN_CENTER_API_PREFIX}/apply`, { body: { official: true } })
     await server.close()
     expect(response.status).toBe(200)
-    expect(response.body).toEqual({ ok: true, active: 'none', message: 'restored' })
+    expect(response.body).toEqual({ ok: true, active: 'none', message: 'restored', trial: null })
     expect(calls).toEqual([['use', 'official'], ['current']])
   })
 
   it('POST /apply rejects an empty body', async () => {
     const { run } = stubRunner([])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const response = await call(server.port, 'POST', `${SKIN_CENTER_API_PREFIX}/apply`, { body: {} })
     await server.close()
     expect(response.status).toBe(400)
@@ -167,7 +183,7 @@ describe('skin-center routes', () => {
 
   it('POST /apply rejects an empty skin name', async () => {
     const { run } = stubRunner([])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const response = await call(server.port, 'POST', `${SKIN_CENTER_API_PREFIX}/apply`, { body: { skin: '' } })
     await server.close()
     expect(response.status).toBe(400)
@@ -175,7 +191,7 @@ describe('skin-center routes', () => {
 
   it('POST /apply rejects skin and official together', async () => {
     const { run } = stubRunner([])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const response = await call(server.port, 'POST', `${SKIN_CENTER_API_PREFIX}/apply`, { body: { skin: 'ths', official: true } })
     await server.close()
     expect(response.status).toBe(400)
@@ -184,7 +200,7 @@ describe('skin-center routes', () => {
 
   it('POST /apply passes a CLI failure through as 400 with trimmed stderr', async () => {
     const { run } = stubRunner([{ args: ['use', 'nope'], fail: 'unknown skin "nope"\n' }])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const response = await call(server.port, 'POST', `${SKIN_CENTER_API_PREFIX}/apply`, { body: { skin: 'nope' } })
     await server.close()
     expect(response.status).toBe(400)
@@ -193,7 +209,7 @@ describe('skin-center routes', () => {
 
   it('rejects cross-site requests on both endpoints', async () => {
     const { run } = stubRunner([])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const state = await call(server.port, 'GET', `${SKIN_CENTER_API_PREFIX}/state`, {
       headers: { 'sec-fetch-site': 'cross-site' },
     })
@@ -209,7 +225,7 @@ describe('skin-center routes', () => {
 
   it('rejects a mismatched Origin header', async () => {
     const { run } = stubRunner([])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const response = await call(server.port, 'POST', `${SKIN_CENTER_API_PREFIX}/apply`, {
       body: { skin: 'ths' },
       headers: { origin: 'http://evil.example' },
@@ -223,19 +239,51 @@ describe('skin-center routes', () => {
       { args: ['use', 'ths'], out: 'wrote patch\n' },
       { args: ['current'], out: 'ths\n' },
     ])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const response = await call(server.port, 'POST', `${SKIN_CENTER_API_PREFIX}/apply`, {
       body: { skin: 'ths' },
       headers: { 'sec-fetch-site': 'same-origin', origin: `http://127.0.0.1:${server.port}` },
     })
     await server.close()
     expect(response.status).toBe(200)
-    expect(response.body).toEqual({ ok: true, active: 'ths', message: 'wrote patch' })
+    expect(response.body).toEqual({ ok: true, active: 'ths', message: 'wrote patch', trial: null })
+  })
+
+  it('POST /trial starts a live trial and reports the skin being tried', async () => {
+    const { run } = stubRunner([{ args: ['current'], out: 'aqua\n' }])
+    const server = await serve(routes(run, {
+      startTrial: (skin) => ({ skin, message: `trying on "${skin}"` }),
+    }))
+    const response = await call(server.port, 'POST', `${SKIN_CENTER_API_PREFIX}/trial`, { body: { skin: 'aqua' } })
+    await server.close()
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({ ok: true, active: 'aqua', trial: 'aqua', message: 'trying on "aqua"' })
+  })
+
+  it('POST /trial rejects a missing skin name', async () => {
+    const { run } = stubRunner([])
+    const server = await serve(routes(run))
+    const response = await call(server.port, 'POST', `${SKIN_CENTER_API_PREFIX}/trial`, { body: {} })
+    await server.close()
+    expect(response.status).toBe(400)
+    expect(response.body).toEqual({ ok: false, error: 'invalid-skin: pass a skin name' })
+  })
+
+  it('POST /trial/exit ends the trial and clears the trial state', async () => {
+    const { run } = stubRunner([{ args: ['current'], out: 'aqua\n' }])
+    const server = await serve(routes(run, {
+      readTrialState: () => null,
+      stopTrial: () => 'trial ended',
+    }))
+    const response = await call(server.port, 'POST', `${SKIN_CENTER_API_PREFIX}/trial/exit`, { body: {} })
+    await server.close()
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({ ok: true, active: 'aqua', trial: null, message: 'trial ended' })
   })
 
   it('fences wrong methods with 405', async () => {
     const { run } = stubRunner([])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const response = await call(server.port, 'PUT', `${SKIN_CENTER_API_PREFIX}/apply`, { body: { skin: 'ths' } })
     await server.close()
     expect(response.status).toBe(405)
@@ -243,7 +291,7 @@ describe('skin-center routes', () => {
 
   it('GET /bundle/<id> serves a real skin client bundle as JavaScript', async () => {
     const { run } = stubRunner([])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const response = await call(server.port, 'GET', `${SKIN_CENTER_API_PREFIX}/bundle/ths`)
     await server.close()
     expect(response.status).toBe(200)
@@ -255,7 +303,7 @@ describe('skin-center routes', () => {
 
   it('GET /bundle/<id> 404s unknown skins and missing bundles', async () => {
     const { run } = stubRunner([])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const unknown = await call(server.port, 'GET', `${SKIN_CENTER_API_PREFIX}/bundle/nope`)
     const empty = await call(server.port, 'GET', `${SKIN_CENTER_API_PREFIX}/bundle/`)
     await server.close()
@@ -267,7 +315,7 @@ describe('skin-center routes', () => {
 
   it('GET /bundle/<id> rejects path-traversal ids', async () => {
     const { run } = stubRunner([])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     // A raw `..` is collapsed by URL normalization before the handler
     // ever sees it, so the request misses the route entirely (404); an
     // encoded traversal survives normalization but fails the id charset
@@ -283,7 +331,7 @@ describe('skin-center routes', () => {
 
   it('fences the bundle route with method and same-origin checks', async () => {
     const { run } = stubRunner([])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const post = await call(server.port, 'POST', `${SKIN_CENTER_API_PREFIX}/bundle/ths`)
     const cross = await call(server.port, 'GET', `${SKIN_CENTER_API_PREFIX}/bundle/ths`, {
       headers: { 'sec-fetch-site': 'cross-site' },
@@ -294,7 +342,7 @@ describe('skin-center routes', () => {
   })
   it('rejects malformed JSON bodies with 400', async () => {
     const { run } = stubRunner([])
-    const server = await serve(makeSkinCenterRoutes({ run }))
+    const server = await serve(routes(run))
     const response = await call(server.port, 'POST', `${SKIN_CENTER_API_PREFIX}/apply`, {
       rawBody: '{not json',
     })

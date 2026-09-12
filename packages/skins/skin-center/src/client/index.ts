@@ -16,13 +16,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { SkinCenter, type SkinCenterInjected } from './SkinCenter.tsx'
 import { BackgroundController, SKIN_BACKGROUND_NS } from './background.ts'
 import { en, zh, type SkinCenterKey } from './locales.ts'
-import { TryOnController } from './try-on.ts'
 // Type-only: 0.1.5 declares `ctx.slots` in ui-renderer's Context merge (ui-slots
 // keeps the slot contracts).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 
 export type { SkinCenterComponentProps, SkinCenterInjected } from './SkinCenter.tsx'
-export { TryOnController } from './try-on.ts'
 
 /** Locale namespace owned by this plugin. */
 export const NS = 'skinCenter'
@@ -69,13 +67,11 @@ export function apply(ctx: ClientContext): void {
   }, 'ui-skin-center: body scope')
 
   const theme = ctx.get('theme') as ThemeRuntime
-  const controller = new TryOnController()
   // Background occluder over the shared skin-background namespace. The scope
   // is bound to this plugin's fiber, so it is torn down with the card.
   const backgroundScope = ctx.settingsScope.bind<{ backgroundOpacity?: number }>({ namespace: SKIN_BACKGROUND_NS })
   const background = new BackgroundController(backgroundScope)
   const injected = (): SkinCenterInjected => ({
-    controller,
     theme: {
       getTheme: () => theme.getTheme(),
       subscribe: listener => ctx.on('theme/change', listener),
