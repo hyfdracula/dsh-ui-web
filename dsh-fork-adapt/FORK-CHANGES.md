@@ -8,12 +8,13 @@
 
 - 官方基线提交：`fb2c4b9e698e30edb738bca4cf0618587db7d203`
   （tag `dsh-v0.1.5-rc.2`，PR #3978 的 merge commit，2026-09-10）
-- fork 分支 / 顶端：`fork/0.1.5-rc.2` = `8016f4fdc2bbb4b537d293f43cf2e85a481a9302`
-- 本地 checkout：`C:\Users\19161\deepseek-harness-next`（4 个 fork 提交直接坐在基线之上，线性无分叉）
+- fork 分支 / 顶端：`fork/0.1.5-rc.2` = `5677d3b`（2026-09-12 23:54 实测；
+  本清单最初生成时顶端是 `8016f4f`，即前 4 个补丁覆盖到的那一笔）
+- 本地 checkout：`C:\Users\19161\deepseek-harness-next`（19 个 fork 提交直接坐在基线之上，线性无分叉）
 - 生成方式：**一个 fork 提交 = 一个补丁**
   `git diff --binary --full-index --no-color --output=<补丁> <commit>^ <commit>`
   （文件由 git 自己写：LF、无 BOM，不经 PowerShell 管道）
-- 顺序：4 个补丁是**累积**的，必须按 010 → 020 → 030 → 040 顺序套
+- 顺序：19 个补丁是**累积**的，必须按 `010` → `020` → … → `190` 的序号顺序套
 - 校验：`git apply --check` 干跑 + 每套一个补丁就 `git add -A && git write-tree`，
   与对应提交的 tree 逐字节比对（见文末验证记录）
 
@@ -231,6 +232,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\dsh-web-restart.ps1
 
 1. **干跑** `apply-fork-patches.ps1 -Check`：4/4 全部 **strict** 通过（临时 `GIT_INDEX_FILE`
    串行模拟整条阶梯），工作树零改动（`git status --porcelain` 0 项）。
+   （本条记录的是清单只有前 4 个补丁时的实测；当时顶端 = `8016f4f`。补到 19 个之后，
+   最新一次 `-Check` 见本文件「已知缺口与残余风险」一节。）
 2. **真实重放** `apply-fork-patches.ps1 -VerifyTree`：4/4 以 `strict` 应用，且每套一个补丁后
    `git add -A && git write-tree` 与对应提交的 tree 完全一致：
    - 010 → `9d2153dfadf71b58d63a8e9aaf1bcf2c5d3ad010` = `20faee2^{tree}`
@@ -268,40 +271,30 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\dsh-web-restart.ps1
 
 ## 已知缺口与残余风险
 
-- **仓库聚合面（根 tsconfig）里有两条既有缺口，重放会如实复现**（补丁不改根 tsconfig，重放树 =
-  fork HEAD 树，所以这是 fork 提交自身的状态，不是补丁引入的）：
-  - `tsc -b tsconfig.host.json` 报 `packages/host/web-restart/tests/worker.spec.ts(4,8) TS6307`：
-    根聚合 tsconfig 是「显式 include + 显式 references」清单，没有引用新增的
-    `packages/host/web-restart`（`packages/client/ui-turn-recovery` 同理，client 面 4 条 TS6307）。
-    消除办法：在 fork 里补两条 references（新提交 → 新补丁），而不是手工改根 tsconfig。
-  - 同一聚合面还报 `packages/llm/llm-pi-ai/tests/glm-normalizer.spec.ts(19,3) TS2741:
-    Property 'cost' is missing … required in type 'Usage'`：F7 移植过来的测试里构造 usage 时缺
-    `cost` 字段；包级程序（`tsc -b packages/llm/llm-pi-ai/tsconfig.json`）是干净的，只有聚合程序
-    看到的是 host 面声明版本。要修就在 fork 里补 `cost`（新提交 → 新补丁）。
-  - 两者都不影响构建产物与运行（`pnpm run build:lib` 走的是包级程序），但会让整仓
-    `pnpm run typecheck` 变红；本轮 C4 只做「诚实重放」，没有代 fork 改源码。
-- **未提交的本地改动不在补丁里**：补丁只导出那四个提交，checkout 里任何未提交内容都**不会**被重放。
-  2026-09-12 17:05 实测该 checkout 的未提交项为：`dsh-web-host-launch.ps1`（telemetry opt-out
-  `DSH_TELEMETRY_DISABLED=1`，决定 D4）、`dsh-web-service.json`（新增 `_host` 说明键）、
-  未跟踪的 `dsh-web-open.ps1` / `dsh-web-open.vbs`（桌面快捷方式的「读 token 再开浏览器」启动器）
-  以及若干运行日志。这些内容仍在持续变动（同一 checkout 上还有别的会话在改），
-  要用它们就先在 fork 里提交，再跑 `regenerate-fork-patches.ps1`（新增提交应成为新的 `050-fork-*.patch`，
+- **未提交的本地改动不在补丁里**：补丁只导出分支上的 fork 提交，checkout 里任何未提交内容都**不会**
+  被重放。要用它们就先在 fork 里提交，再跑 `regenerate-fork-patches.ps1`（新提交接在下一个三位序号，
   并同步更新两个脚本里的补丁表与基线）。
-- **补丁表已补齐到分支 HEAD（2026-09-12 23:16 实测）**：原先两张表停在 `7e49898`（`060`），
-  落后 12 个提交。现在 `070`–`180` 按提交顺序补齐：`6bdfbf8`（只读本端口的 token 行）、
-  `b54e834`（切到 profile web / 3080）、`e484800`（读宿主自己的日志）、
-  `46c686d`（重启替换旧窗口 + 首个原生快捷发送框）、`0acef7b`（该框改 opt-in）、
-  `4182657`（无人值守巡检）、`a37d3f3`（窗口默认最大化）、`b8bd38b`（token 行多日志轮询）、
-  `456ba1d`（删默认浏览器回退）、`568dc1c`（窗口用 Edge）、`ff9ad76`（删原生快捷发送脚本）、
-  `4420382`（删 `-QuickSend` 开关）。`regenerate-fork-patches.ps1 -Verify` 在一次性 worktree 里
-  重放 **18/18**（每个补丁 strict apply + `git write-tree` 与该提交 tree 逐字节相等），
-  随后对真实 checkout 的 `-Check` 报告 "already integrated"。
+- **补丁表已补齐到分支 HEAD，工作树已干净（2026-09-12 23:54 实测）**：19 个补丁与 19 个 fork 提交
+  一一对应、无缺口。`070`–`190` 依次为 `6bdfbf8`（只读本端口的 token 行）、`b54e834`（切到 profile
+  web / 3080）、`e484800`（读宿主自己的日志）、`46c686d`（重启替换旧窗口 + 首个原生快捷发送框）、
+  `0acef7b`（该框改 opt-in）、`4182657`（无人值守巡检）、`a37d3f3`（窗口默认最大化）、
+  `b8bd38b`（token 行多日志轮询）、`456ba1d`（删默认浏览器回退）、`568dc1c`（窗口用 Edge）、
+  `ff9ad76`（删原生快捷发送脚本）、`4420382`（删 `-QuickSend` 开关）、`5677d3b`（巡检等待无上限）。
+  `apply-fork-patches.ps1 -Check` 报告 patch files OK（19 files, LF, no BOM）与 "already integrated"。
+  早先记录的 17:05 未提交项（`dsh-web-host-launch.ps1` 的遥测退出、`dsh-web-service.json` 的 `_host`
+  键、`dsh-web-open.ps1` / `.vbs`）**都已随 050 / 080 / 090 等提交进入 fork 分支**，checkout 的
+  已跟踪改动与未跟踪项现在都是空的；运行日志则由 checkout 的 `.gitignore` 覆盖。
+- **两条聚合面缺口已修（2026-09-12 23:54 核实）**：曾记录的两条整仓 `pnpm run typecheck` 报错都已在
+  fork 分支内消除——根 `tsconfig.host.json` / `tsconfig.client.json` 已含 `packages/host/web-restart`
+  与 `packages/client/ui-turn-recovery` 两条 references；`glm-normalizer.spec.ts` 构造 `usage` 时已补
+  `cost` 字段（并为 pi-ai 0.85 把它列为强制字段留了注释）。两处都随
+  `060-fork-aggregate-refs-and-spec-fixture.patch` 一起重放，因此不再是缺口。
 
 - **050/060 的通用文件输入链未移植**：0.1.1 fork 曾在输入层加过 `addFiles/removeFile/pruneFiles`、
   `fileIds`、`releaseSessionFiles` 与 InputBar 文件 chip。0.1.5 上游与 fork 提交都没有这套成员，
   因此当前 0.1.5 fork **不具备**「粘贴任意文件」能力（图片附件走上游原生路径）。如仍需该能力，
   需要在 0.1.5 上重新提交一份改动，而不是回套 050。
-- **补丁与 checkout 强绑定**：4 个补丁只对 `fb2c4b9` 这一基线干净可套。升到 0.1.5-rc.3 / 0.1.6 时，
+- **补丁与 checkout 强绑定**：19 个补丁只对 `fb2c4b9` 这一基线干净可套。升到 0.1.5-rc.3 / 0.1.6 时，
   先 rebase fork 提交到新基线，再用 `regenerate-fork-patches.ps1` 重新导出并更新两个脚本里的
   基线/tree 表，不要直接套旧补丁。
 - **aqua 侧不在本清单**：设置面板玻璃化、popupSelect 磨砂、退场动画 CSS、effort-slider 贴右

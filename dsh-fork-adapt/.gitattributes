@@ -1,0 +1,12 @@
+# This directory is a replayable patch adapt set: the patches below are applied
+# with `git apply` against a DSH checkout, so every file here must keep the same
+# line endings on every machine and every fresh clone.
+#
+# The repository runs with `core.autocrlf=true`, which would rewrite these files
+# to CRLF on checkout. Without this rule the markdown that documents the set
+# drifts away from the LF-only patch files it describes, and a CRLF context line
+# never matches an LF working tree (measured 2026-09-12: with CRLF the whole set
+# failed 0/8 against its own baseline, with LF it applied 8/8).
+*.patch text eol=lf
+*.md text eol=lf
+.gitattributes text eol=lf

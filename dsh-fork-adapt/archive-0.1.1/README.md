@@ -1,7 +1,7 @@
 # 0.1.1 时代补丁归档（不可用于 0.1.5）
 
-> 本目录**不属于** `dsh-fork-adapt/` 的有效适配集：`apply-fork-patches.ps1` 只读取
-> `NNN-fork-*.patch` 四个文件，永远不会 glob 到这里。
+> 本目录**不属于** `dsh-fork-adapt/` 的有效适配集：`apply-fork-patches.ps1` 只按脚本内那张
+> 显式补丁表读取根目录的 19 个 `NNN-fork-*.patch`，从不 glob，因此永远不会读到这里。
 > **不要对任何 checkout 执行本目录里的 `*.patch`。**
 
 ## 为什么归档
@@ -11,7 +11,7 @@
 0.1.5-rc.2 checkout（`C:\Users\19161\deepseek-harness-next`）后：
 
 - 一部分内容已被上游吸收（0.1.5 原生就有），
-- 一部分被 fork 的 0.1.5 真实提交重新实现（见 `../FORK-CHANGES.md` 的 4 个 `NNN-fork-*.patch`），
+- 一部分被 fork 的 0.1.5 真实提交重新实现（见 `../FORK-CHANGES.md` 的 `NNN-fork-*.patch` 清单），
 - 一部分按决定退役（070 无限制附件）。
 
 因此它们**不能**应用到 0.1.5 checkout：`index` 行的 blob 与上下文都对不上 0.1.5 树。
