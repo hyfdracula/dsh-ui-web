@@ -1,208 +1,270 @@
-# Regenerate the DSH fork patch(es) from the current working tree vs origin/master.
-# Use AFTER t1/t2/t3 source changes are complete and settled, BEFORE freezing the
-# adaptation set.
+# Regenerate the DSH fork adaptation patches from the fork checkout's commits.
 #
-# Rules enforced (captain's hard-won lessons):
-#   - Each patch file is written via [IO.File]::WriteAllText with a UTF8 encoder
-#     created as [Text.UTF8Encoding]::new($false) -> NO BOM, and LF newlines,
-#     otherwise `git apply` fails.
-#   - New (untracked) fork files MUST be `git add -N` (intent-to-add) first so
-#     `git diff origin/master -- <path>` includes them.
-#   - Patches are generated in stable order (sort by patch number).
-#   - Each generated patch is validated with `git apply --check --reverse` against
-#     the dirty working tree (i.e. it must reverse cleanly off the current files).
+# WHAT THIS IS
+#   The 0.1.5 fork work lives as real commits on branch fork/0.1.5-rc.2 in
+#   C:\Users\19161\deepseek-harness-next:
+#
+#     20faee2  re-port the four client-side fork features (F1 F2 F3 F4)
+#     90fef94  web-restart command and the local service launchers (F9)
+#     c41e032  GLM stream-normalizer seam (F7)
+#     8016f4f  interrupted-turn recovery panel (F6)
+#
+#   This script turns exactly one commit into exactly one patch, in commit order,
+#   against upstream base fb2c4b9e698e30edb738bca4cf0618587db7d203 (tag
+#   dsh-v0.1.5-rc.2). It reads committed objects only -- never the working tree --
+#   so a dirty or half-edited checkout cannot leak into a patch. Uncommitted local
+#   edits (for example the 2026-09 launcher tweaks in the 0.1.5 checkout) are NOT
+#   captured; commit them first if they belong in the set.
+#
+# USAGE
+#   powershell -NoProfile -ExecutionPolicy Bypass -File regenerate-fork-patches.ps1 `
+#     [-ReposRoot <checkout>] [-PatchDir <dir>] [-BaseCommit <sha>] `
+#     [-Verify] [-VerifyWorktree <path>] [-KeepWorktree]
+#
+# GUARANTEES ENFORCED (each one aborts with exit code 2)
+#   - the checkout is a git work tree, its toplevel equals -ReposRoot, and the
+#     base commit exists and is reachable from HEAD;
+#   - the four commits exist and form the exact chain base -> 20faee2 -> 90fef94
+#     -> c41e032 -> 8016f4f (parents are verified, not assumed);
+#   - patches are written by git itself (`git diff --binary --full-index
+#     --no-color --output=<file>`), which is LF and BOM-free by construction, and
+#     every written file is then re-measured byte-wise: 0x0D count must be 0
+#     (blocker F12: a CRLF patch never applies to a `* text=auto eol=lf` tree).
+#     If a CR ever shows up the file is rewritten byte-wise as LF, loudly.
+#   - the expected tree of each commit is printed and cross-checked against the
+#     table inside apply-fork-patches.ps1 (drift is reported as a warning).
+#
+# -Verify additionally creates a THROWAWAY git worktree of the checkout at the
+# base commit, runs apply-fork-patches.ps1 against it with -VerifyTree (real
+# apply + `git write-tree` equality per commit), and removes the worktree again
+# unless -KeepWorktree is given. Do NOT run `pnpm install` inside that worktree:
+# installing node_modules creates paths beyond MAX_PATH, and with Windows
+# LongPathsEnabled=0 neither `git worktree remove` nor PowerShell can delete them
+# (finish with `cmd /c rd /s /q <worktree>`, which handles it without following
+# reparse points).
+#
+# EXIT CODES
+#   0 ok, 1 verification failed, 2 precondition/guard failure
 
 param(
-  [string]$ReposRoot = 'C:\Users\19161\deepseek-harness',
-  [string]$PatchDir  = (Join-Path $PSScriptRoot '.'),
-  [switch]$WhatIf
+  [string]$ReposRoot      = 'C:\Users\19161\deepseek-harness-next',
+  [string]$PatchDir       = $PSScriptRoot,
+  [string]$BaseCommit     = 'fb2c4b9e698e30edb738bca4cf0618587db7d203',
+  [string]$VerifyWorktree = (Join-Path $env:TEMP 'dsh-fork-patchcheck-015'),
+  [switch]$Verify,
+  [switch]$KeepWorktree
 )
 
-# Control flow relies on explicit $LASTEXITCODE checks, NOT on stderr-as-error:
-# native git commands write to stderr even on success, and with EAP=Stop that
-# becomes a terminating NativeCommandError. We keep EAP=Continue and inspect
-# $LASTEXITCODE to decide success/failure.
+# Native git writes to stderr even on success; decide on $LASTEXITCODE instead of
+# turning stderr into a terminating error.
 $ErrorActionPreference = 'Continue'
-function Log($m) { Write-Host ("[{0:HH:mm:ss}] {1}" -f (Get-Date), $m) }
-
-# --- The fork source files that belong in the adapt set ---------------------
-# Grouped by patch. New files (not present in origin/master) are marked as such
-# and get `git add -N` before diffing. Order within a patch = file order.
-# Captain's final naming scheme for the 5 fork patches.
-$patches = @(
-  @{
-    Name = '010-settings-root-two-phase-close.patch'
-    Files = @(
-      'packages/client/ui-settings-general/src/client/SettingsRoot.tsx',
-      'packages/client/ui-settings-general/src/client/SettingsRoot.module.css'
-    )
-  }
-  @{
-    Name = '020-model-select-no-reasoning-effort.patch'
-    Files = @(
-      'packages/client/ui-model-selection/src/client/ModelSelect.tsx',
-      'packages/client/ui-model-selection/src/client/locales.ts',
-      'packages/client/ui-model-selection/tests/model-select.client.spec.tsx'
-    )
-  }
-  @{
-    Name = '030-attachment-file-sync.patch'
-    Files = @(
-      'packages/attachment/attachment/src/error.ts',
-      'packages/attachment/attachment/src/types.ts',
-      'packages/attachment/attachment/src/index.ts',
-      'packages/attachment/attachment-local/src/store.ts',
-      'packages/attachment/attachment-local/src/index.ts',
-      'packages/attachment/attachment-local/src/file-store.ts',        # NEW
-      'packages/attachment/attachment-local/tests/file-store.spec.ts', # NEW
-      'packages/attachment/attachment-local/tests/index.spec.ts'
-    )
-  }
-  @{
-    Name = '040-host-content-file.patch'
-    Files = @(
-      'packages/llm/llm/src/types.ts',
-      'packages/llm/llm-deepseek/src/adapter.ts',   # compat: scope DeepSeekModality to text/image
-      'packages/llm/llm-deepseek/src/index.ts',     # compat: MODEL_MODALITIES uses DeepSeekModality
-      'packages/host/apiproxy/src/api-proxy.ts',
-      'packages/host/apiproxy/src/api/sessions.schema.ts',
-      'packages/host/apiproxy/src/api/sessions.ts',
-      'packages/client/runtime/src/client/contract/session.ts',
-      'packages/client/runtime/src/client/sessions/session.ts',
-      'packages/client/connection/src/client/fixture.ts'
-    )
-  }
-  @{
-    Name = '050-ui-conversation-file.patch'
-    Files = @(
-      'packages/client/ui-conversation/src/client/contract/slots.ts',
-      'packages/client/ui-conversation/src/client/input/contract.ts',
-      'packages/client/ui-conversation/src/client/input/facade.ts',
-      'packages/client/ui-conversation/src/client/input/hub.ts',
-      'packages/client/ui-conversation/src/client/input/machine.ts',
-      'packages/client/ui-conversation/src/client/service.ts',
-      'packages/client/ui-conversation/src/client/apply.ts',
-      'packages/client/ui-conversation/src/client/locales.ts',
-      'packages/client/ui-conversation/src/client/image-labels.ts',
-      'packages/client/ui-conversation/src/client/path-links.ts',             # NEW
-      'packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx',
-      'packages/client/ui-conversation/src/client/skeleton/InputBar.tsx',
-      'packages/client/ui-conversation/src/client/skeleton/InputBar.module.css',
-      'packages/client/ui-conversation/src/client/chat/MessageItem.tsx',
-      'packages/client/ui-conversation/src/client/chat/MessageItem.module.css',
-      'packages/client/ui-conversation/tests/input-bar.client.spec.tsx',
-      'packages/client/ui-conversation/tests/input-matrix.client.spec.tsx',
-      'packages/client/ui-conversation/tests/input-reference-submit.client.spec.ts',
-      'packages/client/ui-conversation/tests/input-scenarios.client.spec.tsx',
-      'packages/client/ui-conversation/tests/skeleton.client.spec.tsx',
-      'packages/client/ui-conversation/tests/chat-view.client.spec.tsx',
-      'packages/client/ui-conversation/tests/gate-branch-tails.client.spec.tsx',
-      'packages/client/ui-conversation/tests/queue-dock.client.spec.tsx'
-    )
-  }
-  @{
-    # Cross-package consumer test compat: the ui-conversation input contract
-    # grew file members (InputActions.addFiles/removeFile/pruneFiles,
-    # InputState.fileIds, ConversationSessionInjected.releaseSessionFiles), which
-    # forced updates to pristine upstream test fixtures in OTHER packages so the
-    # client face still typechecks (tsc -b tsconfig.client.json). Replaying the
-    # contract patch alone would re-break these, so they ship alongside 050.
-    Name = '060-input-contract-consumer-tests.patch'
-    Files = @(
-      'packages/client/ui-tool/tests/diff-card.client.spec.tsx',
-      'packages/client/ui-tool/tests/read-card.client.spec.tsx',
-      'packages/client/ui-tool/tests/search-card.client.spec.tsx',
-      'packages/client/ui-tool/tests/terminal-card.client.spec.tsx',
-      'packages/client/ui-tool/tests/web-card.client.spec.tsx',
-      'packages/client/ui-trajectory/tests/views.client.spec.tsx',
-      'packages/client/ui-attachment/tests/message-image.client.spec.tsx'
-    )
-  }
-  @{
-    # Restore the "unlimited attachment" sentinel skip guard in
-    # assertImageBodyCapacity. rc.8 dropped it, so an UNLIMITED_ATTACHMENT
-    # deployment (maxMessageImageBytes = Number.MAX_SAFE_INTEGER) made every
-    # /api request hit the request-body ceiling and stall the session list
-    # after refresh. The guard makes the capacity check a no-op for the
-    # no-finite-bound sentinel.
-    Name = '070-connection-unlimited-skip.patch'
-    Files = @(
-      'packages/client/connection/src/index.ts'
-    )
-  }
-  @{
-    # Session-list loading state in the workspace browser: while the session
-    # list phase is not yet 'ready' (e.g. right after page refresh), show
-    # "正在加载会话…" instead of "暂无会话" (which upstream shows for any
-    # empty list, causing a misleading "no sessions" flash during load).
-    # Shipped in the same fork commit as the 070 refresh fix (8c3c5b4d4b).
-    Name = '080-ui-workspace-loading-state.patch'
-    Files = @(
-      'packages/client/ui-workspace/src/client/WorkspaceBrowser.tsx',
-      'packages/client/ui-workspace/src/client/locales.ts',
-      'packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx'
-    )
-  }
-)
-
-Push-Location $ReposRoot
-try {
-  foreach ($p in $patches) {
-    $name = $p.Name
-    $files = $p.Files
-    Log ("=== {0} ({1} files) ===" -f $name, $files.Count)
-
-    # Intent-to-add any file that is currently untracked.
-    foreach ($f in $files) {
-      $null = & git ls-files --error-unmatch -- $f 2>&1
-      if ($LASTEXITCODE -ne 0) {
-        if ($WhatIf) { Log ("  (whatif) intent-to-add (new): {0}" -f $f); continue }
-        Log ("  + intent-to-add (new): {0}" -f $f)
-        & git add -N -- $f 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "git add -N failed for $f" }
-      }
-    }
-
-    if ($WhatIf) {
-      Log "  (whatif) would generate $name"
-      continue
-    }
-
-    # Capture the diff as an array of lines via a direct assignment (NOT
-    # Out-String — that line-wraps and corrupts the patch). Join with "`n" and
-    # write with no BOM, which is the pair that makes `git apply` succeed.
-    $diff = git diff --no-color origin/master -- $files 2>$null
-    if ($LASTEXITCODE -ne 0) { throw "git diff failed for $name" }
-    $content = ($diff -join "`n") + "`n"
-    # CRITICAL: normalizing the line endings is what makes `git apply` succeed.
-    # Capturing a native command's stdout gives back lines that may still carry a
-    # trailing CR (the CRLF that was measured on every patch before 2026-09-12),
-    # and a CR-terminated context line never matches the LF working tree the
-    # repo's `.gitattributes` (`* text=auto eol=lf`) enforces — so the patch
-    # failed to apply even on its own baseline. Normalize here, once, instead of
-    # relying on the caller to pass --ignore-whitespace.
-    $content = ($content -replace "`r`n", "`n") -replace "`r", "`n"
-    $target = Join-Path $PatchDir $name
-    # No BOM + LF: the whole reason `git apply` fails otherwise.
-    [IO.File]::WriteAllText($target, $content, [Text.UTF8Encoding]::new($false))
-    Log ("  wrote {0} ({1} bytes)" -f $name, $content.Length)
-
-    if ($content.Trim().Length -eq 0) {
-      Log "  WARNING: empty diff — no fork change present for these files?"
-      continue
-    }
-
-    # Validate the patch reverses cleanly off the current (dirty) working tree.
-    $revOut = (& git apply --check --reverse $target 2>&1 | Out-String)
-    if ($LASTEXITCODE -eq 0) {
-      Log "  OK: patch reverses cleanly off current tree"
-    } else {
-      Log "  FAIL: reverse-check reported problems (see above)"
-      $revOut -split "`r?`n" | Where-Object { $_ -ne '' } | ForEach-Object { Log "    $_" }
-    }
-  }
-} finally {
-  Pop-Location
+if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
+  $PSNativeCommandUseErrorActionPreference = $false
 }
 
-Log "=== regenerate-fork-patches done ==="
+function Log($m) { Write-Host ("[{0:HH:mm:ss}] {1}" -f (Get-Date), $m) }
+function Fail([int]$code, $message) {
+  Write-Host ""
+  Write-Host "FAILED: $message" -ForegroundColor Red
+  exit $code
+}
+function Invoke-Git {
+  param([string]$WorkDir, [string[]]$Arguments)
+  $lines = & git -C $WorkDir @Arguments 2>&1
+  return [pscustomobject]@{ Code = $LASTEXITCODE; Lines = @($lines | ForEach-Object { [string]$_ }) }
+}
+function Show-Lines($lines, [string]$indent) {
+  foreach ($l in $lines) { Log ("{0}{1}" -f $indent, $l) }
+}
+function Measure-Bytes([string]$Path) {
+  $bytes = [IO.File]::ReadAllBytes($Path)
+  $cr = 0; foreach ($b in $bytes) { if ($b -eq 0x0D) { $cr++ } }
+  $lf = 0; foreach ($b in $bytes) { if ($b -eq 0x0A) { $lf++ } }
+  return [pscustomobject]@{
+    Bytes = $bytes.Length
+    CR    = $cr
+    LF    = $lf
+    BOM   = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+  }
+}
+
+# --- The fork commit chain, in patch order -----------------------------------
+$chain = @(
+  [pscustomobject]@{
+    Name    = '010-fork-f1-f4-client-features.patch'
+    Commit  = '20faee250e8ab7b3d3a47a018870a431ef60ee45'
+    Feature = 'F1 settings two-phase close + aqua anchor, F2 model select without reasoning effort, F3 bare-path links, F4 workspace session-list loading state'
+  }
+  [pscustomobject]@{
+    Name    = '020-fork-f9-web-restart-launchers.patch'
+    Commit  = '90fef94712d1c397d12bb03d467ca11d01a9637e'
+    Feature = 'F9 /restart host command + restart worker + local Windows service launchers'
+  }
+  [pscustomobject]@{
+    Name    = '030-fork-f7-glm-normalizer.patch'
+    Commit  = 'c41e032013aa9d841469ad7bea8a5d1c27e4cf2e'
+    Feature = 'F7 llm-glm-normalize package + llm-pi-ai stream-normalizer seam'
+  }
+  [pscustomobject]@{
+    Name    = '040-fork-f6-turn-recovery.patch'
+    Commit  = '8016f4fdc2bbb4b537d293f43cf2e85a481a9302'
+    Feature = 'F6 ui-turn-recovery panel wired into the web-app bundle'
+  }
+)
+
+Log "=== regenerate DSH fork patches (0.1.5) ==="
+Log "checkout   : $ReposRoot"
+Log "patch dir  : $PatchDir"
+Log "base commit: $BaseCommit"
+
+# --- 0. Preconditions --------------------------------------------------------
+if (-not (Test-Path -LiteralPath $ReposRoot)) {
+  Fail 2 "checkout not found: $ReposRoot. This script targets the 0.1.5 fork checkout C:\Users\19161\deepseek-harness-next; pass -ReposRoot <path> if it moved."
+}
+$rootFull = [IO.Path]::GetFullPath($ReposRoot)
+$top = Invoke-Git $rootFull @('rev-parse', '--show-toplevel')
+if ($top.Code -ne 0) {
+  Fail 2 "$rootFull is not a git work tree. git rev-parse --show-toplevel failed: $($top.Lines -join ' | ')"
+}
+$topFull = [IO.Path]::GetFullPath($top.Lines[0].Trim())
+if (-not $topFull.Equals($rootFull, [StringComparison]::OrdinalIgnoreCase)) {
+  Fail 2 "checkout mismatch: -ReposRoot is $rootFull but git reports the work tree root as $topFull."
+}
+if (-not (Test-Path -LiteralPath $PatchDir)) { Fail 2 "patch dir not found: $PatchDir" }
+
+$hasBase = Invoke-Git $rootFull @('cat-file', '-e', "$BaseCommit^{commit}")
+if ($hasBase.Code -ne 0) {
+  Fail 2 "base commit $BaseCommit (upstream 0.1.5-rc.2) is missing from $rootFull; wrong checkout, shallow clone or rewritten history."
+}
+$baseIsAncestor = Invoke-Git $rootFull @('merge-base', '--is-ancestor', $BaseCommit, 'HEAD')
+if ($baseIsAncestor.Code -ne 0) {
+  $headNow = Invoke-Git $rootFull @('rev-parse', 'HEAD')
+  Fail 2 "base commit $BaseCommit is NOT an ancestor of HEAD=$($headNow.Lines[0]); this is not a 0.1.5-rc.2 descendant."
+}
+$headHash = (Invoke-Git $rootFull @('rev-parse', 'HEAD')).Lines[0].Trim()
+$branchName = (Invoke-Git $rootFull @('rev-parse', '--abbrev-ref', 'HEAD')).Lines[0].Trim()
+Log "checkout OK (branch $branchName, HEAD $($headHash.Substring(0,12)))"
+
+# The chain must be exactly base -> commit1 -> commit2 -> commit3 -> commit4.
+$expectedParent = $BaseCommit
+foreach ($c in $chain) {
+  $resolved = Invoke-Git $rootFull @('rev-parse', "$($c.Commit)^{commit}")
+  if ($resolved.Code -ne 0) {
+    Fail 2 "fork commit $($c.Commit) ($($c.Name)) is missing from $rootFull; the branch fork/0.1.5-rc.2 was rewritten or the objects were pruned."
+  }
+  $actualParent = (Invoke-Git $rootFull @('rev-parse', "$($c.Commit)^")).Lines[0].Trim()
+  if ($actualParent -ne $expectedParent) {
+    Fail 2 "commit chain broken at $($c.Commit): its parent is $actualParent, expected $expectedParent. Patches are only meaningful while the four commits sit directly on $BaseCommit."
+  }
+  $expectedParent = (Invoke-Git $rootFull @('rev-parse', "$($c.Commit)^{commit}")).Lines[0].Trim()
+}
+Log "commit chain OK: base -> $((($chain | ForEach-Object { $_.Commit.Substring(0,7) }) -join ' -> '))"
+
+$tipReachable = Invoke-Git $rootFull @('merge-base', '--is-ancestor', $chain[-1].Commit, 'HEAD')
+if ($tipReachable.Code -ne 0) {
+  Log "WARNING: the fork tip $($chain[-1].Commit.Substring(0,12)) is not reachable from HEAD ($($headHash.Substring(0,12))); generating from the commits anyway."
+}
+
+# --- 1. Generate one patch per commit ---------------------------------------
+$applyScript = Join-Path $PSScriptRoot 'apply-fork-patches.ps1'
+$applyText = if (Test-Path -LiteralPath $applyScript) { Get-Content -LiteralPath $applyScript -Raw } else { '' }
+$written = @()
+
+foreach ($c in $chain) {
+  $parent = (Invoke-Git $rootFull @('rev-parse', "$($c.Commit)^")).Lines[0].Trim()
+  $commit = (Invoke-Git $rootFull @('rev-parse', "$($c.Commit)^{commit}")).Lines[0].Trim()
+  $tree = (Invoke-Git $rootFull @('rev-parse', "$($c.Commit)^{tree}")).Lines[0].Trim()
+  $target = Join-Path $PatchDir $c.Name
+
+  Log "=== $($c.Name) ==="
+  Log "  commit : $($commit.Substring(0,12)) ($($c.Feature))"
+  Log "  parent : $($parent.Substring(0,12))"
+  Log "  tree   : $tree"
+
+  # git writes the file itself: LF endings, no BOM, no PowerShell pipeline in
+  # between (a native command's stdout can keep a trailing CR per line, which is
+  # exactly how the 0.1.1 set ended up CRLF).
+  $diff = Invoke-Git $rootFull @('diff', '--binary', '--full-index', '--no-color', "--output=$target", $parent, $commit)
+  if ($diff.Code -ne 0) {
+    Show-Lines $diff.Lines '    '
+    Fail 2 "git diff failed for $($c.Name)"
+  }
+  if (-not (Test-Path -LiteralPath $target)) { Fail 2 "git diff --output wrote nothing for $($c.Name)" }
+
+  # Byte measurement is the guarantee, not the tool's intent.
+  $m = Measure-Bytes $target
+  if ($m.Bytes -eq 0) { Fail 2 "$($c.Name) is empty; commit $($commit.Substring(0,12)) would then be untracked work." }
+  if ($m.CR -gt 0) {
+    Log "  WARNING: $($m.CR) CR byte(s) found; rewriting as LF (byte-wise, no re-encode)."
+    $raw = [IO.File]::ReadAllBytes($target)
+    $out = New-Object System.Collections.Generic.List[byte]
+    for ($i = 0; $i -lt $raw.Length; $i++) {
+      if ($raw[$i] -eq 0x0D -and ($i + 1) -lt $raw.Length -and $raw[$i + 1] -eq 0x0A) { continue }
+      if ($raw[$i] -eq 0x0D) { $out.Add([byte]0x0A); continue }
+      $out.Add($raw[$i])
+    }
+    [IO.File]::WriteAllBytes($target, $out.ToArray())
+    $m = Measure-Bytes $target
+  }
+  if ($m.CR -ne 0) { Fail 2 "$($c.Name) still contains CR bytes after the rewrite; refusing to ship it." }
+  if ($m.BOM) { Fail 2 "$($c.Name) starts with a UTF-8 BOM; refusing to ship it." }
+
+  $stat = Invoke-Git $rootFull @('apply', '--stat', $target)
+  $paths = @()
+  foreach ($line in $stat.Lines) {
+    if ($line -match '^\s*(.+?)\s+\|\s+(\d+)\s*([+-]*)\s*$') { $paths += $Matches[1].Trim() }
+  }
+  Log ("  wrote  : {0} ({1} bytes, {2} LF, {3} CR, BOM={4}, {5} path(s))" -f $c.Name, $m.Bytes, $m.LF, $m.CR, $m.BOM, $paths.Count)
+  foreach ($line in $stat.Lines) { Log "    $line" }
+
+  # Cross-check the table the apply script uses.
+  if ($applyText -ne '') {
+    if ($applyText -notmatch [regex]::Escape($c.Name)) { Log "  WARNING: apply-fork-patches.ps1 does not mention $($c.Name)." }
+    if ($applyText -notmatch [regex]::Escape($tree)) { Log "  WARNING: apply-fork-patches.ps1 has no expected tree $tree for $($c.Name); update its table." }
+    if ($applyText -notmatch [regex]::Escape($commit)) { Log "  WARNING: apply-fork-patches.ps1 has no commit id $($commit.Substring(0,12)) for $($c.Name)." }
+  }
+  $written += [pscustomobject]@{ Name = $c.Name; Path = $target; Bytes = $m.Bytes; CR = $m.CR; LF = $m.LF; Paths = $paths.Count; Tree = $tree; Commit = $commit }
+}
+
+Log "patches regenerated: $($written.Count)"
+
+# --- 2. Optional end-to-end verification in a throwaway worktree ------------
+$verifyExit = 0
+if ($Verify) {
+  if (Test-Path -LiteralPath $VerifyWorktree) {
+    Fail 2 "verification worktree path already exists: $VerifyWorktree. Remove it or pass -VerifyWorktree <other path>."
+  }
+  Log "=== verifying in a throwaway worktree at $BaseCommit ==="
+  Log "worktree: $VerifyWorktree"
+  $add = Invoke-Git $rootFull @('worktree', 'add', '--detach', $VerifyWorktree, $BaseCommit)
+  if ($add.Code -ne 0) {
+    Show-Lines $add.Lines '    '
+    Fail 2 "git worktree add failed; nothing to verify against."
+  }
+  try {
+    if (-not (Test-Path -LiteralPath $applyScript)) { Fail 2 "apply-fork-patches.ps1 not found next to this script." }
+    & powershell -NoProfile -ExecutionPolicy Bypass -File $applyScript -ReposRoot $VerifyWorktree -PatchDir $PatchDir -BaseCommit $BaseCommit -VerifyTree
+    $verifyExit = $LASTEXITCODE
+    if ($verifyExit -ne 0) { Log "verification FAILED (apply script exit $verifyExit)" }
+    else { Log "verification OK: replay reproduces the fork commits tree for tree" }
+  } finally {
+    if ($KeepWorktree) {
+      Log "keeping the worktree as requested: $VerifyWorktree"
+    } else {
+      $rm = Invoke-Git $rootFull @('worktree', 'remove', '--force', $VerifyWorktree)
+      if ($rm.Code -ne 0) {
+        Show-Lines $rm.Lines '    '
+        Log "WARNING: could not remove $VerifyWorktree; remove it manually with: git -C `"$rootFull`" worktree remove --force `"$VerifyWorktree`""
+      } else {
+        Log "worktree removed"
+      }
+    }
+  }
+  Log "=== also running a dry run against the real checkout ==="
+  & powershell -NoProfile -ExecutionPolicy Bypass -File $applyScript -ReposRoot $rootFull -PatchDir $PatchDir -BaseCommit $BaseCommit -Check
+  if ($LASTEXITCODE -ne 0) { Log "dry run against $rootFull reported: exit $LASTEXITCODE (expected when the checkout already has the four commits)" }
+}
+
+Log "=== regenerate done ==="
+if ($Verify -and $verifyExit -ne 0) { exit 1 }
+exit 0

@@ -1,0 +1,864 @@
+diff --git a/packages/client/ui-chat/src/client/chat/MessageItem.tsx b/packages/client/ui-chat/src/client/chat/MessageItem.tsx
+index f4e0fffa54d318d8ac3e63a4e9cc4d5834895244..80937fd30f9a0f9306d68f226ed60ffaff77dcf3 100644
+--- a/packages/client/ui-chat/src/client/chat/MessageItem.tsx
++++ b/packages/client/ui-chat/src/client/chat/MessageItem.tsx
+@@ -156,7 +156,7 @@ function TurnMaxTokensItem({ t }: {
+ /** Right-aligned bubble shared by user and steering rows. */
+ function UserStyleBubble({
+   content, renderMessageImages, actions, pending = false, echo = false, referenceLabels = [], skillNames = [],
+-  previewAttachments, t,
++  previewAttachments, openPath, t,
+ }: {
+   content: readonly unknown[]
+   renderMessageImages: ChatNodeOwnerProps['renderMessageImages']
+@@ -172,6 +172,8 @@ function UserStyleBubble({
+   skillNames?: readonly string[]
+   /** Local submission-echo attachments replacing the content-derived attachment sequence. */
+   previewAttachments?: readonly PresentedAttachment[]
++  /** Opens a Windows absolute path the text carries (the owner's `openFile`). */
++  openPath?: (path: string) => void
+   t: ChatViewSlotProps['t']
+ }): ReactNode {
+   const { text, attachments: contentAttachments, rest } = contentParts(content)
+@@ -213,7 +215,7 @@ function UserStyleBubble({
+           </div>
+         )}
+         {showBubble && <div className={css.bubble}>
+-          {projectUserText(text, referenceLabels, skillNames)}
++          {projectUserText(text, referenceLabels, skillNames, 'skill', openPath)}
+           {rest.map((block, i) => <JsonBlock key={i} label={t('message.extraBlock')} payload={block} truncatedLabel={truncated} />)}
+         </div>}
+         {referenceLabels.length > 0 && (
+@@ -312,13 +314,14 @@ export function PendingSubmissionBubble({ submission, renderMessageImages, t }:
+ 
+ /** User and admitted-steering keyed Chat renderer. */
+ export const UserMessageNodeView = memo(function UserMessageNodeView({
+-  node, renderMessageImages, t,
++  node, renderMessageImages, openFile, t,
+ }: ChatNodeViewProps<'user' | 'steering'>) {
+   const data = node.data
+   return (
+     <UserStyleBubble
+       content={data.content}
+       renderMessageImages={renderMessageImages}
++      openPath={openFile}
+       {...data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }}
+       {...data.skillNames === undefined ? {} : { skillNames: data.skillNames }}
+       t={t}
+diff --git a/packages/client/ui-model-selection/src/client/ModelSelect.tsx b/packages/client/ui-model-selection/src/client/ModelSelect.tsx
+index e9fc0195efbfc603d9fb7708ba99e96ea7f2d370..014a88822e8702986e27b260340d02d1fccf3871 100644
+--- a/packages/client/ui-model-selection/src/client/ModelSelect.tsx
++++ b/packages/client/ui-model-selection/src/client/ModelSelect.tsx
+@@ -17,24 +17,23 @@ import {
+ } from 'react'
+ import { createPortal } from 'react-dom'
+ import clsx from 'clsx'
+-import type { ModelReasoningEffort, ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
++import type { ModelSelection } from '@deepseek-ai/dsh-api-remotes/client'
+ import {
+-  IconCheckOutline16, IconChevronDownOutline14, IconChevronRightOutline14,
++  IconCheckOutline16, IconChevronDownOutline14,
+   IconDataOutline16, IconWarningOutline16, Toast,
+ } from '@deepseek-ai/dsh-client-ui-primitives'
+ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
+ import type { ModelSelectInjected } from './slots.ts'
+ import css from './ModelSelect.module.css'
+ 
+-/** Which pane the dropdown shows: the two-row root or one drilled-in list. */
+-type Pane = 'root' | 'model' | 'effort'
+-
+-/** One dynamic effort row; undefined means preserve the provider default. */
+-interface EffortChoice {
+-  key: string
+-  effort: string | undefined
+-  label: string
+-}
++/**
++ * Which pane the dropdown shows. This fork renders exactly one pane: the model
++ * list. The stock shell drills from a two-row root into a model list or an
++ * effort list; reasoning strength moved to the composer's own control (the
++ * effort slider plugin), so the trigger shows the model alone and clicking it
++ * lands on the list.
++ */
++type Pane = 'model'
+ 
+ /** Unplaced portal card: hidden but laid out at a fixed origin so offsetWidth/offsetHeight are real (Menu primitive's measure pass). */
+ const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
+@@ -54,7 +53,7 @@ export function ModelSelect(
+     () => directory.getSnapshot(),
+   )
+   const [open, setOpen] = useState(false)
+-  const [pane, setPane] = useState<Pane>('root')
++  const [pane] = useState<Pane>('model')
+   // The in-menu error strip serves catalog loads (its Retry re-runs the
+   // load); a rejected SELECTION announces through the transient toast
+   // instead, so the strip renders only while the latest failure-capable
+@@ -85,25 +84,6 @@ export function ModelSelect(
+     ? -1
+     : choices.findIndex(c => c.selection.provider === state.current?.provider && c.selection.model === state.current.model)
+   const currentChoice = choices[selectedIndex]
+-  const reasoning = currentChoice?.model.reasoning
+-  const effectiveEffort = state.current?.reasoningEffort ?? reasoning?.defaultEffort
+-  const effortLabel = reasoning === undefined
+-    ? undefined
+-    : effectiveEffort === undefined
+-      ? t('effort.providerDefault')
+-      : reasoning.efforts.find(level => level.id === effectiveEffort)?.name ?? effectiveEffort
+-  const effortChoices = useMemo<readonly EffortChoice[]>(() => reasoning === undefined
+-    ? []
+-    : [
+-      ...reasoning.defaultEffort === undefined
+-        ? [{ key: 'provider-default', effort: undefined, label: t('effort.providerDefault') }]
+-        : [],
+-      ...reasoning.efforts.map((effort: ModelReasoningEffort) => ({
+-        key: `effort:${effort.id}`,
+-        effort: effort.id,
+-        label: effort.name,
+-      })),
+-    ], [reasoning, t])
+   const busy = state.status === 'selecting'
+ 
+   const reload = (): void => {
+@@ -160,14 +140,12 @@ export function ModelSelect(
+   if (!available) return null
+ 
+   const show = (): void => {
+-    setPane('root')
+     setOpen(true)
+     reload()
+   }
+ 
+   const close = (restoreFocus = false): void => {
+     setOpen(false)
+-    setPane('root')
+     if (restoreFocus) queueMicrotask(() => { triggerRef.current?.focus() })
+   }
+ 
+@@ -182,9 +160,8 @@ export function ModelSelect(
+   const onRootKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+     if (event.key === 'Escape' && open) {
+       event.preventDefault()
+-      // Escape backs out of a drilled pane first, then closes.
+-      if (pane !== 'root') setPane('root')
+-      else close(true)
++      // One pane only: Escape closes the card.
++      close(true)
+       return
+     }
+     if (!open) return
+@@ -223,34 +200,17 @@ export function ModelSelect(
+     void select(selection).then(settleSelection)
+   }
+ 
+-  const chooseEffort = (effort: string | undefined): void => {
+-    if (state.current === null) return
+-    if (effectiveEffort === effort) {
+-      close(true)
+-      return
+-    }
+-    const selection: ModelSelection = {
+-      provider: state.current.provider,
+-      model: state.current.model,
+-      ...effort === undefined ? {} : { reasoningEffort: effort },
+-    }
+-    lastActionRef.current = 'select'
+-    void select(selection).then(settleSelection)
+-  }
+-
+   const waiting = state.current === null && state.status === 'loading'
+   const modelLabel = waiting
+     ? t('trigger.loading')
+     : currentChoice?.model.name
+       ?? (state.current === null ? t('trigger.fallback') : `${state.current.provider}/${state.current.model}`)
+-  const triggerLabel = effortLabel === undefined ? modelLabel : `${modelLabel} · ${effortLabel}`
++  const triggerLabel = modelLabel
+   const triggerAria = waiting
+     ? t('trigger.loading')
+     : state.current === null
+       ? t('trigger.selectAria')
+-      : effortLabel === undefined
+-        ? t('trigger.aria', { model: modelLabel })
+-        : t('trigger.ariaEffort', { model: modelLabel, effort: effortLabel })
++      : t('trigger.aria', { model: modelLabel })
+   itemRefs.current = []
+   let itemIndex = 0
+   const itemRef = () => {
+@@ -280,7 +240,6 @@ export function ModelSelect(
+       >
+         <IconDataOutline16 className={css.triggerIcon} size={16} />
+         <span className={css.triggerLabel}>{modelLabel}</span>
+-        {effortLabel !== undefined && <span className={css.triggerEffort}>{effortLabel}</span>}
+         <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
+       </button>
+ 
+@@ -297,23 +256,6 @@ export function ModelSelect(
+           aria-label={t('menu.aria')}
+           aria-busy={state.status === 'loading' || busy}
+         >
+-          {pane === 'root' && (
+-            <>
+-              <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { setPane('model') }}>
+-                <span className={css.cellLabel}>{t('menu.model')}</span>
+-                <span className={css.cellValue}>{modelLabel}</span>
+-                <IconChevronRightOutline14 className={css.cellChevron} />
+-              </button>
+-              {reasoning !== undefined && (
+-                <button ref={itemRef()} type="button" role="menuitem" className={css.cell} onClick={() => { setPane('effort') }}>
+-                  <span className={css.cellLabel}>{t('menu.effort')}</span>
+-                  <span className={css.cellValue}>{effortLabel}</span>
+-                  <IconChevronRightOutline14 className={css.cellChevron} />
+-                </button>
+-              )}
+-            </>
+-          )}
+-
+           {pane === 'model' && (
+             <>
+               {state.status === 'loading' && (
+@@ -369,38 +311,6 @@ export function ModelSelect(
+               )}
+             </>
+           )}
+-
+-          {pane === 'effort' && (
+-            <>
+-              {state.error !== null && lastActionRef.current === 'load' && (
+-                <div className={css.error}>
+-                  <span>{t('error.action', { message: state.error })}</span>
+-                  <button type="button" className={css.retry} onClick={reload}>{t('action.reload')}</button>
+-                </div>
+-              )}
+-              {effortChoices.length === 0
+-                ? <div className={css.empty}>{t('empty.efforts')}</div>
+-                : effortChoices.map(level => (
+-                  <button
+-                    ref={itemRef()}
+-                    type="button"
+-                    role="menuitemradio"
+-                    aria-checked={effectiveEffort === level.effort}
+-                    className={clsx(css.option, effectiveEffort === level.effort && css.selected)}
+-                    key={level.key}
+-                    disabled={busy}
+-                    onClick={() => { chooseEffort(level.effort) }}
+-                  >
+-                    <span className={css.optionCopy}>
+-                      <span className={css.modelName}>{level.label}</span>
+-                    </span>
+-                    <span className={css.check}>
+-                      {effectiveEffort === level.effort ? <IconCheckOutline16 /> : null}
+-                    </span>
+-                  </button>
+-                ))}
+-            </>
+-          )}
+         </div>,
+         document.body,
+       )}
+diff --git a/packages/client/ui-model-selection/tests/model-select.client.spec.tsx b/packages/client/ui-model-selection/tests/model-select.client.spec.tsx
+index 3b8c92d8bf43a6b76a16b489ab4004afba7690a0..4ac488642ff2ae43d74783c3ec0880569921d389 100644
+--- a/packages/client/ui-model-selection/tests/model-select.client.spec.tsx
++++ b/packages/client/ui-model-selection/tests/model-select.client.spec.tsx
+@@ -52,8 +52,8 @@ function state(overrides: Partial<ModelDirectoryState> = {}): ModelDirectoryStat
+ 
+ afterEach(cleanup)
+ 
+-describe('ModelSelect reasoning effort', () => {
+-  it('renders effort names without descriptions and submits the effort as part of the session selection', async () => {
++describe('ModelSelect model-only menu', () => {
++  it('shows the model alone and lands on the list, submitting the provider default effort', async () => {
+     const directory = createSnapshotStore<ModelDirectoryState>(state())
+     const select = vi.fn(async (selection: ModelSelection) => {
+       directory.set(state({ current: selection }))
+@@ -68,27 +68,59 @@ describe('ModelSelect reasoning effort', () => {
+       t={t}
+     />)
+ 
+-    const trigger = screen.getByRole('button', {
+-      name: '选择模型，当前 DeepSeek-V4-Flash，推理等级 High',
+-    })
++    const trigger = screen.getByRole('button', { name: '选择模型，当前 DeepSeek-V4-Flash' })
++    // The trigger carries the model name and nothing else: reasoning strength
++    // belongs to the composer's own control in this fork.
++    expect(trigger.textContent).not.toContain('High')
+     fireEvent.click(trigger)
+-    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
++    // Clicking lands on the model list directly — no root row, no effort pane.
++    expect(screen.queryByRole('menuitem', { name: /推理等级/ })).toBeNull()
++    expect(screen.queryByRole('menuitem', { name: /^模型/ })).toBeNull()
+     expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
+-      .toEqual(['Off', 'High', 'Max'])
+-    expect(screen.queryByText('Largest budget')).toBeNull()
++      .toEqual(['DeepSeek-V4-Flash'])
++
++    // Re-picking the current model only closes the card.
++    fireEvent.click(screen.getByRole('menuitemradio', { name: /DeepSeek-V4-Flash/ }))
++    expect(select).not.toHaveBeenCalled()
++    expect(screen.queryByRole('menu')).toBeNull()
++  })
++
++  it('submits the native provider/model pair, adding the target model default effort', async () => {
++    const groups = [{
++      id: 'deepseek-official',
++      name: 'DeepSeek',
++      models: [
++        { id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', reasoning },
++        { id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro' },
++      ],
++    }]
++    const directory = createSnapshotStore<ModelDirectoryState>(state({ groups }))
++    const select = vi.fn(async (selection: ModelSelection) => {
++      directory.set(state({ groups, current: selection }))
++      return true
++    })
++    render(<ModelSelect
++      locked={false}
++      available
++      directory={directory}
++      load={vi.fn()}
++      select={select}
++      t={t}
++    />)
+ 
+-    fireEvent.click(screen.getByRole('menuitemradio', { name: /Max/ }))
++    fireEvent.click(screen.getByRole('button', { name: '选择模型，当前 DeepSeek-V4-Flash' }))
++    fireEvent.click(screen.getByRole('menuitemradio', { name: /DeepSeek-V4-Pro/ }))
+     await waitFor(() => {
++      // The menu never asks for an effort, but the choice still carries the
++      // selection shape the Session expects.
+       expect(select).toHaveBeenCalledWith({
+         provider: 'deepseek-official',
+-        model: 'deepseek-v4-flash',
+-        reasoningEffort: 'max',
++        model: 'deepseek-v4-pro',
+       })
+-      expect(trigger.getAttribute('aria-label')).toBe('选择模型，当前 DeepSeek-V4-Flash，推理等级 Max')
+     })
+   })
+ 
+-  it('offers provider default only when the adapter does not configure a model default', () => {
++  it('keeps the model-only trigger when the adapter configures no default effort', () => {
+     const directory = createSnapshotStore(state({
+       groups: [{
+         id: 'provider',
+@@ -110,12 +142,11 @@ describe('ModelSelect reasoning effort', () => {
+       t={t}
+     />)
+ 
+-    fireEvent.click(screen.getByRole('button', {
+-      name: '选择模型，当前 Model，推理等级 Default',
+-    }))
+-    fireEvent.click(screen.getByRole('menuitem', { name: /推理等级/ }))
+-    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent))
+-      .toEqual(['Default', 'Standard'])
++    const trigger = screen.getByRole('button', { name: '选择模型，当前 Model' })
++    expect(trigger.textContent).not.toContain('Default')
++    fireEvent.click(trigger)
++    expect(screen.queryByRole('menuitem', { name: /推理等级/ })).toBeNull()
++    expect(screen.getAllByRole('menuitemradio').map(item => item.textContent)).toEqual(['Model'])
+   })
+ 
+   it('shows the durable model id when the catalog has no matching display name', () => {
+@@ -136,7 +167,6 @@ describe('ModelSelect reasoning effort', () => {
+     expect(trigger.textContent).toContain('deepseek-official/removed-model')
+     fireEvent.click(trigger)
+     expect(screen.queryByRole('menuitem', { name: /推理等级/ })).toBeNull()
+-    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+     expect(screen.queryByRole('menuitemradio', { name: 'removed-model' })).toBeNull()
+     expect(screen.getByRole('menuitemradio', { name: 'DeepSeek-V4-Flash' })).toBeTruthy()
+     expect(screen.queryByText('Fast catalog description')).toBeNull()
+@@ -163,7 +193,7 @@ describe('ModelSelect reasoning effort', () => {
+     directory.set(state())
+     await waitFor(() => {
+       expect(screen.getByRole('button', {
+-        name: '选择模型，当前 DeepSeek-V4-Flash，推理等级 High',
++        name: '选择模型，当前 DeepSeek-V4-Flash',
+       })).toBeTruthy()
+     })
+   })
+@@ -192,7 +222,6 @@ describe('ModelSelect reasoning effort', () => {
+     />)
+ 
+     fireEvent.click(screen.getByRole('button', { name: /选择模型|当前/ }))
+-    fireEvent.click(screen.getByRole('menuitem', { name: /模型/ }))
+     fireEvent.click(screen.getByRole('menuitemradio', { name: /DeepSeek-V4-Pro/ }))
+     const toast = await screen.findByRole('alert')
+     expect(toast.textContent).toContain('模型操作失败：session/model-unavailable: session already contains images')
+diff --git a/packages/client/ui-primitives/src/path-links.ts b/packages/client/ui-primitives/src/path-links.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..40e419829b0df4f2aeea264a3c2160d757be62a2
+--- /dev/null
++++ b/packages/client/ui-primitives/src/path-links.ts
+@@ -0,0 +1,75 @@
++/**
++ * Windows absolute path tokenizer for sent user text.
++ *
++ * Ported from this fork's earlier `ui-conversation/src/client/path-links.ts`
++ * (itself the same regex the `@captain1275/dsh-path-links` package exports), so
++ * the behaviour a log that already rendered as links keeps rendering the same
++ * way after the 0.1.5 client re-point. Lives inside ui-primitives rather than
++ * depending on the plugin package: the consumer here is an official package,
++ * and a pure regex split has no runtime surface worth a dependency.
++ *
++ * Two branches, deliberately different:
++ *   - a QUOTED path ("C:\my dir\file!.txt") is verbatim: it is what a user gets
++ *     from "copy as path", so nothing inside the quotes is trimmed;
++ *   - a BARE path sheds trailing sentence punctuation and stops at CJK prose,
++ *     because a Chinese sentence routinely runs on right after a path with no
++ *     separator ("见 C:\a\b.txt。" and "C:\data\报告.docx内容见上").
++ */
++
++/** One split result: a path to linkify, or ordinary text to keep as-is. */
++export type PathToken = { path: string } | { text: string }
++
++/** Trailing punctuation a bare path may pick up from prose (half- and full-width). */
++const TRAILING = /[.,;:!?)\]}…！？，。；：、）》】」』'"]+$/
++
++/**
++ * Windows absolute path recognition.
++ * - Quoted branch: `"C:\…"` / `"\\server\share\…"`, kept verbatim.
++ * - Bare branch: requires a word boundary before the drive letter (so `abcC:\x`
++ *   is not linkified mid-word), excludes CJK and full-width characters, and
++ *   excludes the `\\?\` / `\\.\` device prefixes.
++ */
++const PATH_RE = /"((?:[A-Za-z]:[\\/]|\\\\(?![?\\]))[^"\r\n]+)"|(?<![\p{L}\p{N}:_\\/])((?:[A-Za-z]:[\\/]|\\\\(?![?\\]))[^\s"'<>|*?\r\n　-〿㐀-䶿一-鿿豈-﫿＀-ｅ]+)/gu
++
++/**
++ * Split one text into ordered plain runs and path tokens.
++ * @param text - the logged model text of a message.
++ * @returns tokens covering the whole text, in order.
++ */
++export function splitPathTokens(text: string): PathToken[] {
++  const out: PathToken[] = []
++  let cursor = 0
++  let m: RegExpExecArray | null
++  PATH_RE.lastIndex = 0
++  while ((m = PATH_RE.exec(text)) !== null) {
++    const full = m[0]
++    const quoted = m[1]
++    const path = quoted !== undefined ? quoted : (m[2] ?? '').replace(TRAILING, '')
++    if (path.length === 0) continue
++    const pathStart = full.indexOf(path)
++    if (m.index > cursor) out.push({ text: text.slice(cursor, m.index) })
++    if (pathStart > 0) out.push({ text: full.slice(0, pathStart) })
++    out.push({ path })
++    const after = full.slice(pathStart + path.length)
++    if (after.length > 0) out.push({ text: after })
++    cursor = m.index + full.length
++  }
++  if (cursor < text.length) out.push({ text: text.slice(cursor) })
++  if (out.length === 0) out.push({ text })
++  return out
++}
++
++/**
++ * Locate the path tokens of one text as half-open offsets.
++ * @param text - the same text handed to {@link splitPathTokens}.
++ * @returns one range per path token, in order.
++ */
++export function pathTokenRanges(text: string): { start: number; end: number; path: string }[] {
++  const ranges: { start: number; end: number; path: string }[] = []
++  let cursor = 0
++  for (const token of splitPathTokens(text)) {
++    if ('path' in token) ranges.push({ start: cursor, end: cursor + token.path.length, path: token.path })
++    cursor += 'path' in token ? token.path.length : token.text.length
++  }
++  return ranges
++}
+diff --git a/packages/client/ui-primitives/src/user-text.module.css b/packages/client/ui-primitives/src/user-text.module.css
+index 3654d6f990d48aab7938bc3def4f050df19f2d54..75fb8f0e0ac7f70e2195d48fb4a44bac4dcfeef3 100644
+--- a/packages/client/ui-primitives/src/user-text.module.css
++++ b/packages/client/ui-primitives/src/user-text.module.css
+@@ -41,3 +41,29 @@
+      a font-relative amount, so it holds across the font axis. */
+   vertical-align: -0.125em;
+ }
++
++/* A Windows absolute path the text carries. Rendered inline like the plain runs
++   (a long path must be free to wrap rather than push the bubble wide), with the
++   link affordance carried by colour and a dotted underline instead of a chip, so
++   the sentence keeps its reading rhythm. Interactive only because ui-chat passed
++   an opener: no opener means this class is never applied. */
++.pathLink {
++  display: inline;
++  color: var(--dsw-alias-state-business-primary);
++  text-decoration: underline;
++  text-decoration-style: dotted;
++  text-underline-offset: 2px;
++  cursor: pointer;
++  /* A path has no spaces to break at, so allow a break anywhere inside it. */
++  word-break: break-all;
++}
++
++.pathLink:hover {
++  text-decoration-style: solid;
++}
++
++.pathLink:focus-visible {
++  outline: 2px solid var(--dsw-alias-state-business-primary);
++  outline-offset: 2px;
++  border-radius: 3px;
++}
+diff --git a/packages/client/ui-primitives/src/user-text.tsx b/packages/client/ui-primitives/src/user-text.tsx
+index f0b89cfbb49326d192b78b619492643486e40367..e84b0507c8c23bf81907e89dfdce3fcffe3b7d59 100644
+--- a/packages/client/ui-primitives/src/user-text.tsx
++++ b/packages/client/ui-primitives/src/user-text.tsx
+@@ -17,6 +17,7 @@
+ import type { ReactNode } from 'react'
+ import clsx from 'clsx'
+ import { ReferenceIcon } from './ReferenceIcon.tsx'
++import { pathTokenRanges } from './path-links.ts'
+ import css from './user-text.module.css'
+ 
+ /** The wire form a session chip serializes to; label is the display text. */
+@@ -30,7 +31,7 @@ interface DecorationRange {
+   readonly end: number
+   /** Matched source text (hover title). */
+   readonly label: string
+-  readonly kind: 'session' | 'plain'
++  readonly kind: 'session' | 'plain' | 'path'
+   /** Pre-resolved display text (wire folds); derived from label when absent. */
+   readonly display?: string
+ }
+@@ -43,6 +44,10 @@ interface DecorationRange {
+  * host loaded for this message, or the command a command bubble echoes
+  * (unsent queue rows pass none).
+  * @param slashKind - the chip kind those tokens render as.
++ * @param openPath - when supplied, Windows absolute paths in the text render as
++ * clickable links and this receives the path on click (ui-chat wires it to the
++ * owner's `openFile`, which opens the path in the right Sidebar). Without it the
++ * text renders exactly as the stock projection does.
+  * @returns inline nodes covering the whole text.
+  */
+ export function projectUserText(
+@@ -50,6 +55,7 @@ export function projectUserText(
+   sessionLabels: readonly string[],
+   slashNames: readonly string[] = [],
+   slashKind: 'skill' | 'command' = 'skill',
++  openPath?: (path: string) => void,
+ ): ReactNode {
+   const ranges: DecorationRange[] = []
+   SESSION_WIRE_RE.lastIndex = 0
+@@ -85,7 +91,15 @@ export function projectUserText(
+     if (label.startsWith('/') && !slashNames.includes(label.slice(1))) continue
+     ranges.push({ start: tokenStart, end: tokenStart + label.length, label, kind: 'plain' })
+   }
+-  const rankOf = (range: DecorationRange): number => range.kind === 'session' ? 0 : 1
++  // Bare and quoted Windows absolute paths become clickable only when a caller
++  // supplies the opener; without it the projection is byte-identical to stock.
++  if (openPath !== undefined) {
++    for (const range of pathTokenRanges(text)) {
++      ranges.push({ start: range.start, end: range.end, label: range.path, kind: 'path' })
++    }
++  }
++  const rankOf = (range: DecorationRange): number =>
++    range.kind === 'session' ? 0 : range.kind === 'plain' ? 1 : 2
+   ranges.sort((a, b) => a.start - b.start || rankOf(a) - rankOf(b) || b.end - a.end)
+   const parts: ReactNode[] = []
+   let cursor = 0
+@@ -96,6 +110,29 @@ export function projectUserText(
+     if (range.start < cursor) continue
+     const { start: tokenStart, end, label, kind } = range
+     if (tokenStart > cursor) pushPlain(cursor, tokenStart)
++    if (kind === 'path') {
++      parts.push(
++        <span
++          key={tokenStart}
++          className={css.pathLink}
++          data-dsh-path-link
++          role="button"
++          tabIndex={0}
++          title={label}
++          onClick={() => { openPath?.(label) }}
++          onKeyDown={(e) => {
++            if (e.key === 'Enter' || e.key === ' ') {
++              e.preventDefault()
++              openPath?.(label)
++            }
++          }}
++        >
++          {label}
++        </span>,
++      )
++      cursor = end
++      continue
++    }
+     const referenceKind = kind === 'session'
+       ? 'session'
+       : label.startsWith('@')
+diff --git a/packages/client/ui-primitives/tests/user-text.client.spec.tsx b/packages/client/ui-primitives/tests/user-text.client.spec.tsx
+index b65bb8f43dfcc8255cc61eab0929d4a3bfbcf16d..e085fa43f52f98f811f86b154bb5faa4467ce694 100644
+--- a/packages/client/ui-primitives/tests/user-text.client.spec.tsx
++++ b/packages/client/ui-primitives/tests/user-text.client.spec.tsx
+@@ -4,7 +4,7 @@
+  * message (bubble regression), and wire session forms fold to their label
+  * (queue-row readability).
+  */
+-import { describe, expect, it } from 'vitest'
++import { describe, expect, it, vi } from 'vitest'
+ import { render } from '@testing-library/react'
+ import { projectUserText } from '../src/user-text.tsx'
+ 
+@@ -13,8 +13,9 @@ const project = (
+   labels: readonly string[] = [],
+   slashNames: readonly string[] = [],
+   slashKind: 'skill' | 'command' = 'skill',
++  openPath?: (path: string) => void,
+ ) =>
+-  render(<div data-host>{projectUserText(text, labels, slashNames, slashKind)}</div>).container.querySelector('[data-host]')!
++  render(<div data-host>{projectUserText(text, labels, slashNames, slashKind, openPath)}</div>).container.querySelector('[data-host]')!
+ 
+ describe('projectUserText', () => {
+   it('keeps a decorated single-line message on one line: every part is inline', () => {
+@@ -112,4 +113,42 @@ describe('projectUserText', () => {
+     expect(host.querySelectorAll('[data-ref-chip]').length).toBe(0)
+     expect(host.textContent).toBe('纯文本，无引用')
+   })
++
++  it('linkifies a bare Windows path only when an opener is supplied, and opens it on click', () => {
++    const text = '请查看 C:\\Users\\19161\\Desktop\\a.md 这个文件'
++    // No opener: the stock projection keeps the path as ordinary inline text.
++    const plain = project(text)
++    expect(plain.querySelectorAll('[data-dsh-path-link]').length).toBe(0)
++    expect(plain.textContent).toBe(text)
++
++    const open = vi.fn()
++    const host = project(text, [], [], 'skill', open)
++    const link = host.querySelector('[data-dsh-path-link]')!
++    expect(link.textContent).toBe('C:\\Users\\19161\\Desktop\\a.md')
++    expect(link.getAttribute('title')).toBe('C:\\Users\\19161\\Desktop\\a.md')
++    // Decoration is inline and lossless: the sentence still reads exactly as sent.
++    expect(host.querySelectorAll('div').length).toBe(0)
++    expect(host.textContent).toBe(text)
++    link.dispatchEvent(new MouseEvent('click', { bubbles: true }))
++    expect(open).toHaveBeenCalledWith('C:\\Users\\19161\\Desktop\\a.md')
++  })
++
++  it('trims trailing prose punctuation off a bare path and keeps a quoted one verbatim', () => {
++    const open = vi.fn()
++    const bare = project('在 C:\\a\\b.txt。继续', [], [], 'skill', open)
++    expect(bare.querySelector('[data-dsh-path-link]')!.textContent).toBe('C:\\a\\b.txt')
++    expect(bare.textContent).toBe('在 C:\\a\\b.txt。继续')
++
++    const quoted = project('文件 "C:\\data\\报告.docx" 已保存', [], [], 'skill', open)
++    expect(quoted.querySelector('[data-dsh-path-link]')!.textContent).toBe('C:\\data\\报告.docx')
++    expect(quoted.textContent).toBe('文件 "C:\\data\\报告.docx" 已保存')
++  })
++
++  it('keeps a session chip on its own range when a path sits in the same message', () => {
++    const open = vi.fn()
++    const host = project('@[查图](dsh-session:InNzcw) 见 C:\\shots\\a.png', [], [], 'skill', open)
++    expect(host.querySelector('[data-ref-chip="session"]')!.textContent).toBe('查图')
++    expect(host.querySelector('[data-dsh-path-link]')!.textContent).toBe('C:\\shots\\a.png')
++    expect(host.textContent).toBe('查图 见 C:\\shots\\a.png')
++  })
+ })
+diff --git a/packages/client/ui-settings-general/src/client/SettingsRoot.module.css b/packages/client/ui-settings-general/src/client/SettingsRoot.module.css
+index 95de4063810e16b68e620ccb625fb4b7e75da4d4..07ce02cbfb0acd142a704967d9bfb364b32b3d84 100644
+--- a/packages/client/ui-settings-general/src/client/SettingsRoot.module.css
++++ b/packages/client/ui-settings-general/src/client/SettingsRoot.module.css
+@@ -19,9 +19,9 @@
+   align-items: center;
+   gap: 8px;
+   width: auto;
+-  height: 42px;
++  height: 34px;
+   margin: 0;
+-  padding: 0 10px 0 8px;
++  padding: 6px 2px 6px 10px;
+   box-sizing: border-box;
+   border: none;
+   border-radius: 12px;
+@@ -67,6 +67,14 @@
+   justify-content: center;
+ }
+ 
++/* Exit lifecycle: while the overlay carries data-closing, the panel stays
++   mounted for an optional layer-provided exit animation (the Aqua/glass theme
++   plays one on the live dialog); freeze interaction so a mask re-click or a
++   stray nav tap cannot retrigger close mid-flight. */
++.overlay[data-closing] {
++  pointer-events: none;
++}
++
+ .mask {
+   position: absolute;
+   inset: 0;
+diff --git a/packages/client/ui-settings-general/src/client/SettingsRoot.tsx b/packages/client/ui-settings-general/src/client/SettingsRoot.tsx
+index e0b20dceed3ddf4e970246f570b665343e56bde1..eec1246aef2037098a034596957b1cb9242eb210 100644
+--- a/packages/client/ui-settings-general/src/client/SettingsRoot.tsx
++++ b/packages/client/ui-settings-general/src/client/SettingsRoot.tsx
+@@ -37,6 +37,10 @@ type PanelProps = {
+   activeId: string | undefined
+   onSelect: (id: string) => void
+   onClose: () => void
++  /** Two-phase close: the panel stays mounted while an exit animation plays. */
++  closing: boolean
++  /** Called by the panel once the exit beat ends (or immediately when no exit animation is declared). */
++  onClosed: () => void
+ }
+ 
+ /**
+@@ -44,7 +48,7 @@ type PanelProps = {
+  * header button, a mask click, and document-level Escape (mounted only while
+  * open, so the listener lifetime is the panel's).
+  */
+-function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelProps) {
++function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose, closing, onClosed }: PanelProps) {
+   // Entries can unmount underneath the requested id, so the render-time
+   // projection falls back to the first row when the id is gone.
+   const active = rows.find(r => r.id === activeId)?.id ?? rows[0]?.id
+@@ -62,10 +66,37 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
+   const closeButton = useRef<HTMLButtonElement | null>(null)
+   useEffect(() => { closeButton.current?.focus() }, [])
+ 
++  // Exit lifecycle: while closing, the overlay keeps the panel mounted and
++  // carries data-closing so a style layer (the Aqua/glass theme) can play a
++  // reverse animation on the LIVE dialog — no DOM-clone ghost, so scroll
++  // position and layout survive. When nothing declares an exit animation for
++  // the dialog (stock UI, reduced motion) the panel unmounts immediately: the
++  // stock close path must not gain a delay.
++  const overlay = useRef<HTMLDivElement | null>(null)
++  useEffect(() => {
++    if (!closing) return
++    const root = overlay.current
++    const dialog = root?.querySelector<HTMLElement>('[role="dialog"]')
++    if (root === null || root === undefined || dialog === null || dialog === undefined) { onClosed(); return }
++    const animationName = getComputedStyle(dialog).animationName
++    if (animationName === '' || animationName === 'none') { onClosed(); return }
++    const onEnd = (e: AnimationEvent): void => {
++      // Descendant animations bubble; only the dialog's own exit ends the beat.
++      if (e.target === dialog) onClosed()
++    }
++    dialog.addEventListener('animationend', onEnd)
++    // Fallback: a stalled or cancelled animation must not strand the panel.
++    const timer = setTimeout(onClosed, 600)
++    return () => {
++      dialog.removeEventListener('animationend', onEnd)
++      clearTimeout(timer)
++    }
++  }, [closing, onClosed])
++
+   return (
+-    <div className={css.overlay} role="presentation">
++    <div ref={overlay} className={css.overlay} role="presentation" data-closing={closing ? '' : undefined}>
+       <div className={css.mask} aria-hidden="true" onClick={onClose} />
+-      <div className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId}>
++      <div className={css.panel} role="dialog" aria-modal="true" aria-labelledby={titleId} data-dsh-aqua-settings>
+         <nav className={css.nav}>
+           <div className={css.navTitle} id={titleId}>{renderSlot('settings.header', {})}</div>
+           <div className={css.navList}>
+@@ -110,13 +141,21 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
+     wide, reconnect, useConnectionState, useSections, useOnboardingSteps, useSessions, renderSlot, t,
+   } = props
+   const [open, setOpen] = useState(false)
++  const [closing, setClosing] = useState(false)
+   const [activeId, setActiveId] = useState<string | undefined>(undefined)
+   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
+   const [showRecovery, setShowRecovery] = useState(false)
+   const triggerButton = useRef<HTMLButtonElement | null>(null)
+   const wasOpen = useRef(open)
++  // Two-phase close: `close` starts the exit beat and keeps the panel mounted;
++  // the section reset rides the real unmount, so mid-exit the content never
++  // snaps back to the first section.
+   const close = useCallback(() => {
++    setClosing(true)
++  }, [])
++  const finishClose = useCallback(() => {
+     setOpen(false)
++    setClosing(false)
+     setActiveId(undefined)
+   }, [])
+   // Restore after the close commit, when the dialog can no longer own focus.
+@@ -187,7 +226,7 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
+           aria-label={t('trigger')}
+           aria-haspopup="dialog"
+           aria-expanded={open}
+-          onClick={() => { setOpen(true) }}
++          onClick={() => { setClosing(false); setOpen(true) }}
+         >
+           {renderSlot('settings.trigger', { wide })}
+         </button>
+@@ -209,6 +248,8 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
+           activeId={activeId}
+           onSelect={setActiveId}
+           onClose={close}
++          closing={closing}
++          onClosed={finishClose}
+         />
+       )}
+       {/* Dialog chrome and `#root` inert ownership live inside each step's
+diff --git a/packages/client/ui-workspace/src/client/locales.ts b/packages/client/ui-workspace/src/client/locales.ts
+index af0f535b68984e834b99ee543c46d3ee2a216cdb..81fed457d29b3541d965a185b4499a596afe17ec 100644
+--- a/packages/client/ui-workspace/src/client/locales.ts
++++ b/packages/client/ui-workspace/src/client/locales.ts
+@@ -20,6 +20,7 @@ export const zh = {
+   'sessions.expand': '展开其余 {n} 个会话',
+   'sessions.collapse': '收起',
+   'empty.none': '暂无会话',
++  'empty.loading': '正在加载会话…',
+   'empty.noMatches': '无匹配结果',
+   'workspace.add': '添加工作区',
+   'search.sessions.aria': '搜索会话',
+@@ -90,6 +91,7 @@ export const en = {
+   'sessions.expand': 'Show {n} more sessions',
+   'sessions.collapse': 'Show less',
+   'empty.none': 'No sessions yet',
++  'empty.loading': 'Loading sessions…',
+   'empty.noMatches': 'No matches',
+   'workspace.add': 'Add workspace',
+   'search.sessions.aria': 'Search sessions',
+diff --git a/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx b/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx
+index 585e9c87666abcb6f6178a7553d3ca45a5a44228..291080894001a4eca19ce7bf9751c61ff8ed7e4c 100644
+--- a/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx
++++ b/packages/client/ui-workspace/src/client/rows/WorkspaceBrowser.tsx
+@@ -457,7 +457,10 @@ function SessionTree({
+         role="tree"
+         aria-label={t('section.sessions')}
+       >
+-        {groups.length === 0 && (
++        {list.phase !== 'ready' && (
++          <div className={css.empty}>{t('empty.loading')}</div>
++        )}
++        {list.phase === 'ready' && groups.length === 0 && (
+           <div className={css.empty}>{t('empty.none')}</div>
+         )}
+         {groups.map((group) => {
+@@ -700,7 +703,10 @@ function FlatList({
+   return (
+     <div className={clsx(css.treeBody, css.wide)}>
+       <div className={clsx(css.list, css.flatList)} role="tree" aria-label={t('section.sessions')}>
+-        {rows.length === 0 && (
++        {list.phase !== 'ready' && (
++          <div className={css.empty}>{t('empty.loading')}</div>
++        )}
++        {list.phase === 'ready' && rows.length === 0 && (
+           <div className={css.empty}>{t('empty.none')}</div>
+         )}
+         {rows.map((node) => {
+diff --git a/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx b/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
+index b25b32e1661bc7b73f33af560632666be3633dcb..f98b9f99848ce75ecfeb9505490de4077e29e170 100644
+--- a/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
++++ b/packages/client/ui-workspace/tests/workspace-browser.client.spec.tsx
+@@ -1006,6 +1006,22 @@ describe('WorkspaceBrowser', () => {
+     }
+   })
+ 
++  it('shows the loading label while pending and 暂无会话 only once ready, in both modes', () => {
++    const pending = sessionState([], { phase: 'pending' })
++    const b = mount({ useSessions: hook(pending) })
++    expect(screen.getByText('正在加载会话…')).toBeTruthy()
++    expect(screen.queryByText('暂无会话')).toBeNull()
++
++    b.store.actions.setGroupBy('flat')
++    expect(screen.getByText('正在加载会话…')).toBeTruthy()
++    expect(screen.queryByText('暂无会话')).toBeNull()
++    rerender(b, {})
++
++    rerender(b, { useSessions: hook(sessionState([])) })
++    expect(screen.getByText('暂无会话')).toBeTruthy()
++    expect(screen.queryByText('正在加载会话…')).toBeNull()
++  })
++
+   it('shows the no-sessions empty state in both modes and resolves an empty search', async () => {
+     vi.useFakeTimers()
+     try {

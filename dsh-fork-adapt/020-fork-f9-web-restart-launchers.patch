@@ -1,0 +1,1354 @@
+diff --git a/.gitignore b/.gitignore
+index fb999f93fbac6f4a513db34e5caddc102c623851..f497db626dac6c650d821850768e14259ad87a47 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -44,3 +44,12 @@ worktrees/
+ .agents/worktrees/
+ .typert-*/
+ native/system/test/bin/
++
++# Local machine config (registry auth) and the dsh web service run logs.
++/.npmrc
++/dsh-web.log
++/dsh-web.err.log
++/dsh-web.previous.log
++/dsh-web-host.lock
++/dsh-restart-verify.log
++/dsh-preflight.log
+diff --git a/dsh-web-host-launch.ps1 b/dsh-web-host-launch.ps1
+new file mode 100644
+index 0000000000000000000000000000000000000000..7c7d7feea50162bf1d1ab78cf7a4b65df1ece168
+--- /dev/null
++++ b/dsh-web-host-launch.ps1
+@@ -0,0 +1,94 @@
++# Launch the built DSH Host without cmd.exe console windows or a console-backed
++# Node process. Called by the GUI-subsystem dsh-web-service-launch.vbs (and by
++# the restart worker through start-dsh-web.cmd).
++#
++# 0.1.5 notes:
++#   - profile/port/node come from the sibling dsh-web-service.json, so a cutover
++#     (web-next/3081 -> web/3080) is one file edit;
++#   - the Host runs with --no-open: this launcher and the restart worker own
++#     browser opening, exactly once;
++#   - node's stdout/stderr are redirected by cmd.exe INTO dsh-web.log /
++#     dsh-web.err.log. cmd's own file redirection is used deliberately: Node
++#     writes synchronously to a file handle, so the `dsh web: http://...?token=`
++#     line is on disk the moment it is printed, which is what the restart worker
++#     greps (0.1.5 answers an unauthenticated index request with 401, so the
++#     tokenized URL is the only thing a browser can use). The event-based drain
++#     (Register-ObjectEvent + BeginOutputReadLine) does not deliver under
++#     Windows PowerShell 5.1 while the script blocks in WaitForExit.
++#
++# Keep this file ASCII-only.
++[CmdletBinding()]
++param(
++  [string]$Profile = '',
++  [int]$Port = 0
++)
++
++$ErrorActionPreference = 'Stop'
++$root = $PSScriptRoot
++if ([string]::IsNullOrEmpty($root)) { $root = 'C:\Users\19161\deepseek-harness-next' }
++
++function Read-ServiceConfig {
++  $path = Join-Path $root 'dsh-web-service.json'
++  if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
++    throw "dsh-web-host-launch: service config not found: $path"
++  }
++  return (Get-Content -LiteralPath $path -Raw | ConvertFrom-Json)
++}
++
++$config = Read-ServiceConfig
++if ([string]::IsNullOrEmpty($Profile)) { $Profile = [string]$config.profile }
++if ($Port -le 0) { $Port = [int]$config.port }
++$node = [string]$config.node
++if ([string]::IsNullOrEmpty($node)) { $node = 'node' }
++
++$cliDir = Join-Path $root 'apps\cli'
++$stdout = Join-Path $root 'dsh-web.log'
++$stderr = Join-Path $root 'dsh-web.err.log'
++
++# Never start a second Host for the same port: an autostart task, a desktop
++# shortcut, and the restart worker all funnel through here.
++if ([bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)) {
++  Add-Content -LiteralPath $stdout -Value ("{0:yyyy-MM-dd HH:mm:ss} host already listening on {1}; launch skipped" -f (Get-Date), $Port)
++  exit 0
++}
++
++# One run per log: keep the previous tail, then start fresh so the token line
++# the restart worker greps always belongs to the host that is starting now.
++if (Test-Path -LiteralPath $stdout -PathType Leaf) {
++  Move-Item -LiteralPath $stdout -Destination (Join-Path $root 'dsh-web.previous.log') -Force
++}
++Set-Content -LiteralPath $stdout -Value ("{0:yyyy-MM-dd HH:mm:ss} launching host (profile {1}, port {2})" -f (Get-Date), $Profile, $Port)
++
++# cmd /d /s /c "…" keeps one command line: the /s form lets the outer quotes wrap
++# the whole command, so the inner quoted paths survive verbatim.
++$inner = '"' + $node + '" "lib/bin.js" --profile ' + $Profile + ' --port ' + $Port + ' --no-open'
++$inner += ' 1>>"' + $stdout + '" 2>>"' + $stderr + '"'
++
++$psi = [System.Diagnostics.ProcessStartInfo]::new()
++$psi.FileName = Join-Path $env:WINDIR 'System32\cmd.exe'
++$psi.Arguments = '/d /s /c "' + $inner + '"'
++$psi.WorkingDirectory = $cliDir
++$psi.UseShellExecute = $false
++$psi.CreateNoWindow = $true
++$process = [System.Diagnostics.Process]::Start($psi)
++if (-not $process) { throw 'dsh-web-host-launch: failed to start the built DSH Host.' }
++Add-Content -LiteralPath $stdout -Value ("{0:yyyy-MM-dd HH:mm:ss} host process started (cmd pid {1})" -f (Get-Date), $process.Id)
++$process.Dispose()
++
++# Wait for the HTTP layer so an interactive caller sees a live service, not a
++# half-bound port. 401 is the expected unauthenticated answer on 0.1.5.
++$deadline = (Get-Date).AddSeconds(90)
++$ready = $false
++while ((Get-Date) -lt $deadline) {
++  Start-Sleep -Milliseconds 500
++  try {
++    $response = Invoke-WebRequest ("http://127.0.0.1:$Port/") -UseBasicParsing -TimeoutSec 3
++    if ([int]$response.StatusCode -in 200, 303) { $ready = $true; break }
++  } catch {
++    $webResponse = $_.Exception.Response
++    if ($null -ne $webResponse -and [int]$webResponse.StatusCode -eq 401) { $ready = $true; break }
++  }
++}
++Add-Content -LiteralPath $stdout -Value ("{0:yyyy-MM-dd HH:mm:ss} launch wait finished (ready={1})" -f (Get-Date), $ready)
++if (-not $ready) { exit 1 }
++exit 0
+diff --git a/dsh-web-restart-worker-launch.vbs b/dsh-web-restart-worker-launch.vbs
+new file mode 100644
+index 0000000000000000000000000000000000000000..e91c865e0693a0b3d5cd295acd8f0cdb9392b729
+--- /dev/null
++++ b/dsh-web-restart-worker-launch.vbs
+@@ -0,0 +1,19 @@
++' Hidden launcher for the one-shot DSH Web restart worker (0.1.5 checkout).
++' Scheduled Tasks starts wscript.exe (GUI subsystem), which then creates the
++' PowerShell worker with SW_HIDE. This avoids the transient console window that
++' appears when Task Scheduler starts powershell.exe directly.
++
++Option Explicit
++
++Dim shell, command, index, argument
++Set shell = CreateObject("WScript.Shell")
++
++command = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ""C:\Users\19161\deepseek-harness-next\dsh-web-restart.ps1"" -Worker"
++
++For index = 0 To WScript.Arguments.Count - 1
++  argument = WScript.Arguments(index)
++  command = command & " """ & argument & """"
++Next
++
++' intWindowStyle=0 (hidden), bWaitOnReturn=False (worker outlives launcher).
++shell.Run command, 0, False
+diff --git a/dsh-web-restart.ps1 b/dsh-web-restart.ps1
+new file mode 100644
+index 0000000000000000000000000000000000000000..6d0870a7835359ad1b03b8dabed4dab5f4f55f19
+--- /dev/null
++++ b/dsh-web-restart.ps1
+@@ -0,0 +1,199 @@
++# Restart the DSH web host (0.1.5 checkout) through a one-shot Scheduled Task.
++#
++# The worker is registered BEFORE the old host is stopped, so the command that
++# requested the restart survives the node process it replaces. Windows owns the
++# worker independently of the Host process.
++#
++# 0.1.5 differences from the 0.1.1 script this replaces:
++#   - readiness cannot be "HTTP 200 + /api/host.describe": the index route and
++#     every /api endpoint answer 401 unless the request carries the session
++#     cookie minted from the launch token. Readiness is therefore "the HTTP
++#     layer answers at all (401 expected) and /api responds (401 = the fence and
++#     the API route are mounted)".
++#   - the browser cannot simply open http://127.0.0.1:<port>/ (401). The worker
++#     reads the fresh `?token=` URL out of dsh-web.log, which the host launcher
++#     drains node's stdout into.
++#
++# Keep this file ASCII-only so it parses under Windows PowerShell 5.1.
++[CmdletBinding()]
++param(
++  [int]$Port = 0,
++  [int]$TimeoutSeconds = 90,
++  [switch]$Worker,
++  [switch]$NoBrowser,
++  [string]$TaskName
++)
++
++$ErrorActionPreference = 'Stop'
++$RepoRoot = 'C:\Users\19161\deepseek-harness-next'
++$StartCmd = Join-Path $RepoRoot 'start-dsh-web.cmd'
++$Log = Join-Path $RepoRoot 'dsh-restart-verify.log'
++$HostLog = Join-Path $RepoRoot 'dsh-web.log'
++$ServiceConfig = Join-Path $RepoRoot 'dsh-web-service.json'
++
++function Read-Service {
++  if (-not (Test-Path -LiteralPath $ServiceConfig -PathType Leaf)) { return $null }
++  return (Get-Content -LiteralPath $ServiceConfig -Raw | ConvertFrom-Json)
++}
++
++$service = Read-Service
++if ($Port -le 0) {
++  $Port = if ($null -ne $service) { [int]$service.port } else { 3080 }
++}
++$ProfileName = if ($null -ne $service) { [string]$service.profile } else { 'web' }
++$Url = "http://127.0.0.1:$Port/"
++
++function Write-Log {
++  param([string]$Message)
++  Add-Content -LiteralPath $Log -Value ("{0:yyyy-MM-dd HH:mm:ss} {1}" -f (Get-Date), $Message)
++}
++
++function Get-WebProcessIds {
++  $ids = @{}
++  Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
++    ForEach-Object { $ids[[int]$_.OwningProcess] = $true }
++  Get-CimInstance Win32_Process -Filter "Name='node.exe'" -ErrorAction SilentlyContinue |
++    Where-Object { $_.CommandLine -match ('(?i)(?:^|[\\/ ])lib[\\/]bin\.js.*--profile\s+' + [regex]::Escape($ProfileName) + '(?:\s|$)') } |
++    ForEach-Object { $ids[[int]$_.ProcessId] = $true }
++  return @($ids.Keys | ForEach-Object { [int]$_ })
++}
++
++function Wait-ListeningState {
++  param([bool]$Expected, [int]$Seconds = 20)
++  $deadline = (Get-Date).AddSeconds($Seconds)
++  do {
++    $listening = [bool](Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
++    if ($listening -eq $Expected) { return $true }
++    Start-Sleep -Milliseconds 250
++  } while ((Get-Date) -lt $deadline)
++  return $false
++}
++
++function Get-HttpStatus {
++  param([string]$Uri, [string]$Method = 'GET', [string]$Body = '')
++  try {
++    if ($Method -eq 'POST') {
++      $response = Invoke-WebRequest $Uri -Method Post -ContentType 'application/json' -Body $Body -UseBasicParsing -TimeoutSec 4
++    } else {
++      $response = Invoke-WebRequest $Uri -UseBasicParsing -TimeoutSec 4
++    }
++    return [int]$response.StatusCode
++  } catch {
++    $webResponse = $_.Exception.Response
++    if ($null -ne $webResponse) { return [int]$webResponse.StatusCode }
++    return -1
++  }
++}
++
++function Get-FreshTokenUrl {
++  # The host launcher rotates dsh-web.log per run, so the LAST token line in it
++  # belongs to the host we just started.
++  if (-not (Test-Path -LiteralPath $HostLog -PathType Leaf)) { return $null }
++  $matches = Select-String -LiteralPath $HostLog -Pattern 'http://127\.0\.0\.1:(\d+)/\?token=([A-Za-z0-9_\-]+)' -AllMatches
++  if ($null -eq $matches -or $matches.Count -eq 0) { return $null }
++  $last = $matches[$matches.Count - 1].Matches[0].Value
++  return $last
++}
++
++function Test-HostReady {
++  # 0.1.5: an unauthenticated index request answers 401 once the auth fence is
++  # live; an unauthenticated /api request answers 401 once the connection
++  # plugin has mounted the API route. Both must answer before the browser is
++  # handed the page (a 404 or no answer means the Loader is still composing).
++  $root = Get-HttpStatus -Uri $Url
++  if ($root -ne 401 -and $root -ne 200 -and $root -ne 303) { return $false }
++  $payload = '{"type":"client-request","rpcId":"restart-readiness-' + [guid]::NewGuid().ToString('N') + '","method":"settings/describe","payload":{}}'
++  $api = Get-HttpStatus -Uri ($Url.TrimEnd('/') + '/api/settings/describe') -Method POST -Body $payload
++  return ($api -eq 401 -or $api -eq 200)
++}
++
++function Register-RestartWorker {
++  param([string]$Name)
++  $launcher = Join-Path $RepoRoot 'dsh-web-restart-worker-launch.vbs'
++  if (-not (Test-Path -LiteralPath $launcher -PathType Leaf)) { throw "Restart worker launcher not found: $launcher" }
++  $actionArgs = '"' + $launcher + '" -TaskName "' + $Name + '" -Port ' + $Port + ' -TimeoutSeconds ' + $TimeoutSeconds
++  if ($NoBrowser) { $actionArgs += ' -NoBrowser' }
++  $action = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument $actionArgs
++  $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1)
++  $principal = New-ScheduledTaskPrincipal -UserId (([System.Security.Principal.WindowsIdentity]::GetCurrent()).Name) -LogonType Interactive -RunLevel Limited
++  Register-ScheduledTask -TaskName $Name -Action $action -Trigger $trigger -Principal $principal -Force | Out-Null
++  Start-ScheduledTask -TaskName $Name
++}
++
++function Unregister-RestartWorker {
++  param([string]$Name)
++  if ($Name) { try { Unregister-ScheduledTask -TaskName $Name -Confirm:$false -ErrorAction SilentlyContinue } catch {} }
++}
++
++if (-not $Worker) {
++  try {
++    if (-not (Test-Path -LiteralPath $StartCmd -PathType Leaf)) { throw "Start script not found: $StartCmd" }
++    if (-not $TaskName) { $TaskName = 'DSH Web Restart ' + ([guid]::NewGuid().ToString('N').Substring(0, 8)) }
++    Write-Log ("registering restart worker '{0}' (port={1} profile={2} browser={3})" -f $TaskName, $Port, $ProfileName, (-not $NoBrowser))
++    Register-RestartWorker -Name $TaskName
++    Write-Log 'restart worker scheduled; caller may safely continue while the host restarts'
++    exit 0
++  } catch {
++    $message = $_.Exception.Message
++    try { Write-Log ("=== DSH Web restart scheduling failed: {0} ===" -f $message) } catch {}
++    Write-Error $message
++    exit 1
++  }
++}
++
++try {
++  if (-not $TaskName) { throw 'Worker mode requires -TaskName.' }
++  Write-Log ("=== DSH Web restart worker begin ({0}) ===" -f $TaskName)
++  Start-Sleep -Seconds 3
++
++  foreach ($id in (Get-WebProcessIds)) {
++    $process = Get-Process -Id $id -ErrorAction SilentlyContinue
++    if ($process) {
++      Write-Log ("stopping PID {0} ({1})" -f $process.Id, $process.ProcessName)
++      Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
++    }
++  }
++  if (-not (Wait-ListeningState -Expected:$false -Seconds 20)) { throw "Port $Port is still listening after the old host was stopped." }
++
++  $psi = New-Object System.Diagnostics.ProcessStartInfo
++  $psi.FileName = Join-Path $env:WINDIR 'System32\cmd.exe'
++  $psi.Arguments = '/d /c call "' + $StartCmd + '"'
++  $psi.WorkingDirectory = $RepoRoot
++  $psi.UseShellExecute = $false
++  $psi.CreateNoWindow = $true
++  $child = [System.Diagnostics.Process]::Start($psi)
++  if (-not $child) { throw 'Failed to create the detached start process.' }
++  $childId = $child.Id
++  $child.Dispose()
++  Write-Log ("started detached cmd PID {0}" -f $childId)
++
++  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
++  do {
++    if (Test-HostReady) { break }
++    Start-Sleep -Milliseconds 500
++  } while ((Get-Date) -lt $deadline)
++  if (-not (Test-HostReady)) { throw "DSH did not answer HTTP on $Url within $TimeoutSeconds seconds." }
++
++  $newIds = Get-WebProcessIds
++  Write-Log ("Host readiness {0} (401 = auth fence live) + /api/settings/describe -> OK; host PID(s): {1}" -f $Url, (($newIds -join ', ')))
++
++  if (-not $NoBrowser) {
++    $tokenUrl = Get-FreshTokenUrl
++    if ($null -ne $tokenUrl) {
++      Start-Process $tokenUrl
++      Write-Log ("browser opened at {0}" -f ($tokenUrl -replace 'token=[A-Za-z0-9_\-]+', 'token=***'))
++    } else {
++      Start-Process $Url
++      Write-Log ("no token line found in {0}; opened {1} (paste the token printed by the host log)" -f $HostLog, $Url)
++    }
++  }
++  Write-Log '=== DSH Web restart worker end: success ==='
++  exit 0
++} catch {
++  $message = $_.Exception.Message
++  try { Write-Log ("=== DSH Web restart worker failed: {0} ===" -f $message) } catch {}
++  Write-Error $message
++  exit 1
++} finally {
++  Unregister-RestartWorker -Name $TaskName
++}
+diff --git a/dsh-web-service-launch.vbs b/dsh-web-service-launch.vbs
+new file mode 100644
+index 0000000000000000000000000000000000000000..c3490feee43da940c2cf291cf334ed0266b36923
+--- /dev/null
++++ b/dsh-web-service-launch.vbs
+@@ -0,0 +1,17 @@
++' DSH Web service launcher (0.1.5 checkout).
++' GUI-subsystem bootstrap: starts the built Node web host without creating a
++' visible cmd/PowerShell console window. The clipboard watcher and the native
++' drag bridge are owned elsewhere and are deliberately not started here.
++
++Option Explicit
++
++Dim shell, root, host
++Set shell = CreateObject("WScript.Shell")
++root = "C:\Users\19161\deepseek-harness-next"
++
++' Run the PowerShell wrapper that creates Node with CreateNoWindow and drains
++' stdout/stderr into dsh-web.log / dsh-web.err.log (the restart worker reads the
++' fresh tokenized URL from that log). SW_HIDE is applied at process creation, so
++' no console window can flash.
++host = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & root & "\dsh-web-host-launch.ps1"""
++shell.Run host, 0, False
+diff --git a/dsh-web-service.json b/dsh-web-service.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..8730c1c200708b6196da73b800afc1c6b0ff3b82
+--- /dev/null
++++ b/dsh-web-service.json
+@@ -0,0 +1,7 @@
++{
++  "profile": "web-next",
++  "port": 3081,
++  "openBrowser": true,
++  "node": "C:\\Users\\19161\\AppData\\Local\\Programs\\kimi-desktop\\resources\\resources\\runtime\\node.exe",
++  "_comment": "Single source of truth for the DSH Web service in THIS checkout. At cutover set profile=web and port=3080, then update the web-restart row in the profile's cordis.patch.yml to match."
++}
+diff --git a/packages/host/web-restart/README.md b/packages/host/web-restart/README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..3a32bc183013cd3bef4598d4c838a24dc23a2061
+--- /dev/null
++++ b/packages/host/web-restart/README.md
+@@ -0,0 +1,75 @@
++# @deepseek-ai/dsh-host-web-restart
++
++Web-host restart command for the dsh web profile. Provides a plugin-owned
++`/restart` command backed by the checkout's proven one-shot Scheduled Task
++worker.
++
++## What it does
++
++- Registers the human slash command `/restart` on every session.
++- On invocation it synchronously asks `dsh-web-restart.ps1` to register and
++  start a one-shot Windows Scheduled Task BEFORE the old Host is stopped.
++- Windows owns that worker independently of the Host process. It:
++  1. waits briefly,
++  2. stops the current web Host,
++  3. waits for port 3080 to release,
++  4. relaunches `start-dsh-web.cmd`,
++  5. waits for the root page and `/api/host.describe` readiness handshake,
++  6. reopens the browser once, and
++  7. unregisters itself.
++
++The configured `start-dsh-web.cmd` launches the Host with `--no-open`, so the
++Host itself does not race the worker to open a second browser window.
++
++The host's own session persistence and the "continue task" surface then behave
++exactly as after a script-driven restart.
++
++## Configuration
++
++Mount via the web profile's `cordis.patch.yml`:
++
++```yaml
++- insert:
++    - id: web-restart
++      name: '@deepseek-ai/dsh-host-web-restart'
++      config:
++        port: 3080
++        startCmd: C:\Users\19161\deepseek-harness\start-dsh-web.cmd
++        repoRoot: C:\Users\19161\deepseek-harness
++        verifyLog: C:\Users\19161\deepseek-harness\dsh-restart-verify.log
++        openBrowser: true
++```
++
++| Field | Default | Meaning |
++| --- | --- | --- |
++| `port` | `3080` | TCP port the web host listens on |
++| `startCmd` | required | absolute path to `start-dsh-web.cmd` |
++| `repoRoot` | required | working directory for relaunching the host |
++| `verifyLog` | absent | optional lifecycle log path |
++| `openBrowser` | `true` | reopen the browser after the host returns |
++| `stopSeconds` | `20` | seconds to wait for the old port to release |
++| `waitSeconds` | `60` | seconds to wait for the full Host readiness handshake |
++
++`startCmd` and `repoRoot` must point to the same checkout. The plugin uses the
++PowerShell scheduler script from `repoRoot`, so an external shortcut is not
++needed for `/restart`.
++
++## Layout
++
++- `src/index.ts` — plugin config, `/restart`, and Scheduled Task scheduler handoff.
++- `src/worker.ts` — retained restart/readiness helpers and tests; the installed
++  Windows command path uses `dsh-web-restart.ps1` for durable process ownership.
++- `tests/worker.spec.ts` — config and `netstat` parsing tests.
++
++## Building
++
++```sh
++pnpm exec tsc -b packages/host/web-restart
++pnpm --filter @deepseek-ai/dsh-host-web-restart bundle
++```
++
++Run tests:
++
++```sh
++pnpm exec vitest run packages/host/web-restart/tests/worker.spec.ts
++```
+diff --git a/packages/host/web-restart/package.json b/packages/host/web-restart/package.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..138eb52d441e38524e11f9719deca36c4eb3f0e2
+--- /dev/null
++++ b/packages/host/web-restart/package.json
+@@ -0,0 +1,46 @@
++{
++  "name": "@deepseek-ai/dsh-host-web-restart",
++  "description": "Web-host restart command and detached restart worker for the dsh web profile",
++  "version": "0.1.5-rc.2",
++  "publishConfig": {
++    "access": "public"
++  },
++  "repository": {
++    "type": "git",
++    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
++    "directory": "packages/host/web-restart"
++  },
++  "type": "module",
++  "main": "lib/index.js",
++  "types": "lib/types/index.d.ts",
++  "exports": {
++    ".": {
++      "types": "./lib/types/index.d.ts",
++      "default": "./lib/index.js"
++    },
++    "./worker": {
++      "types": "./lib/types/worker.d.ts",
++      "default": "./lib/worker.js"
++    },
++    "./src/*": "./src/*",
++    "./package.json": "./package.json"
++  },
++  "files": [
++    "lib/index.js",
++    "lib/worker.js",
++    "lib/types/**/*.d.ts"
++  ],
++  "license": "MIT",
++  "scripts": {
++    "bundle": "tsdown",
++    "watch": "tsdown --watch"
++  },
++  "peerDependencies": {
++    "@deepseek-ai/cordis": "workspace:^",
++    "@deepseek-ai/dsh-commands": "workspace:^"
++  },
++  "devDependencies": {
++    "@deepseek-ai/cordis": "workspace:^",
++    "@deepseek-ai/dsh-commands": "workspace:^"
++  }
++}
+diff --git a/packages/host/web-restart/src/index.ts b/packages/host/web-restart/src/index.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..38667eec2c060d45c4b321486f9970515017504c
+--- /dev/null
++++ b/packages/host/web-restart/src/index.ts
+@@ -0,0 +1,126 @@
++/**
++ * Web-host restart command for the dsh web profile.
++ *
++ * `/restart` delegates to the checkout's proven one-shot Scheduled Task
++ * scheduler. Windows owns that worker independently of the Host process, so it
++ * survives the process it stops, relaunches `start-dsh-web.cmd`, waits for the
++ * complete Host readiness handshake, and opens the browser once.
++ *
++ * @module @deepseek-ai/dsh-host-web-restart
++ */
++
++import { spawnSync } from 'node:child_process'
++import { existsSync } from 'node:fs'
++import { join } from 'node:path'
++import type { Context } from '@deepseek-ai/cordis'
++import type { CommandInvocation, CommandResult } from '@deepseek-ai/dsh-commands'
++
++export const name = 'web-restart'
++export const inject = ['commands'] as const
++
++/** Deployment configuration for the restart command. */
++export interface Config {
++  /** TCP port the web host listens on. */
++  readonly port: number
++  /** Absolute path to the command file that boots the host (start-dsh-web.cmd). */
++  readonly startCmd: string
++  /** Working directory for the restart worker (the checkout root). */
++  readonly repoRoot: string
++  /** Optional log file the worker appends its lifecycle to. */
++  readonly verifyLog?: string
++  /** Whether the worker reopens the browser after the host returns. */
++  readonly openBrowser?: boolean
++  /** Seconds to wait for the old host's port to release. */
++  readonly stopSeconds?: number
++  /** Seconds to wait for HTTP 200 after relaunch. */
++  readonly waitSeconds?: number
++}
++
++const USAGE = 'Usage: /restart (no arguments)'
++
++/** Validate the deployment config at the configuration boundary. */
++export function resolveConfig(value: Config | undefined): Required<Pick<Config, 'port' | 'startCmd' | 'repoRoot' | 'openBrowser'>> & Config {
++  const port = value?.port ?? 3080
++  const startCmd = value?.startCmd
++  const repoRoot = value?.repoRoot
++  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
++    throw new TypeError(`web-restart: port must be a valid TCP port, got ${String(port)}`)
++  }
++  if (typeof startCmd !== 'string' || startCmd.length === 0) {
++    throw new TypeError('web-restart: startCmd is required (absolute path to start-dsh-web.cmd)')
++  }
++  if (typeof repoRoot !== 'string' || repoRoot.length === 0) {
++    throw new TypeError('web-restart: repoRoot is required')
++  }
++  return {
++    port,
++    startCmd,
++    repoRoot,
++    openBrowser: value?.openBrowser ?? true,
++    ...(value?.verifyLog === undefined ? {} : { verifyLog: value.verifyLog }),
++    ...(value?.stopSeconds === undefined ? {} : { stopSeconds: value.stopSeconds }),
++    ...(value?.waitSeconds === undefined ? {} : { waitSeconds: value.waitSeconds }),
++  }
++}
++
++/** Schedule the proven Windows one-shot worker before this Host is stopped. */
++function schedule(config: Config): { kind: 'success'; text: string } {
++  if (!existsSync(config.startCmd)) {
++    throw new Error(`web-restart: start script not found: ${config.startCmd}`)
++  }
++  const restartScript = join(config.repoRoot, 'dsh-web-restart.ps1')
++  if (!existsSync(restartScript)) {
++    throw new Error(`web-restart: scheduler script not found: ${restartScript}`)
++  }
++  const args = [
++    '-NoProfile',
++    '-NonInteractive',
++    '-ExecutionPolicy',
++    'Bypass',
++    '-File',
++    restartScript,
++    '-Port',
++    String(config.port),
++    '-TimeoutSeconds',
++    String(config.waitSeconds ?? 60),
++  ]
++  if (config.openBrowser === false) args.push('-NoBrowser')
++  const result = spawnSync('powershell.exe', args, {
++    cwd: config.repoRoot,
++    windowsHide: true,
++    encoding: 'utf8',
++  })
++  if (result.error !== undefined) throw result.error
++  if (result.status !== 0) {
++    const detail = result.stderr.trim() || result.stdout.trim() || `exit code ${String(result.status)}`
++    throw new Error(`web-restart: failed to schedule Windows worker: ${detail}`)
++  }
++  return {
++    kind: 'success',
++    text: `Web host restart scheduled on port ${config.port}. The current process will stop;`
++      + ` Windows will relaunch the host${config.openBrowser ? ' and reopen the browser' : ''}.`,
++  }
++}
++
++/**
++ * Mount the `/restart` human command.
++ * @param ctx - context carrying the command registry.
++ * @param rawConfig - deployment configuration from the profile patch row.
++ */
++export function apply(ctx: Context, rawConfig?: Config): void {
++  const config = resolveConfig(rawConfig)
++  ctx.effect(function* () {
++    yield ctx.commands.register({
++      name: 'restart',
++      description: 'Restart the DSH web host (and reopen the browser)',
++      handler: (invocation: CommandInvocation): CommandResult => {
++        if (invocation.rawInput.trim().length > 0) return { kind: 'error', text: USAGE }
++        try {
++          return schedule(config)
++        } catch (error: unknown) {
++          return { kind: 'error', text: error instanceof Error ? error.message : String(error) }
++        }
++      },
++    })
++  }, 'web-restart lifecycle')
++}
+diff --git a/packages/host/web-restart/src/worker.ts b/packages/host/web-restart/src/worker.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..3ae7dc659aa12155c4fa81cf8877ed5d5fc72970
+--- /dev/null
++++ b/packages/host/web-restart/src/worker.ts
+@@ -0,0 +1,276 @@
++/**
++ * Detached web-host restart worker.
++ *
++ * Launched by the web-restart command as `node worker.js --config <json>`.
++ * The parent plugin process spawns this script detached BEFORE the old host is
++ * stopped, so the worker survives the process it replaces. It stops the port
++ * listener, relaunches `start-dsh-web.cmd`, waits for the HTTP layer to answer,
++ * reopens the browser (at the fresh tokenized URL, since 0.1.5 answers an
++ * unauthenticated index request with 401), and records the lifecycle in the
++ * verify log.
++ *
++ * @module @deepseek-ai/dsh-host-web-restart/worker
++ */
++
++import { execFile, spawn } from 'node:child_process'
++import { appendFile, readFile } from 'node:fs/promises'
++import { resolve } from 'node:path'
++import { fileURLToPath } from 'node:url'
++
++/** The worker's frozen configuration, carried verbatim from the command. */
++export interface RestartWorkerConfig {
++  readonly port: number
++  /** Absolute path to the command file that boots the host. */
++  readonly startCmd: string
++  /** Working directory for relaunching the host. */
++  readonly repoRoot: string
++  /** Optional log file the worker appends its lifecycle to. */
++  readonly verifyLog?: string
++  /** Whether to reopen the browser after the host returns. */
++  readonly openBrowser: boolean
++  /** Seconds to wait for the old host's port to release. */
++  readonly stopSeconds: number
++  /** Seconds to wait for the HTTP layer to answer after relaunch. */
++  readonly waitSeconds: number
++  /**
++   * Host launcher log the worker reads the fresh tokenized URL from.
++   * Defaults to `<repoRoot>/dsh-web.log`.
++   */
++  readonly hostLog?: string
++}
++
++const DEFAULT_STOP_SECONDS = 20
++const DEFAULT_WAIT_SECONDS = 60
++
++/** Parse and validate the `--config <json>` argument. */
++export function parseWorkerConfig(argv: readonly string[]): RestartWorkerConfig {
++  const flag = argv.indexOf('--config')
++  if (flag === -1) throw new Error('web-restart worker requires --config <json>')
++  const raw = argv[flag + 1]
++  if (raw === undefined) throw new Error('web-restart worker requires a --config value')
++  let value: Record<string, unknown>
++  try {
++    value = JSON.parse(raw) as Record<string, unknown>
++  } catch (error: unknown) {
++    throw new Error(`web-restart worker received invalid --config JSON: ${String(error)}`)
++  }
++  const port = value.port
++  const startCmd = value.startCmd
++  const repoRoot = value.repoRoot
++  if (!Number.isInteger(port) || (port as number) <= 0 || (port as number) > 65535) {
++    throw new Error(`web-restart worker: port must be a valid TCP port, got ${String(port)}`)
++  }
++  if (typeof startCmd !== 'string' || startCmd.length === 0) {
++    throw new Error('web-restart worker: startCmd is required')
++  }
++  if (typeof repoRoot !== 'string' || repoRoot.length === 0) {
++    throw new Error('web-restart worker: repoRoot is required')
++  }
++  return {
++    port: port as number,
++    startCmd,
++    repoRoot,
++    ...(typeof value.verifyLog === 'string' && value.verifyLog.length > 0 ? { verifyLog: value.verifyLog } : {}),
++    ...(typeof value.hostLog === 'string' && value.hostLog.length > 0 ? { hostLog: value.hostLog } : {}),
++    openBrowser: Boolean(value.openBrowser ?? true),
++    stopSeconds: Number(value.stopSeconds ?? DEFAULT_STOP_SECONDS),
++    waitSeconds: Number(value.waitSeconds ?? DEFAULT_WAIT_SECONDS),
++  }
++}
++
++/** Extract LISTENING owning PIDs for one port from `netstat -ano -p tcp` output. */
++export function listeningPidsFromNetstat(text: string, port: number): number[] {
++  const pids = new Set<number>()
++  for (const line of text.split(/\r?\n/)) {
++    const tokens = line.trim().split(/\s+/)
++    if (tokens.length < 5) continue
++    if (tokens[3] !== 'LISTENING') continue
++    const local = tokens[1]
++    if (local === undefined || !local.endsWith(`:${port}`)) continue
++    const pid = Number(tokens[4])
++    if (Number.isInteger(pid) && pid > 0) pids.add(pid)
++  }
++  return [...pids]
++}
++
++/** Whether `netstat -ano -p tcp` output still shows a listener on the port. */
++export function hasListener(text: string, port: number): boolean {
++  return text.split(/\r?\n/).some((line) => {
++    const tokens = line.trim().split(/\s+/)
++    if (tokens.length >= 5 && tokens[3] === 'LISTENING') {
++      const local = tokens[1]
++      if (local !== undefined && local.endsWith(`:${port}`)) return true
++    }
++    return false
++  })
++}
++
++const sleep = (ms: number): Promise<void> => new Promise(resolve => { setTimeout(resolve, ms) })
++
++/** One `netstat -ano -p tcp` run. */
++function runNetstat(): Promise<string> {
++  return new Promise((resolve, reject) => {
++    execFile('netstat', ['-ano', '-p', 'tcp'], { windowsHide: true }, (error, stdout) => {
++      if (error !== null) reject(error)
++      else resolve(stdout)
++    })
++  })
++}
++
++/** Stop every process listening on the port. */
++async function stopListener(port: number): Promise<number> {
++  const pids = listeningPidsFromNetstat(await runNetstat(), port)
++  for (const pid of pids) {
++    await new Promise<void>((resolve) => {
++      execFile('taskkill', ['/F', '/PID', String(pid)], { windowsHide: true }, () => { resolve() })
++    })
++  }
++  return pids.length
++}
++
++/** Poll until the port stops (or starts) listening. */
++async function waitForPort(port: number, listening: boolean, seconds: number): Promise<boolean> {
++  const deadline = Date.now() + seconds * 1000
++  while (Date.now() < deadline) {
++    const current = hasListener(await runNetstat(), port)
++    if (current === listening) return true
++    await sleep(250)
++  }
++  return false
++}
++
++/**
++ * Poll the index route and one /api endpoint until the browser can connect.
++ *
++ * 0.1.5 authenticates every index and /api request: without the session cookie
++ * minted from the launch token both answer 401. That 401 is itself the
++ * readiness proof this worker needs — an HTTP answer means the web server is
++ * bound, and a 401 from `/api/settings/describe` means the connection plugin
++ * mounted the API route and its request fence, which is what a browser needs
++ * before it can load the shell. A 404 or a transport failure means the Loader
++ * is still composing.
++ */
++export async function isHostReady(port: number): Promise<boolean> {
++  const root = `http://127.0.0.1:${port}/`
++  const describe = `http://127.0.0.1:${port}/api/settings/describe`
++  try {
++    const page = await fetch(root)
++    if (page.status !== 200 && page.status !== 303 && page.status !== 401) return false
++    const response = await fetch(describe, {
++      method: 'POST',
++      headers: { 'content-type': 'application/json' },
++      body: JSON.stringify({
++        type: 'client-request',
++        rpcId: `restart-readiness-${Date.now()}-${Math.random().toString(36).slice(2)}`,
++        method: 'settings/describe',
++        payload: {},
++      }),
++    })
++    return response.status === 401 || response.status === 200
++  } catch {
++    return false
++  }
++}
++
++/**
++ * Read the newest `?token=` URL the host printed into its launcher log. The
++ * launcher rotates that log per run, so the last line belongs to this host; an
++ * unauthenticated browser would only ever see 401, which is why the worker
++ * opens the tokenized URL instead of the bare origin.
++ * @param hostLog - absolute path of the launcher log (undefined disables the read).
++ * @returns the tokenized URL, or undefined when the log has no token line yet.
++ */
++export async function readTokenUrl(hostLog: string | undefined): Promise<string | undefined> {
++  if (hostLog === undefined) return undefined
++  try {
++    const text = await readFile(hostLog, 'utf8')
++    const matches = [...text.matchAll(/http:\/\/127\.0\.0\.1:\d+\/\?token=[A-Za-z0-9_-]+/g)]
++    return matches.at(-1)?.[0]
++  } catch {
++    return undefined
++  }
++}
++
++/** Poll until the browser-facing Host handshake is ready. */
++async function waitForHttp(port: number, seconds: number): Promise<boolean> {
++  const deadline = Date.now() + seconds * 1000
++  while (Date.now() < deadline) {
++    if (await isHostReady(port)) return true
++    await sleep(500)
++  }
++  return false
++}
++
++/** Open the URL with the OS default browser. */
++function openBrowser(url: string): void {
++  execFile('cmd.exe', ['/c', 'start', '', url], { windowsHide: true }, () => {})
++}
++
++/** Append one timestamped lifecycle line to the verify log, when configured. */
++async function writeLog(verifyLog: string | undefined, message: string): Promise<void> {
++  if (verifyLog === undefined) return
++  const stamp = new Date().toISOString().replace('T', ' ').slice(0, 19)
++  await appendFile(verifyLog, `${stamp} ${message}\n`).catch(() => {})
++}
++
++/** The worker entry point. */
++async function main(): Promise<void> {
++  let config: RestartWorkerConfig
++  try {
++    config = parseWorkerConfig(process.argv)
++  } catch (error: unknown) {
++    console.error(error instanceof Error ? error.message : String(error))
++    process.exit(2)
++  }
++
++  await writeLog(config.verifyLog, '=== DSH Web restart worker begin ===')
++  await sleep(1500)
++
++  const stopped = await stopListener(config.port)
++  await writeLog(config.verifyLog, `stopped ${stopped} listener process(es) on port ${config.port}`)
++  if (!(await waitForPort(config.port, false, config.stopSeconds))) {
++    await writeLog(config.verifyLog, `port ${config.port} still listening after ${config.stopSeconds}s; aborting`)
++    process.exit(1)
++  }
++
++  const child = spawn('cmd.exe', ['/d', '/c', 'call', `"${config.startCmd}"`], {
++    cwd: config.repoRoot,
++    detached: true,
++    stdio: 'ignore',
++    windowsHide: true,
++  })
++  child.unref()
++  await writeLog(config.verifyLog, `started detached host via ${config.startCmd}`)
++
++  if (!(await waitForHttp(config.port, config.waitSeconds))) {
++    await writeLog(config.verifyLog, `host did not answer HTTP on port ${config.port} within ${config.waitSeconds}s`)
++    process.exit(1)
++  }
++  await writeLog(config.verifyLog, `Host readiness http://127.0.0.1:${config.port}/ (401 = auth fence) + /api/settings/describe -> OK`)
++
++  if (config.openBrowser) {
++    const tokenUrl = await readTokenUrl(config.hostLog ?? `${config.repoRoot}/dsh-web.log`)
++    if (tokenUrl !== undefined) {
++      openBrowser(tokenUrl)
++      await writeLog(config.verifyLog, `browser opened at ${tokenUrl.replace(/token=[A-Za-z0-9_-]+/, 'token=***')}`)
++    } else {
++      openBrowser(`http://127.0.0.1:${config.port}/`)
++      await writeLog(config.verifyLog, `no token line in the host log yet; opened http://127.0.0.1:${config.port}/`)
++    }
++  }
++  await writeLog(config.verifyLog, '=== DSH Web restart worker end: success ===')
++  process.exit(0)
++}
++
++/** Run as the worker entry only when invoked directly (`node worker.js ...`). */
++const isDirectRun = ((): boolean => {
++  const invoked = process.argv[1]
++  if (invoked === undefined) return false
++  try {
++    return resolve(invoked).toLowerCase() === resolve(fileURLToPath(import.meta.url)).toLowerCase()
++  } catch {
++    return false
++  }
++})()
++
++if (isDirectRun) void main()
+diff --git a/packages/host/web-restart/tests/worker.spec.ts b/packages/host/web-restart/tests/worker.spec.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..dc168f198ed7982df713c8b8e926dd2aa98fa153
+--- /dev/null
++++ b/packages/host/web-restart/tests/worker.spec.ts
+@@ -0,0 +1,74 @@
++import { describe, expect, it } from 'vitest'
++import {
++  hasListener, listeningPidsFromNetstat, parseWorkerConfig,
++} from '../src/worker.ts'
++
++const NETSTAT_SAMPLE = [
++  'Active Connections',
++  '',
++  '  Proto  Local Address          Foreign Address        State           PID',
++  '  TCP    127.0.0.1:3080         0.0.0.0:0              LISTENING       4012',
++  '  TCP    127.0.0.1:3080         127.0.0.1:51342        ESTABLISHED     4012',
++  '  TCP    127.0.0.1:3081         0.0.0.0:0              LISTENING       5123',
++  '  TCP    [::1]:3080             [::]:0                 LISTENING       6123',
++  '  TCP    0.0.0.0:445            0.0.0.0:0              LISTENING       4',
++].join('\n')
++
++describe('parseWorkerConfig', () => {
++  it('parses a complete config from --config JSON', () => {
++    const config = parseWorkerConfig([
++      'node', 'worker.js', '--config',
++      JSON.stringify({
++        port: 3080,
++        startCmd: 'C:\\start-dsh-web.cmd',
++        repoRoot: 'C:\\repo',
++        verifyLog: 'C:\\verify.log',
++        openBrowser: false,
++      }),
++    ])
++    expect(config).toEqual({
++      port: 3080,
++      startCmd: 'C:\\start-dsh-web.cmd',
++      repoRoot: 'C:\\repo',
++      verifyLog: 'C:\\verify.log',
++      openBrowser: false,
++      stopSeconds: 20,
++      waitSeconds: 60,
++    })
++  })
++
++  it('applies defaults for optional fields', () => {
++    const config = parseWorkerConfig([
++      'node', 'worker.js', '--config',
++      JSON.stringify({ port: 3080, startCmd: 'start.cmd', repoRoot: '.' }),
++    ])
++    expect(config.openBrowser).toBe(true)
++    expect(config.stopSeconds).toBe(20)
++    expect(config.waitSeconds).toBe(60)
++    expect(config.verifyLog).toBeUndefined()
++  })
++
++  it('rejects missing, malformed, or invalid configs', () => {
++    expect(() => parseWorkerConfig(['node', 'worker.js'])).toThrow(/--config/)
++    expect(() => parseWorkerConfig(['node', 'worker.js', '--config', '{bad'])).toThrow(/invalid --config/)
++    expect(() => parseWorkerConfig(['node', 'worker.js', '--config', '{"port":70000}'])).toThrow(/port/)
++    expect(() => parseWorkerConfig(['node', 'worker.js', '--config', '{"port":3080}'])).toThrow(/startCmd/)
++    expect(() => parseWorkerConfig([
++      'node', 'worker.js', '--config', '{"port":3080,"startCmd":"x"}',
++    ])).toThrow(/repoRoot/)
++  })
++})
++
++describe('netstat parsing', () => {
++  it('extracts only LISTENING owners of the exact port', () => {
++    expect(listeningPidsFromNetstat(NETSTAT_SAMPLE, 3080)).toEqual([4012, 6123])
++    expect(listeningPidsFromNetstat(NETSTAT_SAMPLE, 3081)).toEqual([5123])
++    expect(listeningPidsFromNetstat(NETSTAT_SAMPLE, 445)).toEqual([4])
++    expect(listeningPidsFromNetstat(NETSTAT_SAMPLE, 9999)).toEqual([])
++  })
++
++  it('detects whether a listener remains', () => {
++    expect(hasListener(NETSTAT_SAMPLE, 3080)).toBe(true)
++    expect(hasListener('', 3080)).toBe(false)
++  })
++})
+diff --git a/packages/host/web-restart/tsconfig.json b/packages/host/web-restart/tsconfig.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..39c75e2c78c960fa66808ac68b7ba2311e882e76
+--- /dev/null
++++ b/packages/host/web-restart/tsconfig.json
+@@ -0,0 +1,18 @@
++{
++  "extends": "../../../tsconfig.base.json",
++  "compilerOptions": {
++    "rootDir": "src",
++    "outDir": "lib/types"
++  },
++  "include": [
++    "src"
++  ],
++  "references": [
++    {
++      "path": "../../../vendor/cordis"
++    },
++    {
++      "path": "../../interaction/commands"
++    }
++  ]
++}
+diff --git a/packages/host/web-restart/tsdown.config.ts b/packages/host/web-restart/tsdown.config.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..d342a4f2724a8cb348f7da6c161d480888399826
+--- /dev/null
++++ b/packages/host/web-restart/tsdown.config.ts
+@@ -0,0 +1,12 @@
++import { defineConfig } from 'tsdown'
++
++export default defineConfig({
++  entry: ['lib/types/{index,worker}.js'],
++  outDir: 'lib',
++  format: ['esm'],
++  platform: 'node',
++  target: 'es2024',
++  fixedExtension: false,
++  dts: false,
++  clean: false,
++})
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index be1647c24bbdb3d70d022e0c296e173e0025ddd8..f7e108af2c3ec29cf53a7f43909224ef1046e2d5 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -1986,7 +1986,7 @@ importers:
+         version: 15.0.0
+       open:
+         specifier: ^11.0.0
+-        version: 11.0.0
++        version: 11.0.2
+     devDependencies:
+       '@deepseek-ai/cordis':
+         specifier: workspace:^
+@@ -3446,7 +3446,7 @@ importers:
+         version: 18.3.7(@types/react@18.3.31)
+       '@types/use-sync-external-store':
+         specifier: ^1.5.0
+-        version: 1.5.0
++        version: 1.7.0
+       react:
+         specifier: ^18.2.0
+         version: 18.3.1
+@@ -6697,6 +6697,15 @@ importers:
+         specifier: workspace:^
+         version: link:../../typert/protocol
+ 
++  packages/host/web-restart:
++    devDependencies:
++      '@deepseek-ai/cordis':
++        specifier: workspace:^
++        version: link:../../../vendor/cordis
++      '@deepseek-ai/dsh-commands':
++        specifier: workspace:^
++        version: link:../../interaction/commands
++
+   packages/host/webserver:
+     dependencies:
+       '@deepseek-ai/schemastery':
+@@ -6707,7 +6716,7 @@ importers:
+         version: 1.8.1(supports-color@9.4.0)
+       negotiator:
+         specifier: ^1.0.0
+-        version: 1.0.0
++        version: 1.1.0
+     devDependencies:
+       '@deepseek-ai/cordis':
+         specifier: workspace:^
+@@ -14213,8 +14222,8 @@ packages:
+   '@types/unist@3.0.3':
+     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
+ 
+-  '@types/use-sync-external-store@1.5.0':
+-    resolution: {integrity: sha512-5dyB8nLC/qogMrlCizZnYWQTA4lnb/v+It+sqNl5YnSRAPMlIqY/X0Xn+gZw8vOL+TgTTr28VEbn3uf8fUtAkw==}
++  '@types/use-sync-external-store@1.7.0':
++    resolution: {integrity: sha512-v8435kzWm3FuxyUa4r8o4sG6b0D+r+uOrzF5MXHxZKW4Haoo6txu/lq56Vio45e2i1nkmFPA+R7myWcmV7Z7Bg==}
+ 
+   '@types/web-bluetooth@0.0.21':
+     resolution: {integrity: sha512-oIQLCGWtcFZy2JW77j9k8nHzAOpqMHLQejDA48XXMWH6tjCQHz5RCFz1bzsmROyL6PUm+LLnUiI4BCn221inxA==}
+@@ -14886,6 +14895,10 @@ packages:
+     resolution: {integrity: sha512-j/O/d7GcZCyNl7/hwZAb606rzqkyvaDctLmckbxLzHvFBzTJHuGEdodATcP3yIRoDrLHkIATJuvzbFlp/ki2cQ==}
+     engines: {node: '>=18'}
+ 
++  content-type@2.1.0:
++    resolution: {integrity: sha512-mj7UPXE0jaqaOsukNZRUEfEi2AcL7C/vwmwcHV0O97eO1E1pxBZuyjlZrx5seTaNBg1U6+o35wpa35Qfcc+7ag==}
++    engines: {node: '>=18'}
++
+   convert-source-map@2.0.0:
+     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
+ 
+@@ -15137,8 +15150,8 @@ packages:
+     resolution: {integrity: sha512-x1VCxdX4t+8wVfd1so/9w+vQ4vx7lKd2Qp5tDRutErwmR85OgmfX7RlLRMWafRMY7hbEiXIbudNrjOAPa/hL8Q==}
+     engines: {node: '>=18'}
+ 
+-  default-browser@5.5.0:
+-    resolution: {integrity: sha512-H9LMLr5zwIbSxrmvikGuI/5KGhZ8E2zH3stkMgM5LpOWDutGM2JZaj460Udnf1a+946zc7YBgrqEWwbk7zHvGw==}
++  default-browser@5.5.1:
++    resolution: {integrity: sha512-m1pAzaJgZ/gssEqlOhJkPJp8Xly7QyW6xcrkUa2KKcDeDSEMP7X8xipU3snUcfisTQx0w1AGae+9UtJSfVnXGw==}
+     engines: {node: '>=18'}
+ 
+   defer-to-connect@2.0.1:
+@@ -15696,9 +15709,13 @@ packages:
+     deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
+     hasBin: true
+ 
++  glob@7.2.0:
++    resolution: {integrity: sha512-lmLf6gtyrPq8tTjSmrO94wBeQbFR3HbLHbuyD69wuyQkImp2hWqMGB47OX65FBkPffO641IP9jWa1z4ivqG26Q==}
++    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
++
+   glob@7.2.3:
+     resolution: {integrity: sha512-nFR0zLpU2YCaRxwoCJvL6UvCH2JFyFVIvwTLsIf21AuHlMskA1hhTdk+LlYJtOlYt9v6dvszD2BGRqBL+iQK9Q==}
+-    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
++    deprecated: Glob versions prior to v9 are no longer supported
+ 
+   global-agent@3.0.0:
+     resolution: {integrity: sha512-PT6XReJ+D07JvGoxQMkT6qji/jVNfX/h364XHZOWeRzy64sSFr+xJ5OX7LI3b4MPQzdL4H8Y8M0xzPpsVMwA8Q==}
+@@ -16407,8 +16424,8 @@ packages:
+   mdn-data@2.27.1:
+     resolution: {integrity: sha512-9Yubnt3e8A0OKwxYSXyhLymGW4sCufcLG6VdiDdUGVkPhpqLxlvP5vl1983gQjJl3tqbrM731mjaZaP68AgosQ==}
+ 
+-  media-typer@1.1.0:
+-    resolution: {integrity: sha512-aisnrDP4GNe06UcKFnV5bfMNPBUw4jsLGaWwWfnH3v02GnBuXX2MCVn5RbrWo0j3pczUilYblq7fQ7Nw2t5XKw==}
++  media-typer@1.1.1:
++    resolution: {integrity: sha512-yz3xRaG20c6/BOzvYoDaGtPmGscs7YivItZEEqe6GbwNfHuxu9YNmvnEkMzKldAGY4/80pRcQRZSEnhquk9XuQ==}
+     engines: {node: '>= 0.8'}
+ 
+   merge-descriptors@2.0.0:
+@@ -16613,9 +16630,9 @@ packages:
+     resolution: {integrity: sha512-myRT3DiWPHqho5PrJaIRyaMv2kgYf0mUVgBNOYMuCH5Ki1yEiQaf/ZJuQ62nvpc44wL5WDbTX7yGJi1Neevw8w==}
+     engines: {node: '>= 0.6'}
+ 
+-  negotiator@1.0.0:
+-    resolution: {integrity: sha512-8Ofs/AUQh8MaEcrlq5xOX0CQ9ypTF5dl78mjlMNfOK08fzpgTHQRQPBxcPlEtIw0yRpws+Zo/3r+5WRby7u3Gg==}
+-    engines: {node: '>= 0.6'}
++  negotiator@1.1.0:
++    resolution: {integrity: sha512-NMPBRMJgiQHjbd8phG3Vebdx4kZ1H121rbl5IkMqeOsahptB9BKo/d7oJ3zTXqTgagn2bWlNSXkh0QUGM31RYg==}
++    engines: {node: '>=18'}
+ 
+   node-abi@3.96.0:
+     resolution: {integrity: sha512-rebQ/lz7i0EkoLzUVSrKRzA69zMkwLp95kKMWoMDkkM00Suxz0D7zEQPwRml5fQum24mj7bPvmlgLAmu2JCiYg==}
+@@ -16763,8 +16780,8 @@ packages:
+   oniguruma-to-es@4.3.6:
+     resolution: {integrity: sha512-csuQ9x3Yr0cEIs/Zgx/OEt9iBw9vqIunAPQkx19R/fiMq2oGVTgcMqO/V3Ybqefr1TBvosI6jU539ksaBULJyA==}
+ 
+-  open@11.0.0:
+-    resolution: {integrity: sha512-smsWv2LzFjP03xmvFoJ331ss6h+jixfA4UUV/Bsiyuu4YJPfN+FIQGOIiv4w9/+MoHkfkJ22UIaQWRVFRfH6Vw==}
++  open@11.0.2:
++    resolution: {integrity: sha512-RWqF+pBSkqecEvCKOn8QYhaNdRMJDZRIrlS/7rTDdLHaPcfXGCZ/h8zb413NfvdeAV0MR7T1yJcA34/q+CSm1Q==}
+     engines: {node: '>=20'}
+ 
+   openai@6.40.0:
+@@ -16965,6 +16982,10 @@ packages:
+     resolution: {integrity: sha512-dM0jVuXJPsDN6DvRpea484tCUaMiXWjuCn++HGTqUWzGDjv5tZkEZldAJ/UMlqRYGFrD/etByo4/xOuC/snX2A==}
+     engines: {node: '>=20'}
+ 
++  powershell-utils@0.2.1:
++    resolution: {integrity: sha512-C+y9x90UElAddDZmV4qOx9W53B61PO7cIqWz2dQsWlwswuq4mr8NEwytdGKboYbQlGZ3awrkTeNvcZiZNHnQ8A==}
++    engines: {node: '>=20'}
++
+   preact@10.29.7:
+     resolution: {integrity: sha512-DCHYrK/B10yUD3ZjLfhZ3WIE/9Vf9VFUODcRE2dRomTYDpJk6z6L9wecSfhfE6M9ZTHUdyQkoC46arIDhEV84Q==}
+     peerDependencies:
+@@ -18069,8 +18090,8 @@ packages:
+       utf-8-validate:
+         optional: true
+ 
+-  wsl-utils@0.3.1:
+-    resolution: {integrity: sha512-g/eziiSUNBSsdDJtCLB8bdYEUMj4jR7AGeUo96p/3dTafgjHhpF4RiCFPiRILwjQoDXx5MqkBr4fwWtR3Ky4Wg==}
++  wsl-utils@1.0.0:
++    resolution: {integrity: sha512-Hl0ZOAs672vg+06kfujwRhoS6/jehvULrlFkuF2dRu6pHgA8U06h3xqNIqNNU1LTXPcedxByAR4GS6pwQK0mgA==}
+     engines: {node: '>=20'}
+ 
+   xml-name-validator@5.0.0:
+@@ -20786,7 +20807,7 @@ snapshots:
+ 
+   '@types/unist@3.0.3': {}
+ 
+-  '@types/use-sync-external-store@1.5.0': {}
++  '@types/use-sync-external-store@1.7.0': {}
+ 
+   '@types/web-bluetooth@0.0.21': {}
+ 
+@@ -21108,7 +21129,7 @@ snapshots:
+   accepts@2.0.0:
+     dependencies:
+       mime-types: 3.0.2
+-      negotiator: 1.0.0
++      negotiator: 1.1.0
+ 
+   acorn-jsx@5.3.2(acorn@8.17.0):
+     dependencies:
+@@ -21541,6 +21562,8 @@ snapshots:
+ 
+   content-type@2.0.0: {}
+ 
++  content-type@2.1.0: {}
++
+   convert-source-map@2.0.0: {}
+ 
+   cookie-signature@1.2.2: {}
+@@ -21807,7 +21830,7 @@ snapshots:
+ 
+   default-browser-id@5.0.1: {}
+ 
+-  default-browser@5.5.0:
++  default-browser@5.5.1:
+     dependencies:
+       bundle-name: 4.1.0
+       default-browser-id: 5.0.1
+@@ -22559,6 +22582,15 @@ snapshots:
+       package-json-from-dist: 1.0.1
+       path-scurry: 2.0.2
+ 
++  glob@7.2.0:
++    dependencies:
++      fs.realpath: 1.0.0
++      inflight: 1.0.6
++      inherits: 2.0.4
++      minimatch: 3.1.5
++      once: 1.4.0
++      path-is-absolute: 1.0.1
++
+   glob@7.2.3:
+     dependencies:
+       fs.realpath: 1.0.0
+@@ -23332,7 +23364,7 @@ snapshots:
+ 
+   mdn-data@2.27.1: {}
+ 
+-  media-typer@1.1.0: {}
++  media-typer@1.1.1: {}
+ 
+   merge-descriptors@2.0.0: {}
+ 
+@@ -23650,7 +23682,9 @@ snapshots:
+ 
+   negotiator@0.6.4: {}
+ 
+-  negotiator@1.0.0: {}
++  negotiator@1.1.0:
++    dependencies:
++      content-type: 2.1.0
+ 
+   node-abi@3.96.0:
+     dependencies:
+@@ -23796,14 +23830,14 @@ snapshots:
+       regex: 6.1.0
+       regex-recursion: 6.0.2
+ 
+-  open@11.0.0:
++  open@11.0.2:
+     dependencies:
+-      default-browser: 5.5.0
++      default-browser: 5.5.1
+       define-lazy-prop: 3.0.0
+       is-in-ssh: 1.0.0
+       is-inside-container: 1.0.0
+-      powershell-utils: 0.1.0
+-      wsl-utils: 0.3.1
++      powershell-utils: 0.2.1
++      wsl-utils: 1.0.0
+ 
+   openai@6.40.0(ws@8.21.0)(zod@4.4.3):
+     optionalDependencies:
+@@ -24010,6 +24044,8 @@ snapshots:
+ 
+   powershell-utils@0.1.0: {}
+ 
++  powershell-utils@0.2.1: {}
++
+   preact@10.29.7: {}
+ 
+   prebuild-install@7.1.3:
+@@ -24228,7 +24264,7 @@ snapshots:
+ 
+   rimraf@2.6.3:
+     dependencies:
+-      glob: 7.2.3
++      glob: 7.2.0
+ 
+   roarr@2.15.4:
+     dependencies:
+@@ -24839,7 +24875,7 @@ snapshots:
+   type-is@2.1.0:
+     dependencies:
+       content-type: 2.0.0
+-      media-typer: 1.1.0
++      media-typer: 1.1.1
+       mime-types: 3.0.2
+ 
+   typebox@1.3.7: {}
+@@ -25260,7 +25296,7 @@ snapshots:
+ 
+   ws@8.21.0: {}
+ 
+-  wsl-utils@0.3.1:
++  wsl-utils@1.0.0:
+     dependencies:
+       is-wsl: 3.1.1
+       powershell-utils: 0.1.0
+diff --git a/restart-dsh-web.ps1 b/restart-dsh-web.ps1
+new file mode 100644
+index 0000000000000000000000000000000000000000..5cf840977a61ba247a6a7e44196c281561004559
+--- /dev/null
++++ b/restart-dsh-web.ps1
+@@ -0,0 +1,4 @@
++# Compatibility entry point for the DSH web restart command (0.1.5 checkout).
++# Keep one implementation so callers cannot drift into different behavior.
++& (Join-Path $PSScriptRoot 'dsh-web-restart.ps1') @args
++exit $LASTEXITCODE
+diff --git a/start-dsh-web.cmd b/start-dsh-web.cmd
+new file mode 100644
+index 0000000000000000000000000000000000000000..74a98cd953732113250794cfe1ebf29f9ab67694
+--- /dev/null
++++ b/start-dsh-web.cmd
+@@ -0,0 +1,7 @@
++@echo off
++rem GUI-subsystem bootstrap for THIS checkout (0.1.5): the VBS launcher starts
++rem the built Host with hidden process creation, so no console window appears.
++rem The Host is launched with --no-open; browser opening is owned by the outer
++rem launcher or the restart worker, exactly once.
++wscript.exe "C:\Users\19161\deepseek-harness-next\dsh-web-service-launch.vbs"
++exit /b 0

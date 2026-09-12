@@ -1,0 +1,690 @@
+diff --git a/packages/bundle/web-app/cordis.patch.yml b/packages/bundle/web-app/cordis.patch.yml
+index cf4603031f6f452891a4d7da420869b6472fb333..6e411274428cd8d5fa3d19275ae7edbf3fa5ddb8 100644
+--- a/packages/bundle/web-app/cordis.patch.yml
++++ b/packages/bundle/web-app/cordis.patch.yml
+@@ -254,6 +254,11 @@
+ 
+     - id: ui-chat
+       name: '@deepseek-ai/dsh-client-ui-chat'
++    # Interrupted-turn recovery affordance, independently removable from chat:
++    # offers one user-confirmed continuation for a Turn whose durable closer
++    # says `interrupted` (crash-orphaned turn closed by agent-loop resume).
++    - id: ui-turn-recovery
++      name: '@deepseek-ai/dsh-client-ui-turn-recovery'
+ 
+     # Official occupants for the generic sidebar and conversation brand slots.
+     - id: ui-brand-official
+diff --git a/packages/client/ui-turn-recovery/package.json b/packages/client/ui-turn-recovery/package.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..d580534cc4528fb9241c9f23c6c4522df364026e
+--- /dev/null
++++ b/packages/client/ui-turn-recovery/package.json
+@@ -0,0 +1,73 @@
++{
++  "name": "@deepseek-ai/dsh-client-ui-turn-recovery",
++  "description": "Interrupted-turn continuation presentation plugin",
++  "version": "0.1.5-rc.2",
++  "publishConfig": {
++    "access": "public"
++  },
++  "repository": {
++    "type": "git",
++    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
++    "directory": "packages/client/ui-turn-recovery"
++  },
++  "type": "module",
++  "main": "lib/index.js",
++  "types": "lib/types/index.d.ts",
++  "exports": {
++    ".": {
++      "types": "./lib/types/index.d.ts",
++      "default": "./lib/index.js"
++    },
++    "./invariant": {
++      "types": "./lib/types/invariant.d.ts",
++      "default": "./lib/invariant.js"
++    },
++    "./client": {
++      "types": "./lib/types/client/index.d.ts",
++      "default": "./lib/client.js"
++    },
++    "./src/*": "./src/*",
++    "./package.json": "./package.json"
++  },
++  "dsh": {
++    "client": {
++      "inject": [
++        "@deepseek-ai/dsh-client-locale",
++        "@deepseek-ai/dsh-client-ui-chat",
++        "@deepseek-ai/dsh-client-ui-conversation",
++        "@deepseek-ai/dsh-client-ui-renderer"
++      ],
++      "platform": "web"
++    }
++  },
++  "scripts": {
++    "bundle": "tsdown",
++    "watch": "tsdown --watch"
++  },
++  "license": "MIT",
++  "dependencies": {},
++  "devDependencies": {
++    "@deepseek-ai/cordis": "workspace:^",
++    "@deepseek-ai/dsh-api-session-controller": "workspace:^",
++    "@deepseek-ai/dsh-client-locale": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-chat": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-conversation": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-primitives": "workspace:^",
++    "@deepseek-ai/dsh-client-ui-slots": "workspace:^",
++    "@deepseek-ai/dsh-session": "workspace:^",
++    "@types/react": "~18.3.1",
++    "@types/react-dom": "~18.3.0",
++    "react": "^18.2.0",
++    "react-dom": "^18.2.0",
++    "@deepseek-ai/dsh-client-ui-renderer": "workspace:^"
++  },
++  "files": [
++    "lib/index.js",
++    "lib/invariant.js",
++    "lib/client.js",
++    "lib/types/**/*.d.ts"
++  ],
++  "peerDependencies": {
++    "@deepseek-ai/cordis": "workspace:^"
++  }
++}
+diff --git a/packages/client/ui-turn-recovery/src/client/ContinuePanel.module.css b/packages/client/ui-turn-recovery/src/client/ContinuePanel.module.css
+new file mode 100644
+index 0000000000000000000000000000000000000000..f932321d203f2433321cbba56148beb4ab1f7e1f
+--- /dev/null
++++ b/packages/client/ui-turn-recovery/src/client/ContinuePanel.module.css
+@@ -0,0 +1,16 @@
++.panel {
++  display: flex;
++  align-items: center;
++  gap: 12px;
++  padding: 12px 16px;
++  border: 1px solid var(--dsw-alias-state-warn-secondary);
++  border-radius: 10px;
++  background: var(--dsw-alias-state-warn-tertiary);
++  color: var(--dsw-alias-label-secondary);
++  font: var(--dsw-font-s-regular-14);
++}
++
++.error {
++  color: var(--dsw-alias-state-error-primary);
++  font-size: 12px;
++}
+diff --git a/packages/client/ui-turn-recovery/src/client/ContinuePanel.tsx b/packages/client/ui-turn-recovery/src/client/ContinuePanel.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..a83f8a78537564a7e83c09d2aa69482ed944f997
+--- /dev/null
++++ b/packages/client/ui-turn-recovery/src/client/ContinuePanel.tsx
+@@ -0,0 +1,78 @@
++/**
++ * The interrupted-turn continuation panel.
++ *
++ * Rendered by the Chat's `conversation.chat.turnTail` chain for a Turn whose
++ * durable closer says `interrupted`. The panel never continues on its own: it
++ * states the situation and queues one fixed continuation prompt on an explicit
++ * click, guarding against a duplicate send while the click is in flight and
++ * while the continuation already sits in the session's queue.
++ */
++import { memo, useState } from 'react'
++import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
++import type { InjectFace, PropsLocale, SessionStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
++import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client'
++import type { TurnRecoveryInjected } from './index.ts'
++import { continuationAlreadyRequested } from './continue-policy.ts'
++import css from './ContinuePanel.module.css'
++
++/** Selector payload handed to the panel by the chain election. */
++export interface TurnRecoveryMatch {
++  /** Durable turn number that ended interrupted. */
++  turn: number
++}
++
++/**
++ * Full props of the panel: the chain's matched share, the framework's session
++ * seats (identity + live snapshot hook), the injected continuation verb, and
++ * the locale seat.
++ */
++export type ContinuePanelProps = { matched: TurnRecoveryMatch }
++  & Pick<SessionStandardProps, 'sessionId' | 'useSession'>
++  & InjectFace<TurnRecoveryInjected>
++  & PropsLocale<'turn-recovery'>
++
++/** User-confirmed continuation affordance for a persisted interrupted turn. */
++export const ContinuePanel = memo(function ContinuePanel({
++  sessionId, useSession, continueInterrupted, t,
++}: ContinuePanelProps) {
++  const [busy, setBusy] = useState(false)
++  const [requested, setRequested] = useState(false)
++  const [error, setError] = useState<string | null>(null)
++  // Live queue facts: a continuation that is already queued or running keeps
++  // the button hidden even after a remount, so the send cannot be duplicated.
++  const alreadyRequested = useSession(snapshot => continuationAlreadyRequested(snapshot))
++
++  if (requested || alreadyRequested) {
++    return (
++      <div className={css.panel} role="alert">
++        <span>{t('message.interrupted.hint')}</span>
++      </div>
++    )
++  }
++
++  const continueTask = async (): Promise<void> => {
++    if (busy) return
++    setBusy(true)
++    setError(null)
++    try {
++      await continueInterrupted(sessionId)
++      setRequested(true)
++    } catch (cause: unknown) {
++      setError(t('message.interrupted.error', { message: cause instanceof Error ? cause.message : String(cause) }))
++    } finally {
++      setBusy(false)
++    }
++  }
++
++  return (
++    <div className={css.panel} role="alert">
++      <span>{t('message.interrupted.hint')}</span>
++      <Button variant="primary" disabled={busy} onClick={() => { void continueTask() }}>
++        {busy ? t('message.interrupted.continuing') : t('message.interrupted.continue')}
++      </Button>
++      {error === null ? null : <span className={css.error}>{error}</span>}
++    </div>
++  )
++})
++
++export type { TurnTailOwnerProps }
+diff --git a/packages/client/ui-turn-recovery/src/client/continue-policy.ts b/packages/client/ui-turn-recovery/src/client/continue-policy.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..bea6a1ce55387d51e14ed9ad40aa93f9851a0474
+--- /dev/null
++++ b/packages/client/ui-turn-recovery/src/client/continue-policy.ts
+@@ -0,0 +1,36 @@
++/**
++ * Continuation-after-interruption policy.
++ *
++ * The interrupted-turn Continue affordance asks the session to queue one fixed
++ * continuation prompt. Queueing is only safe once per interruption: re-clicking
++ * the historical button while the continuation is already queued or running
++ * would enqueue a second autonomous continuation. The panel's own in-flight
++ * state guards rapid double-clicks, but the queue survives it — the prompt can
++ * sit queued (not yet running) while the button re-enables — and a remounted
++ * view forgets local state. This module owns the business predicate that makes
++ * the send itself idempotent.
++ *
++ * Ported from the 0.1.1 fork's `ui-conversation/chat/continue-policy.ts`; the
++ * 0.1.5 client session snapshot carries the same two facts (`running`, and the
++ * pending queue with each row's plain `text`).
++ */
++import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
++
++/** The user-confirmed continuation prompt sent after an interrupted turn. */
++export const CONTINUE_PROMPT =
++  'The previous task was interrupted by a host restart. Continue from the saved context. Verify completed work and do not blindly repeat side-effecting tool calls.'
++
++/**
++ * Whether a continuation for the interrupted turn is already in flight: the
++ * session is running a turn, or the fixed continuation prompt is still pending
++ * in the queue. Either way another send would duplicate it.
++ * @param snapshot - the scoped session's live snapshot.
++ * @param prompt - the continuation prompt to recognize (tests may substitute).
++ * @returns true when a fresh continuation send must be skipped.
++ */
++export function continuationAlreadyRequested(
++  snapshot: Pick<SessionSnapshot, 'running' | 'queue'>,
++  prompt: string = CONTINUE_PROMPT,
++): boolean {
++  return snapshot.running || snapshot.queue.some(row => row.text === prompt)
++}
+diff --git a/packages/client/ui-turn-recovery/src/client/index.ts b/packages/client/ui-turn-recovery/src/client/index.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..831beb94ee8ffbf6b0141c55508efff2827c5cff
+--- /dev/null
++++ b/packages/client/ui-turn-recovery/src/client/index.ts
+@@ -0,0 +1,98 @@
++/**
++ * Interrupted-turn recovery presentation plugin.
++ *
++ * A persisted log whose last turn never ended is closed after the fact with a
++ * `turn/end` reason of `interrupted` (agent-loop resume appends the closer; a
++ * cold read synthesizes it). The restored context is complete — the model may
++ * simply continue — so this plugin offers one explicit, user-confirmed
++ * continuation through the Chat's completed-Turn extension chain
++ * (`conversation.chat.turnTail`), never automatically.
++ *
++ * 0.1.5 differences from the 0.1.1 fork this ports: the chain slot moved to
++ * ui-chat and its owner props carry no `interrupted`/`continueInterrupted`; the
++ * selector reads the turn's own `turn/end` reason instead, and the continuation
++ * goes through the session face (`binding.session.prompt`) rather than a
++ * ui-conversation-injected verb, so this stays a single removable plugin.
++ */
++import type { Context as ClientContext } from '@deepseek-ai/cordis'
++import type { SessionId } from '@deepseek-ai/dsh-session/types'
++// Type-only: pulls `ctx.sessions` (ISessions + SessionFace) and the ui-chat
++// SlotMap merge that declares `conversation.chat.turnTail`.
++import type {} from '@deepseek-ai/dsh-api-session-controller/client'
++import type { TurnTailOwnerProps } from '@deepseek-ai/dsh-client-ui-chat/client'
++import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
++import type {} from '@deepseek-ai/dsh-client-locale/client'
++// Type-only: 0.1.5 declares `ctx.slots` in ui-renderer's Context merge.
++import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
++import { ContinuePanel, type TurnRecoveryMatch } from './ContinuePanel.tsx'
++import { CONTINUE_PROMPT, continuationAlreadyRequested } from './continue-policy.ts'
++import { en, zh, type TurnRecoveryKey } from './locales.ts'
++
++export type { TurnRecoveryKey } from './locales.ts'
++export type { TurnRecoveryMatch } from './ContinuePanel.tsx'
++export { CONTINUE_PROMPT, continuationAlreadyRequested } from './continue-policy.ts'
++
++/** Dictionary namespace owned by this plugin. */
++const NS = 'turn-recovery'
++
++declare module '@deepseek-ai/dsh-client-ui-slots' {
++  interface LocaleNamespaceMap {
++    'turn-recovery': TurnRecoveryKey
++  }
++}
++
++/** Injected business face of the recovery panel. */
++export interface TurnRecoveryInjected {
++  /**
++   * Queue the fixed continuation prompt for one interrupted session.
++   * Idempotent: a running turn or an already-queued continuation is a no-op.
++   * @param sessionId - the session whose interrupted turn is being continued.
++   * @throws when the session is unknown or the host rejects the prompt.
++   */
++  continueInterrupted(sessionId: SessionId): Promise<void>
++}
++
++/** Services required by this plugin. */
++export const inject = ['slots', 'sessions', 'locale']
++
++/**
++ * Elect one closing Turn whose `turn/end` reason is `interrupted`.
++ *
++ * Pure by contract (chain selectors run at render time and must not read
++ * external state): an interrupted turn is a durable fact on the owner.
++ * @param owner - the closing Turn's owner currency.
++ * @returns the match handed to the panel, or null to decline this Turn.
++ */
++export function selectInterruptedTurn(owner: TurnTailOwnerProps): TurnRecoveryMatch | null {
++  const reason = owner.turn.end?.data.reason
++  return reason?.kind === 'interrupted' ? { turn: owner.turn.turn } : null
++}
++
++/**
++ * Register the interrupted-turn continuation panel.
++ * @param ctx - client root context.
++ */
++export function apply(ctx: ClientContext): void {
++  ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-turn-recovery: dictionaries')
++  ctx.slots.inject('conversation.chat.turnTail', () => ctx.slots.register({
++    name: 'conversation.chat.turnTail',
++    select: selectInterruptedTurn,
++    locale: NS,
++    inject: (): TurnRecoveryInjected => ({
++      continueInterrupted: async (sessionId: SessionId): Promise<void> => {
++        const session = ctx.sessions.binding(sessionId)?.session
++        if (session === undefined) {
++          throw new Error(`turn-recovery: session "${sessionId}" is unavailable`)
++        }
++        // Idempotent by live data, not by local state: a remounted panel sees
++        // the same queue and stays quiet instead of queueing a second
++        // autonomous continuation.
++        if (continuationAlreadyRequested(session.getSnapshot())) return
++        const result = await session.prompt([{ type: 'text', text: CONTINUE_PROMPT }], 'queue')
++        if (!result.ok) {
++          throw new Error(`${result.error.code}: ${result.error.message}`)
++        }
++      },
++    }),
++  }, ContinuePanel))
++}
+diff --git a/packages/client/ui-turn-recovery/src/client/locales.ts b/packages/client/ui-turn-recovery/src/client/locales.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..f0ae9b1f3cd6b222f3f5a87a98f7c7831cbe43bb
+--- /dev/null
++++ b/packages/client/ui-turn-recovery/src/client/locales.ts
+@@ -0,0 +1,16 @@
++/** Interrupted-turn continuation copy owned by this plugin. */
++export const zh = {
++  'message.interrupted.hint': '上次任务被中断，已恢复上下文；不会自动重放未完成的工具调用。',
++  'message.interrupted.continue': '继续任务',
++  'message.interrupted.continuing': '正在继续…',
++  'message.interrupted.error': '继续任务失败：{message}',
++} satisfies Record<string, string>
++
++export type TurnRecoveryKey = keyof typeof zh
++
++export const en = {
++  'message.interrupted.hint': 'The last task was interrupted. Context is restored; unfinished tools will not be replayed automatically.',
++  'message.interrupted.continue': 'Continue task',
++  'message.interrupted.continuing': 'Continuing…',
++  'message.interrupted.error': 'Could not continue task: {message}',
++} satisfies Record<TurnRecoveryKey, string>
+diff --git a/packages/client/ui-turn-recovery/src/css-modules.d.ts b/packages/client/ui-turn-recovery/src/css-modules.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..8811db126498ec8fac4acff5c3f137ffb839fec5
+--- /dev/null
++++ b/packages/client/ui-turn-recovery/src/css-modules.d.ts
+@@ -0,0 +1,4 @@
++declare module '*.module.css' {
++  const classes: Record<string, string>
++  export default classes
++}
+diff --git a/packages/client/ui-turn-recovery/src/index.ts b/packages/client/ui-turn-recovery/src/index.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..c7f43fc2ad52fb46fb7a05e91dc5a5ba4748b80f
+--- /dev/null
++++ b/packages/client/ui-turn-recovery/src/index.ts
+@@ -0,0 +1,2 @@
++/** Host half: the browser-only interrupted-turn recovery surface plugin. */
++export function apply(): void {}
+diff --git a/packages/client/ui-turn-recovery/src/invariant.ts b/packages/client/ui-turn-recovery/src/invariant.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..8520f74d34776db1c952383f577aad6140a08cab
+--- /dev/null
++++ b/packages/client/ui-turn-recovery/src/invariant.ts
+@@ -0,0 +1,10 @@
++/** Invariant companion for the interrupted-turn recovery presentation plugin. */
++import type { Context } from '@deepseek-ai/cordis'
++import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
++
++const PACKAGE_NAME = '@deepseek-ai/dsh-client-ui-turn-recovery'
++export const name = 'client-ui-turn-recovery-invariant'
++export const inject = ['invariants']
++const install: InvariantInstaller = () => {}
++export const apply = (ctx: Context): Promise<() => void> =>
++  Promise.resolve(ctx.invariants.register(PACKAGE_NAME, install))
+diff --git a/packages/client/ui-turn-recovery/tests/continue-panel.client.spec.tsx b/packages/client/ui-turn-recovery/tests/continue-panel.client.spec.tsx
+new file mode 100644
+index 0000000000000000000000000000000000000000..921e58360d01f25d69892ff0754f25a35466965b
+--- /dev/null
++++ b/packages/client/ui-turn-recovery/tests/continue-panel.client.spec.tsx
+@@ -0,0 +1,129 @@
++// @vitest-environment jsdom
++// Interrupted-turn recovery tests: the chain selector elects only an
++// interrupted Turn, and the panel sends one continuation on an explicit click
++// — never twice, never while the live queue already holds one.
++
++import { afterEach, describe, expect, it, vi } from 'vitest'
++import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
++import type { ReactNode } from 'react'
++import { ContinuePanel } from '../src/client/ContinuePanel.tsx'
++import type { ContinuePanelProps } from '../src/client/ContinuePanel.tsx'
++import { selectInterruptedTurn } from '../src/client/index.ts'
++import { CONTINUE_PROMPT, continuationAlreadyRequested } from '../src/client/continue-policy.ts'
++import { en, zh } from '../src/client/locales.ts'
++
++afterEach(cleanup)
++
++function translate(key: string, params?: Record<string, unknown>): string {
++  const value = (zh as Record<string, string>)[key] ?? (en as Record<string, string>)[key] ?? key
++  return value.replace(/\{([^}]+)\}/g, (_, name: string) => String(params?.[name] ?? `{${name}}`))
++}
++
++/** One closing-Turn owner for the chain selector. */
++function owner(reason: { kind: string } | undefined): Parameters<typeof selectInterruptedTurn>[0] {
++  return {
++    turn: {
++      turn: 3,
++      start: undefined,
++      end: reason === undefined ? undefined : ({ data: { turn: 3, reason } } as never),
++      status: 'closed',
++      steps: [],
++      data: {} as never,
++    },
++    seq: 12,
++    openFile: () => {},
++  } as never
++}
++
++/** A live session snapshot with no queued continuation and no running turn. */
++function idleSnapshot(overrides: Partial<{ running: boolean; texts: (string | null)[] }> = {}) {
++  return {
++    running: overrides.running ?? false,
++    queue: (overrides.texts ?? []).map(text => ({ text })),
++  } as never
++}
++
++function bench(over: {
++  continueInterrupted?: (sessionId: string) => Promise<void>
++  snapshot?: unknown
++} = {}) {
++  const continueInterrupted = vi.fn(over.continueInterrupted ?? (async () => {}))
++  const snapshot = over.snapshot ?? idleSnapshot()
++  const props = {
++    matched: { turn: 3 },
++    sessionId: 's-1',
++    useSession: ((selector: (value: unknown) => unknown) => selector(snapshot)) as never,
++    continueInterrupted,
++    t: translate,
++  } as unknown as ContinuePanelProps
++  const view = render(<ContinuePanel {...props} /> as ReactNode)
++  return { view, continueInterrupted }
++}
++
++describe('selectInterruptedTurn', () => {
++  it('elects a Turn whose durable closer says interrupted', () => {
++    expect(selectInterruptedTurn(owner({ kind: 'interrupted' }))).toEqual({ turn: 3 })
++  })
++
++  it('declines every other closer, and an open Turn', () => {
++    expect(selectInterruptedTurn(owner({ kind: 'completed' }))).toBeNull()
++    expect(selectInterruptedTurn(owner({ kind: 'aborted' }))).toBeNull()
++    expect(selectInterruptedTurn(owner({ kind: 'error' }))).toBeNull()
++    expect(selectInterruptedTurn(owner(undefined))).toBeNull()
++  })
++})
++
++describe('continuationAlreadyRequested', () => {
++  it('is true while a turn runs or the continuation still sits in the queue', () => {
++    expect(continuationAlreadyRequested(idleSnapshot())).toBe(false)
++    expect(continuationAlreadyRequested(idleSnapshot({ running: true }))).toBe(true)
++    expect(continuationAlreadyRequested(idleSnapshot({ texts: [CONTINUE_PROMPT] }))).toBe(true)
++    expect(continuationAlreadyRequested(idleSnapshot({ texts: ['something else'] }))).toBe(false)
++  })
++})
++
++describe('turn-recovery ContinuePanel', () => {
++  it('offers Continue and sends exactly once on rapid re-click', () => {
++    const { continueInterrupted } = bench()
++    const button = screen.getByRole('button', { name: '继续任务' })
++    fireEvent.click(button)
++    fireEvent.click(button)
++    expect(continueInterrupted).toHaveBeenCalledTimes(1)
++    expect(continueInterrupted).toHaveBeenCalledWith('s-1')
++  })
++
++  it('does not send again while the request is in flight', () => {
++    let resolve!: () => void
++    bench({ continueInterrupted: () => new Promise<void>(r => { resolve = r }) })
++    fireEvent.click(screen.getByRole('button', { name: '继续任务' }))
++    const button = screen.getByRole('button', { name: '正在继续…' })
++    expect(button.hasAttribute('disabled')).toBe(true)
++    fireEvent.click(button)
++    expect(screen.getByRole('alert').textContent).toContain('上次任务被中断')
++    act(() => { resolve() })
++  })
++
++  it('withdraws Continue after success while keeping the hint', async () => {
++    bench()
++    fireEvent.click(screen.getByRole('button', { name: '继续任务' }))
++    await vi.waitFor(() => {
++      expect(screen.queryByRole('button', { name: '继续任务' })).toBeNull()
++    })
++    expect(screen.getByRole('alert').textContent).toContain('上次任务被中断，已恢复上下文')
++  })
++
++  it('reports localized failure and keeps the button for retry', async () => {
++    bench({ continueInterrupted: () => Promise.reject(new Error('boom')) })
++    fireEvent.click(screen.getByRole('button', { name: '继续任务' }))
++    await vi.waitFor(() => {
++      expect(screen.getByRole('alert').textContent).toContain('继续任务失败：boom')
++    })
++    expect(screen.getByRole('button', { name: '继续任务' })).not.toBeNull()
++  })
++
++  it('hides Continue when the live queue already holds a continuation', () => {
++    bench({ snapshot: idleSnapshot({ texts: [CONTINUE_PROMPT] }) })
++    expect(screen.queryByRole('button', { name: '继续任务' })).toBeNull()
++    expect(screen.getByRole('alert').textContent).toContain('上次任务被中断')
++  })
++})
+diff --git a/packages/client/ui-turn-recovery/tsconfig.client.json b/packages/client/ui-turn-recovery/tsconfig.client.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..dc6dc087ba8c41078ad35deb04ff2dc986476e08
+--- /dev/null
++++ b/packages/client/ui-turn-recovery/tsconfig.client.json
+@@ -0,0 +1,41 @@
++{
++  "extends": "../../../tsconfig.base.client.json",
++  "compilerOptions": {
++    "rootDir": "src",
++    "outDir": "lib/types",
++    "tsBuildInfoFile": "lib/tsconfig.client.tsbuildinfo"
++  },
++  "include": [
++    "src/client",
++    "src/css-modules.d.ts"
++  ],
++  "references": [
++    {
++      "path": "../../../vendor/cordis"
++    },
++    {
++      "path": "../../api/session-controller/tsconfig.client.json"
++    },
++    {
++      "path": "../locale"
++    },
++    {
++      "path": "../ui-chat"
++    },
++    {
++      "path": "../ui-renderer"
++    },
++    {
++      "path": "../ui-conversation"
++    },
++    {
++      "path": "../ui-primitives"
++    },
++    {
++      "path": "../ui-slots"
++    },
++    {
++      "path": "../../core/session"
++    }
++  ]
++}
+diff --git a/packages/client/ui-turn-recovery/tsconfig.host.json b/packages/client/ui-turn-recovery/tsconfig.host.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..a611cfbd008b90dcc7ba40cc0e4d465a099b774e
+--- /dev/null
++++ b/packages/client/ui-turn-recovery/tsconfig.host.json
+@@ -0,0 +1,20 @@
++{
++  "extends": "../../../tsconfig.base.json",
++  "compilerOptions": {
++    "rootDir": "src",
++    "outDir": "lib/types",
++    "tsBuildInfoFile": "lib/tsconfig.host.tsbuildinfo"
++  },
++  "files": [
++    "src/index.ts",
++    "src/invariant.ts"
++  ],
++  "references": [
++    {
++      "path": "../../../vendor/cordis"
++    },
++    {
++      "path": "../../runtime-diagnostics/invariants"
++    }
++  ]
++}
+diff --git a/packages/client/ui-turn-recovery/tsconfig.json b/packages/client/ui-turn-recovery/tsconfig.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..2eca820546db1a73f650b99283668efc0a0be684
+--- /dev/null
++++ b/packages/client/ui-turn-recovery/tsconfig.json
+@@ -0,0 +1,11 @@
++{
++  "files": [],
++  "references": [
++    {
++      "path": "./tsconfig.host.json"
++    },
++    {
++      "path": "./tsconfig.client.json"
++    }
++  ]
++}
+diff --git a/packages/client/ui-turn-recovery/tsdown.config.ts b/packages/client/ui-turn-recovery/tsdown.config.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..1e9f02771a70c523459877aa256cea21e2ab903f
+--- /dev/null
++++ b/packages/client/ui-turn-recovery/tsdown.config.ts
+@@ -0,0 +1,3 @@
++import { clientBundle } from '../tsdown.client.ts'
++
++export default clientBundle('@deepseek-ai/dsh-client-ui-turn-recovery', ['lib/types/index.js', 'lib/types/invariant.js'])
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 07f6ecccb8b6b23cce3370d934ed735f0f2e90ed..aae98d4891b5473cb1938f95ad62f3899236df3d 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -4323,6 +4323,48 @@ importers:
+         specifier: ^18.2.0
+         version: 18.3.1(react@18.3.1)
+ 
++  packages/client/ui-turn-recovery:
++    devDependencies:
++      '@deepseek-ai/cordis':
++        specifier: workspace:^
++        version: link:../../../vendor/cordis
++      '@deepseek-ai/dsh-api-session-controller':
++        specifier: workspace:^
++        version: link:../../api/session-controller
++      '@deepseek-ai/dsh-client-locale':
++        specifier: workspace:^
++        version: link:../locale
++      '@deepseek-ai/dsh-client-ui-chat':
++        specifier: workspace:^
++        version: link:../ui-chat
++      '@deepseek-ai/dsh-client-ui-conversation':
++        specifier: workspace:^
++        version: link:../ui-conversation
++      '@deepseek-ai/dsh-client-ui-primitives':
++        specifier: workspace:^
++        version: link:../ui-primitives
++      '@deepseek-ai/dsh-client-ui-renderer':
++        specifier: workspace:^
++        version: link:../ui-renderer
++      '@deepseek-ai/dsh-client-ui-slots':
++        specifier: workspace:^
++        version: link:../ui-slots
++      '@deepseek-ai/dsh-session':
++        specifier: workspace:^
++        version: link:../../core/session
++      '@types/react':
++        specifier: ~18.3.1
++        version: 18.3.31
++      '@types/react-dom':
++        specifier: ~18.3.0
++        version: 18.3.7(@types/react@18.3.31)
++      react:
++        specifier: ^18.2.0
++        version: 18.3.1
++      react-dom:
++        specifier: ^18.2.0
++        version: 18.3.1(react@18.3.1)
++
+   packages/client/ui-user-questions:
+     devDependencies:
+       '@deepseek-ai/cordis':

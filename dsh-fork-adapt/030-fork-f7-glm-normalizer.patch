@@ -1,0 +1,1401 @@
+diff --git a/packages/llm/llm-glm-normalize/README.i18n.yaml b/packages/llm/llm-glm-normalize/README.i18n.yaml
+new file mode 100644
+index 0000000000000000000000000000000000000000..5586b53a2a5a259f7481e3846b55af46f849f854
+--- /dev/null
++++ b/packages/llm/llm-glm-normalize/README.i18n.yaml
+@@ -0,0 +1,6 @@
++# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
++# side as of the last confirmed-consistent state. Both languages carry equal authority;
++# after editing either side, bring the other along and re-record with:
++#   pnpm run verify-translation-pairing --write packages/llm/llm-glm-normalize/README.md
++README.md: ad9d227bd45ad872e32c89e54cf8522797b6db10
++README.zh.md: 1bb448d5a1304238654e81976b6b0717df614091
+diff --git a/packages/llm/llm-glm-normalize/README.md b/packages/llm/llm-glm-normalize/README.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..ad9d227bd45ad872e32c89e54cf8522797b6db10
+--- /dev/null
++++ b/packages/llm/llm-glm-normalize/README.md
+@@ -0,0 +1,49 @@
++# dsh-llm-glm-normalize
++
++English | [中文](README.zh.md)
++
++A dependency-light **stream folding** library for a known GLM OpenAI-Responses gateway quirk: the gateway may open a short text block, then emit a later text block containing the complete answer. Without normalization an assembler would retain the short prefix AND the complete answer as two visible blocks. The fold rewrites the later block's end onto the earlier index so only the complete text survives.
++
++The fold operates on a **structural** subset of assistant events: it reads only `type`, `contentIndex`, `delta`, and `content`, and passes every other event through unchanged. Any pi-ai-shaped event stream — or a structural twin from another provider — can be normalized without importing pi-ai. `glmTextFold` is a composable `StreamEventNormalizer` and composes through `chainStreamNormalizers`, so a stream translator can chain provider quirks without owning their implementations.
++
++It is a **library, not a service or plugin**: no `ctx`, registers nothing, emits no events. The pi-ai adapter (`dsh-llm-pi-ai`) applies the fold for its `glm` provider route and re-exports the seam.
++
++## API
++
++```ts ignore-check
++import {
++  glmTextFold,
++  normalizeGlmTextEvents,
++  chainStreamNormalizers,
++} from '@deepseek-ai/dsh-llm-glm-normalize'
++import type { StreamEventNormalizer } from '@deepseek-ai/dsh-llm-glm-normalize'
++```
++
++| Export | Role |
++|---|---|
++| `normalizeGlmTextEvents(events)` | The fold as an async generator: rewrites a folded `text_end` onto the earlier index, passes everything else through. |
++| `glmTextFold(events)` | The fold as a `StreamEventNormalizer` for composition. |
++| `chainStreamNormalizers(...normalizers)` | Composes normalizers in argument order into one; zero arguments is the identity transform. |
++| `StreamEventNormalizer<E>` | The seam type: `(events: AsyncIterable<E>) => AsyncIterable<E>` for `E extends { type: string }`. |
++
++## When the fold applies
++
++A `text_end` folds onto an earlier unclosed block when:
++
++- the later block's content starts with the earlier accumulated text; or
++- the earlier accumulated text is at most 16 characters and the later content is at least 64 characters (a long replay of a stub the gateway truncated).
++
++A later text block opened before the earlier one closes is held until its `text_end` decides, so tool-call and thinking block order stay unchanged. Pending text ends flush before any tool-call or thinking block, and again at end of stream.
++
++## Model Experience
++
++None, as this package is a pure event-stream normalization utility that registers no model context.
++
++#### KV Cache effect
++
++No KV-cache effect: the fold only rewrites assistant text-block indexes; token counts and request caching are decided by the model adapter and the request itself.
++
++## Known Limitations and Deferred Work
++
++- **pi-ai-shaped events only** — the fold reads a structural subset of assistant events; a provider with a different event vocabulary needs its own normalizer composed through `chainStreamNormalizers`.
++- **Content matching is heuristic** — the length rule decides a genuinely distinct short block that shares a prefix with a stub; a gateway that stops replaying complete text leaves both blocks visible.
+diff --git a/packages/llm/llm-glm-normalize/README.zh.md b/packages/llm/llm-glm-normalize/README.zh.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..1bb448d5a1304238654e81976b6b0717df614091
+--- /dev/null
++++ b/packages/llm/llm-glm-normalize/README.zh.md
+@@ -0,0 +1,49 @@
++# dsh-llm-glm-normalize
++
++[English](README.md) | 中文
++
++一个轻依赖的**流折叠**库，用于处理已知的 GLM OpenAI-Responses 网关怪癖：网关可能先开启一个短文本块，随后再发出一个包含完整回答的文本块。若不进行归一化，汇编器会把短前缀和完整回答保留成两个可见块。折叠会将后一个块的结束事件改写回较早的索引，从而只保留完整文本。
++
++折叠只操作助手事件的**结构化**子集：只读取 `type`、`contentIndex`、`delta` 和 `content`，其他事件原样透传。任何 pi-ai 形态的事件流——或其他提供方的结构孪生流——都可以在不引入 pi-ai 的情况下被归一化。`glmTextFold` 是可组合的 `StreamEventNormalizer`，通过 `chainStreamNormalizers` 组合，因此流翻译器可以串联提供方怪癖而不必自己实现它们。
++
++它是**库，而非服务或插件**：没有 `ctx`，不注册任何内容，不发出任何事件。pi-ai 适配器（`dsh-llm-pi-ai`）为其 `glm` 提供方路由应用该折叠，并重新导出这一接缝。
++
++## 对外接口
++
++```ts ignore-check
++import {
++  glmTextFold,
++  normalizeGlmTextEvents,
++  chainStreamNormalizers,
++} from '@deepseek-ai/dsh-llm-glm-normalize'
++import type { StreamEventNormalizer } from '@deepseek-ai/dsh-llm-glm-normalize'
++```
++
++| 导出项 | 职责 |
++|---|---|
++| `normalizeGlmTextEvents(events)` | 作为异步生成器的折叠：将折叠的 `text_end` 改写回较早的索引，其余事件原样透传。 |
++| `glmTextFold(events)` | 以 `StreamEventNormalizer` 形式提供的折叠，用于组合。 |
++| `chainStreamNormalizers(...normalizers)` | 按参数顺序把归一化器组合成一个；零参数时是恒等变换。 |
++| `StreamEventNormalizer<E>` | 接缝类型：`(events: AsyncIterable<E>) => AsyncIterable<E>`，其中 `E extends { type: string }`。 |
++
++## 何时应用折叠
++
++`text_end` 会在以下情况折叠到较早的未关闭块：
++
++- 后一个块的内容以较早累积的文本开头；或
++- 较早累积的文本至多 16 个字符，且后一个块的内容至少 64 个字符（网关截断的桩文本的长回放）。
++
++在较早块关闭之前开启的后一个文本块会被暂存，直到其 `text_end` 做出决定，因此工具调用与思考块的顺序保持不变。待决的文本结束事件会在任何工具调用或思考块之前刷新，并在流结束时再次刷新。
++
++## 模型体验
++
++不涉及，本包是纯粹的事件流归一化工具，不注册任何模型上下文。
++
++#### KV Cache 影响
++
++不影响 KV Cache：折叠只改写助手文本块的索引；令牌计数与请求缓存由模型适配器和请求本身决定。
++
++## 已知限制与暂缓事项
++
++- **仅支持 pi-ai 形态的事件**：折叠只读取助手事件的结构化子集；事件词汇不同的提供方需要通过 `chainStreamNormalizers` 组合自己的归一化器。
++- **内容匹配是启发式的**：长度规则用于判定一个与桩文本共享前缀但确实不同的短块；若网关不再回放完整文本，两个块都会保留。
+diff --git a/packages/llm/llm-glm-normalize/package.json b/packages/llm/llm-glm-normalize/package.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..ed2f4668edc91e0a535785d3961709e77781984d
+--- /dev/null
++++ b/packages/llm/llm-glm-normalize/package.json
+@@ -0,0 +1,42 @@
++{
++  "name": "@deepseek-ai/dsh-llm-glm-normalize",
++  "description": "GLM OpenAI-Responses gateway stream folding for the DeepSeek Harness",
++  "version": "0.1.5-rc.2",
++  "publishConfig": {
++    "access": "public"
++  },
++  "repository": {
++    "type": "git",
++    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
++    "directory": "packages/llm/llm-glm-normalize"
++  },
++  "type": "module",
++  "main": "lib/index.js",
++  "types": "lib/types/index.d.ts",
++  "exports": {
++    ".": {
++      "types": "./lib/types/index.d.ts",
++      "default": "./lib/index.js"
++    },
++    "./src/*": "./src/*",
++    "./invariant": {
++      "types": "./lib/types/invariant.d.ts",
++      "default": "./lib/invariant.js"
++    },
++    "./package.json": "./package.json"
++  },
++  "files": [
++    "lib/index.js",
++    "lib/invariant.js",
++    "lib/types/**/*.d.ts"
++  ],
++  "license": "MIT",
++  "peerDependencies": {
++    "@deepseek-ai/cordis": "workspace:^",
++    "@deepseek-ai/dsh-invariants": "workspace:^"
++  },
++  "devDependencies": {
++    "@deepseek-ai/cordis": "workspace:^",
++    "@deepseek-ai/dsh-invariants": "workspace:^"
++  }
++}
+diff --git a/packages/llm/llm-glm-normalize/src/index.ts b/packages/llm/llm-glm-normalize/src/index.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..3046cf83fe73ad77e4d437f8a129c1ba68314ebb
+--- /dev/null
++++ b/packages/llm/llm-glm-normalize/src/index.ts
+@@ -0,0 +1,292 @@
++/**
++ * GLM OpenAI-Responses gateway stream folding.
++ *
++ * The GLM gateway has a known streaming quirk: it may open a short text block,
++ * then emit a later text block containing the complete answer. Without
++ * normalization an assembler would retain the short prefix AND the complete
++ * answer as two visible blocks. This package folds the later block's end back
++ * onto the earlier index so only the complete text survives.
++ *
++ * The fold operates on a **structural** subset of pi-ai assistant events: it
++ * reads only `type`, `contentIndex`, `delta`, and `content`, and passes every
++ * other event through unchanged. Any pi-ai-shaped event stream (or a
++ * structural twin from another provider) can be normalized without importing
++ * pi-ai. The `glmTextFold` normalizer composes through
++ * {@link chainStreamNormalizers}, so a stream translator can chain provider
++ * quirks without owning their implementations.
++ *
++ * This is a **library, not a service or plugin**: no `ctx`, registers nothing,
++ * emits no events. The pi-ai adapter (`dsh-llm-pi-ai`) applies the fold for
++ * its `glm` provider route.
++ *
++ * @module @deepseek-ai/dsh-llm-glm-normalize
++ */
++
++/** The minimum shape every event carries: a string `type` discriminator. */
++export interface StreamEventLike {
++  type: string
++}
++
++/**
++ * Pluggable per-provider stream-normalizer registry that this package owns. The
++ * pi-ai adapter reads `normalizersFor(provider)`; when a provider has
++ * registered normalizers they supersede the built-in GLM fold for that route
++ * (so this package owns the whole GLM normalization story, and a plugin or the
++ * profile can register/replace it without double-folding). Module-scoped: one
++ * host process owns one registry, the single-deployment posture this seam
++ * targets.
++ */
++const registeredNormalizers = new Map<string, StreamEventNormalizer[]>()
++
++/**
++ * Register (or replace) the stream normalizers for one provider route.
++ * @param provider - provider route key.
++ * @param normalizers - normalizers applied in order for that route.
++ */
++export function registerStreamNormalizer(provider: string, ...normalizers: StreamEventNormalizer[]): void {
++  registeredNormalizers.set(provider, normalizers)
++}
++
++/** The normalizers registered for a provider, or `undefined` when none own it. */
++export function normalizersFor(provider: string): StreamEventNormalizer[] | undefined {
++  return registeredNormalizers.get(provider)
++}
++
++/**
++ * A stream normalizer is one `(events) => AsyncIterable<E>` stage in the pi-ai
++ * assistant event pipeline. This package ships the GLM gateway folds; the
++ * `glmNormalize` plugin entry (below) registers them for the `glm` route so the
++ * pi-ai adapter composes them.
++ */
++export type StreamEventNormalizer<E extends StreamEventLike = StreamEventLike> =
++  (events: AsyncIterable<E>) => AsyncIterable<E>
++
++/** The event shapes the fold inspects; everything else passes through. */
++type GlmTextShape =
++  | { type: 'text_start'; contentIndex: number }
++  | { type: 'text_delta'; contentIndex: number; delta: string }
++  | { type: 'text_end'; contentIndex: number; content: string }
++  | { type: 'toolcall_start' | 'thinking_start'; contentIndex: number }
++
++/** A `text_end` event, the only shape the fold rewrites. */
++type GlmTextEnd = Extract<GlmTextShape, { type: 'text_end' }>
++
++/**
++ * Narrow an arbitrary event to the shapes the fold inspects, or `undefined`
++ * for a pass-through event.
++ * @param event - any stream event.
++ * @returns the fold's view of the event, or `undefined` to pass it through.
++ */
++function asGlmTextShape(event: StreamEventLike): GlmTextShape | undefined {
++  switch (event.type) {
++    case 'text_start':
++    case 'text_delta':
++    case 'text_end':
++    case 'toolcall_start':
++    case 'thinking_start':
++      return event as GlmTextShape
++    default:
++      return undefined
++  }
++}
++
++/**
++ * Normalize the known GLM OpenAI-Responses gateway quirk: it may start a short
++ * text block, then emit a later text block containing the complete answer. The
++ * later block is folded back into the earlier index so the assembler cannot
++ * retain the short prefix and complete answer as two visible blocks.
++ *
++ * Folding rule at `text_end`: the later block folds onto an earlier unclosed
++ * block with non-empty accumulated text when the later content starts with
++ * that prefix, OR the prefix is at most 16 characters and the later content is
++ * at least 64 characters (a long replay of a stub the gateway truncated).
++ * A later text block opened before the earlier one closes is held until its
++ * `text_end` decides, so tool-call and thinking order stay unchanged.
++ * Pending text ends flush before any tool-call or thinking block, before a
++ * terminal `done`/`error` event, and at end of stream — no text block is ever
++ * left open by a stream that stops translating at the terminal event.
++ *
++ * @param events - one assistant event stream.
++ * @returns events with a cumulative text block folded into its earlier block.
++ */
++export async function* normalizeGlmTextEvents<E extends StreamEventLike>(
++  events: AsyncIterable<E>,
++): AsyncGenerator<E> {
++  const buffers = new Map<number, string>()
++  const closed = new Set<number>()
++  const pendingEnds = new Map<number, GlmTextEnd>()
++  const held = new Map<number, GlmTextShape[]>()
++
++  const flushPending = function* (): Generator<E> {
++    for (const index of [...pendingEnds.keys()].sort((a, b) => a - b)) {
++      const end = pendingEnds.get(index)
++      if (end !== undefined) yield end as unknown as E
++      pendingEnds.delete(index)
++      closed.add(index)
++      buffers.delete(index)
++    }
++  }
++
++  for await (const raw of events) {
++    const event = asGlmTextShape(raw)
++    if (event === undefined) {
++      // A terminal event must never precede an unflushed text end: the stream
++      // translator stops at `done`/`error`, so a pending end left behind would
++      // never reach the block assembler and the last text block would stay
++      // open forever. Flush pending ends first, in index order.
++      if (raw.type === 'done' || raw.type === 'error') yield* flushPending()
++      yield raw
++      continue
++    }
++    switch (event.type) {
++      case 'text_start':
++        // GLM may open another text block before closing the earlier short block.
++        // Hold the later block until its text_end reveals whether it is the full
++        // answer replayed by the gateway. A new non-text block flushes pending
++        // text first so tool-call order stays unchanged.
++        {
++          const priorOpen = [...buffers.entries()].some(([index, text]) => (
++            index < event.contentIndex && !closed.has(index) && text.length > 0
++          ))
++          if (priorOpen || pendingEnds.size > 0) held.set(event.contentIndex, [event])
++          else yield* flushPending()
++          if (!priorOpen && pendingEnds.size === 0) yield event as unknown as E
++          buffers.set(event.contentIndex, '')
++          continue
++        }
++      case 'toolcall_start':
++      case 'thinking_start':
++        yield* flushPending()
++        yield event as unknown as E
++        continue
++      case 'text_delta':
++        buffers.set(event.contentIndex, `${buffers.get(event.contentIndex) ?? ''}${event.delta}`)
++        {
++          const queued = held.get(event.contentIndex)
++          if (queued !== undefined) queued.push(event)
++          else yield event as unknown as E
++        }
++        continue
++      case 'text_end':
++        {
++          const prior = [...buffers.entries()].find(([index, prefix]) => (
++            index < event.contentIndex && !closed.has(index) && prefix.length > 0
++              && (event.content.startsWith(prefix) || (prefix.length <= 16 && event.content.length >= 64))
++          ))
++          if (prior !== undefined) {
++            const [index] = prior
++            // block-end is authoritative in BlockAssembler: replace the short
++            // prefix with the complete text and do not publish the later block.
++            yield { ...event, contentIndex: index } as unknown as E
++            closed.add(index)
++            buffers.delete(index)
++            pendingEnds.delete(index)
++            held.delete(event.contentIndex)
++            buffers.delete(event.contentIndex)
++            continue
++          }
++          yield* flushPending()
++          const queued = held.get(event.contentIndex)
++          if (queued !== undefined) {
++            for (const queuedEvent of queued) yield queuedEvent as unknown as E
++            held.delete(event.contentIndex)
++          }
++          pendingEnds.set(event.contentIndex, event)
++          continue
++        }
++    }
++  }
++  yield* flushPending()
++}
++
++/**
++ * The GLM gateway fold as a composable {@link StreamEventNormalizer}: identity
++ * on the event type, `normalizeGlmTextEvents` underneath.
++ */
++export function glmTextFold<E extends StreamEventLike>(events: AsyncIterable<E>): AsyncIterable<E> {
++  return normalizeGlmTextEvents(events)
++}
++
++/** Structural view of the pi-ai terminal events this fold inspects. */
++type TerminalEvent<E> = E & {
++  type: 'done' | 'error'
++  reason?: string
++  message?: { content?: unknown[]; stopReason?: string; errorMessage?: string; usage?: unknown }
++  error?: { content?: unknown[]; stopReason?: string; errorMessage?: string; usage?: unknown }
++}
++
++/**
++ * GLM (Vectide `muse-spark` backend) terminal-event fold. The gateway ends a
++ * stream with `[DONE]` but never emits a terminal `finish_reason` chunk, which
++ * pi-ai surfaces as an `error` event whose message is "Stream ended without
++ * finish_reason". The response is complete — the content blocks were already
++ * delivered — so this normalizer rewrites that benign `error` into a normal
++ * `done`/`stop` as long as content was produced; a genuinely empty or
++ * truncated stream still surfaces as an error.
++ *
++ * @param events - one assistant event stream.
++ * @returns events with the benign missing-finish_reason error folded to stop.
++ */
++export async function* glmTerminalFold<E extends StreamEventLike>(events: AsyncIterable<E>): AsyncGenerator<E> {
++  for await (const raw of events) {
++    const event = raw as TerminalEvent<E>
++    if (event.type !== 'error') {
++      yield raw
++      continue
++    }
++    const msg = event.error ?? event.message
++    const text = msg?.errorMessage ?? ''
++    if (/\bStream ended without finish_reason\b/i.test(text) && (msg?.content?.length ?? 0) > 0) {
++      // Rewrite as a completed stop, preserving usage/content for translation.
++      yield { type: 'done', reason: 'stop', message: { ...msg, stopReason: 'stop' } } as unknown as E
++      continue
++    }
++    yield raw
++  }
++}
++
++/**
++ * Compose stream normalizers into one: each stage sees the stream the previous
++ * stage produced, applied in argument order. With no normalizers this is the
++ * identity transform.
++ * @param normalizers - normalizers applied in order.
++ * @returns one normalizer equivalent to the whole chain.
++ */
++export function chainStreamNormalizers<E extends StreamEventLike>(
++  ...normalizers: StreamEventNormalizer<E>[]
++): StreamEventNormalizer<E> {
++  return (events) => normalizers.reduce(
++    (current, normalizer) => normalizer(current),
++    events,
++  )
++}
++
++// ---------------------------------------------------------------------------
++// Cordis plugin entry: registers the GLM gateway normalization (cumulative-text
++// fold + missing-finish_reason terminal fold) for the `glm` route so the pi-ai
++// adapter composes them. Registering this plugin in a profile makes GLM
++// normalization an installable/removable unit; without it the adapter keeps
++// only the built-in text fold and does not apply the terminal fold.
++// ---------------------------------------------------------------------------
++
++import type { Context } from '@deepseek-ai/cordis'
++
++/** Plugin configuration. */
++export interface Config {
++  /** Provider routes on which the GLM normalization registers; defaults to `['glm']`. */
++  providers?: string[]
++}
++
++export const name = 'glm-normalize'
++
++export const inject = [] as const
++
++export function apply(_ctx: Context, config?: Config): void {
++  for (const provider of config?.providers ?? ['glm']) {
++    registerStreamNormalizer(
++      provider,
++      glmTextFold as StreamEventNormalizer,
++      glmTerminalFold as StreamEventNormalizer,
++    )
++  }
++}
+diff --git a/packages/llm/llm-glm-normalize/src/invariant.ts b/packages/llm/llm-glm-normalize/src/invariant.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..f9148cd5627e357b19cba5ece506f612e947dc95
+--- /dev/null
++++ b/packages/llm/llm-glm-normalize/src/invariant.ts
+@@ -0,0 +1,23 @@
++/**
++ * Package-owned invariant companion for `@deepseek-ai/dsh-llm-glm-normalize`.
++ * @module @deepseek-ai/dsh-llm-glm-normalize/invariant
++ */
++
++/* jscpd:ignore-start */
++import type { Context } from '@deepseek-ai/cordis'
++import type { InvariantInstaller } from '@deepseek-ai/dsh-invariants'
++
++const PACKAGE_NAME = '@deepseek-ai/dsh-llm-glm-normalize'
++
++/** Cordis companion plugin name. */
++export const name = 'llm-glm-normalize-invariant'
++/** Service required before the companion can reserve package ownership. */
++export const inject = ['invariants']
++
++/** No runtime invariant: this package is a pure stream transformation utility. */
++const install: InvariantInstaller = () => {}
++
++/** Register this package's invariant companion. */
++export const apply = (ctx: Context): Promise<() => void> =>
++  Promise.resolve(ctx.invariants.register(PACKAGE_NAME, install))
++/* jscpd:ignore-end */
+diff --git a/packages/llm/llm-glm-normalize/tests/normalize.spec.ts b/packages/llm/llm-glm-normalize/tests/normalize.spec.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..0f9c64c58d473eb6b51b1627adc07fb9d7c7d927
+--- /dev/null
++++ b/packages/llm/llm-glm-normalize/tests/normalize.spec.ts
+@@ -0,0 +1,328 @@
++import { describe, expect, it } from 'vitest'
++import {
++  chainStreamNormalizers,
++  glmTextFold,
++  normalizeGlmTextEvents,
++} from '../src/index.ts'
++import type { StreamEventNormalizer } from '../src/index.ts'
++
++/** A minimal pi-ai-shaped event carrying the fields the fold reads, plus an opaque extra field. */
++type TestEvent =
++  | { type: 'text_start'; contentIndex: number; extra: number }
++  | { type: 'text_delta'; contentIndex: number; delta: string; extra: number }
++  | { type: 'text_end'; contentIndex: number; content: string; extra: number }
++  | { type: 'toolcall_start'; contentIndex: number; extra: number }
++  | { type: 'thinking_start'; contentIndex: number; extra: number }
++  | { type: 'start' }
++  | { type: 'done'; reason: string }
++  | { type: 'error'; reason: string }
++
++const text = (
++  type: 'text_start' | 'text_delta' | 'text_end',
++  contentIndex: number,
++  value: string,
++): TestEvent => {
++  switch (type) {
++    case 'text_start': return { type, contentIndex, extra: 7 }
++    case 'text_delta': return { type, contentIndex, delta: value, extra: 7 }
++    case 'text_end': return { type, contentIndex, content: value, extra: 7 }
++  }
++}
++
++const tool = (contentIndex: number): TestEvent => ({ type: 'toolcall_start', contentIndex, extra: 7 })
++
++async function* feed(...events: TestEvent[]): AsyncGenerator<TestEvent> {
++  for (const event of events) yield event
++}
++
++async function collect<E extends { type: string }>(stream: AsyncIterable<E>): Promise<E[]> {
++  const out: E[] = []
++  for await (const event of stream) out.push(event)
++  return out
++}
++
++describe('normalizeGlmTextEvents', () => {
++  it('folds a short-prefix block into the later complete text block', async () => {
++    const complete = '这是中转站返回的完整回答，内容足够长，应该只显示一次。'
++    const events = await collect(normalizeGlmTextEvents(feed(
++      text('text_start', 0, ''),
++      text('text_delta', 0, '这是'),
++      text('text_end', 0, '这是'),
++      text('text_start', 1, ''),
++      text('text_end', 1, complete),
++    )))
++    expect(events).toEqual([
++      text('text_start', 0, ''),
++      text('text_delta', 0, '这是'),
++      { type: 'text_end', contentIndex: 0, content: complete, extra: 7 },
++    ])
++  })
++
++  it('folds a short stub into a long later block even without a prefix match', async () => {
++    const events = await collect(normalizeGlmTextEvents(feed(
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'x'),
++      text('text_end', 0, 'x'),
++      text('text_start', 1, ''),
++      text('text_end', 1, 'y'.repeat(64)),
++    )))
++    expect(events.filter(event => event.type === 'text_end')).toEqual([
++      { type: 'text_end', contentIndex: 0, content: 'y'.repeat(64), extra: 7 },
++    ])
++  })
++
++  it('does not fold two distinct short blocks', async () => {
++    const events = await collect(normalizeGlmTextEvents(feed(
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'alpha'),
++      text('text_end', 0, 'alpha'),
++      text('text_start', 1, ''),
++      text('text_delta', 1, 'beta'),
++      text('text_end', 1, 'beta'),
++    )))
++    expect(events).toEqual([
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'alpha'),
++      text('text_end', 0, 'alpha'),
++      text('text_start', 1, ''),
++      text('text_delta', 1, 'beta'),
++      text('text_end', 1, 'beta'),
++    ])
++  })
++
++  it('does not fold into an already-closed block', async () => {
++    const events = await collect(normalizeGlmTextEvents(feed(
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'hi'),
++      text('text_end', 0, 'hi'),
++      text('text_start', 1, ''),
++      text('text_delta', 1, 'hi there'),
++      text('text_end', 1, 'hi there'),
++      text('text_start', 2, ''),
++      text('text_delta', 2, 'hi there again'),
++      text('text_end', 2, 'hi there again'),
++    )))
++    expect(events).toEqual([
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'hi'),
++      { type: 'text_end', contentIndex: 0, content: 'hi there', extra: 7 },
++      text('text_start', 2, ''),
++      text('text_delta', 2, 'hi there again'),
++      text('text_end', 2, 'hi there again'),
++    ])
++  })
++
++  it('passes non-text events through unchanged, in order', async () => {
++    const events = await collect(normalizeGlmTextEvents(feed(
++      { type: 'start' },
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'a'),
++      text('text_end', 0, 'a'),
++      { type: 'done', reason: 'stop' },
++    )))
++    expect(events).toEqual([
++      { type: 'start' },
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'a'),
++      text('text_end', 0, 'a'),
++      { type: 'done', reason: 'stop' },
++    ])
++  })
++
++  it('flushes a pending text end before a terminal done event', async () => {
++    // Regression: a single non-folded block ends with text_end, then done. A
++    // stream translator stops at the terminal event, so the fold must emit the
++    // pending text_end first or the block assembler never closes the block.
++    const events = await collect(normalizeGlmTextEvents(feed(
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'plain'),
++      text('text_end', 0, 'plain'),
++      { type: 'done', reason: 'stop' },
++    )))
++    expect(events).toEqual([
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'plain'),
++      text('text_end', 0, 'plain'),
++      { type: 'done', reason: 'stop' },
++    ])
++  })
++
++  it('flushes a pending text end before a terminal error event', async () => {
++    const events = await collect(normalizeGlmTextEvents(feed(
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'plain'),
++      text('text_end', 0, 'plain'),
++      { type: 'error', reason: 'boom' },
++    )))
++    expect(events).toEqual([
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'plain'),
++      text('text_end', 0, 'plain'),
++      { type: 'error', reason: 'boom' },
++    ])
++  })
++
++  it('replays a held later block in order when it does not fold', async () => {
++    const events = await collect(normalizeGlmTextEvents(feed(
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'alpha'),
++      text('text_end', 0, 'alpha'),
++      text('text_start', 1, ''),
++      text('text_delta', 1, 'beta'),
++      text('text_end', 1, 'beta'),
++    )))
++    expect(events).toEqual([
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'alpha'),
++      text('text_end', 0, 'alpha'),
++      text('text_start', 1, ''),
++      text('text_delta', 1, 'beta'),
++      text('text_end', 1, 'beta'),
++    ])
++  })
++
++  it('flushes pending text ends before a tool-call or thinking block', async () => {
++    const events = await collect(normalizeGlmTextEvents(feed(
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'alpha'),
++      text('text_end', 0, 'alpha'),
++      text('text_start', 1, ''),
++      text('text_delta', 1, 'beta'),
++      text('text_end', 1, 'beta'),
++      tool(2),
++      { type: 'thinking_start', contentIndex: 3, extra: 7 },
++    )))
++    expect(events.map(event => event.type)).toEqual([
++      'text_start', 'text_delta', 'text_end',
++      'text_start', 'text_delta', 'text_end',
++      'toolcall_start', 'thinking_start',
++    ])
++  })
++
++  it('flushes pending text ends in index order at end of stream', async () => {
++    const events = await collect(normalizeGlmTextEvents(feed(
++      text('text_start', 0, ''),
++      text('text_end', 0, 'a'),
++      text('text_start', 1, ''),
++      text('text_end', 1, 'b'),
++      text('text_start', 2, ''),
++      text('text_end', 2, 'c'),
++    )))
++    expect(events).toEqual([
++      text('text_start', 0, ''),
++      text('text_end', 0, 'a'),
++      text('text_start', 1, ''),
++      text('text_end', 1, 'b'),
++      text('text_start', 2, ''),
++      text('text_end', 2, 'c'),
++    ])
++  })
++
++  it('keeps an empty earlier block separate from a later block', async () => {
++    const events = await collect(normalizeGlmTextEvents(feed(
++      text('text_start', 0, ''),
++      text('text_end', 0, ''),
++      text('text_start', 1, ''),
++      text('text_delta', 1, 'hello'),
++      text('text_end', 1, 'hello'),
++    )))
++    expect(events).toEqual([
++      text('text_start', 0, ''),
++      text('text_end', 0, ''),
++      text('text_start', 1, ''),
++      text('text_delta', 1, 'hello'),
++      text('text_end', 1, 'hello'),
++    ])
++  })
++
++  it('yields nothing for an empty stream', async () => {
++    await expect(collect(normalizeGlmTextEvents(feed()))).resolves.toEqual([])
++  })
++
++  it('preserves extra fields on rewritten text_end events', async () => {
++    const events = await collect(normalizeGlmTextEvents(feed(
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'hi'),
++      text('text_end', 0, 'hi'),
++      text('text_start', 1, ''),
++      text('text_end', 1, 'hi complete'),
++    )))
++    expect(events.at(-1)).toEqual({ type: 'text_end', contentIndex: 0, content: 'hi complete', extra: 7 })
++  })
++})
++
++describe('glmTextFold', () => {
++  it('is the same transform as normalizeGlmTextEvents', async () => {
++    const complete = 'complete answer with enough length to matter here'
++    const direct = await collect(normalizeGlmTextEvents(feed(
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'short'),
++      text('text_end', 0, 'short'),
++      text('text_start', 1, ''),
++      text('text_end', 1, complete),
++    )))
++    const folded = await collect(glmTextFold(feed(
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'short'),
++      text('text_end', 0, 'short'),
++      text('text_start', 1, ''),
++      text('text_end', 1, complete),
++    )))
++    expect(folded).toEqual(direct)
++  })
++})
++
++describe('chainStreamNormalizers', () => {
++  const marker = (
++    name: string,
++    order: string[],
++  ): StreamEventNormalizer<TestEvent> => events => ({
++    async *[Symbol.asyncIterator]() {
++      for await (const event of events) {
++        order.push(`${name}:${event.type}`)
++        yield event
++      }
++    },
++  })
++
++  it('applies normalizers in argument order', async () => {
++    const order: string[] = []
++    const events = await collect(chainStreamNormalizers(
++      marker('first', order),
++      marker('second', order),
++      glmTextFold,
++    )(feed(
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'hi'),
++      text('text_end', 0, 'hi'),
++      text('text_start', 1, ''),
++      text('text_end', 1, 'hi there'),
++      { type: 'done', reason: 'stop' },
++    )))
++    // Folded: only the complete text block survives as a text_end.
++    expect(events.filter(event => event.type === 'text_end')).toEqual([
++      { type: 'text_end', contentIndex: 0, content: 'hi there', extra: 7 },
++    ])
++    expect(order).toEqual([
++      'first:text_start', 'second:text_start',
++      'first:text_delta', 'second:text_delta',
++      'first:text_end', 'second:text_end',
++      'first:text_start', 'second:text_start',
++      'first:text_end', 'second:text_end',
++      'first:done', 'second:done',
++    ])
++  })
++
++  it('is the identity transform with no normalizers', async () => {
++    const events = await collect(chainStreamNormalizers<TestEvent>()(feed(
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'a'),
++      text('text_end', 0, 'a'),
++    )))
++    expect(events).toEqual([
++      text('text_start', 0, ''),
++      text('text_delta', 0, 'a'),
++      text('text_end', 0, 'a'),
++    ])
++  })
++})
+diff --git a/packages/llm/llm-glm-normalize/tsconfig.json b/packages/llm/llm-glm-normalize/tsconfig.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..779effc3ccf9321512f581b20474aa04aa273f9e
+--- /dev/null
++++ b/packages/llm/llm-glm-normalize/tsconfig.json
+@@ -0,0 +1,15 @@
++{
++  "extends": "../../../tsconfig.base.json",
++  "compilerOptions": {
++    "rootDir": "src",
++    "outDir": "lib/types"
++  },
++  "include": [
++    "src"
++  ],
++  "references": [
++    {
++      "path": "../../runtime-diagnostics/invariants"
++    }
++  ]
++}
+diff --git a/packages/llm/llm-glm-normalize/tsdown.config.ts b/packages/llm/llm-glm-normalize/tsdown.config.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..ab8dc26ee8aa4c85156f2ff7d8672c0bf7fa7a1b
+--- /dev/null
++++ b/packages/llm/llm-glm-normalize/tsdown.config.ts
+@@ -0,0 +1,25 @@
++import { defineConfig } from 'tsdown'
++
++/** Build the package root and invariant companion as independent bundles. */
++export default defineConfig([
++  {
++    entry: ['lib/types/index.js'],
++    outDir: 'lib',
++    format: ['esm'],
++    platform: 'node',
++    target: 'es2024',
++    fixedExtension: false,
++    dts: false,
++    clean: false,
++  },
++  {
++    entry: ['lib/types/invariant.js'],
++    outDir: 'lib',
++    format: ['esm'],
++    platform: 'node',
++    target: 'es2024',
++    fixedExtension: false,
++    dts: false,
++    clean: false,
++  },
++])
+diff --git a/packages/llm/llm-pi-ai/package.json b/packages/llm/llm-pi-ai/package.json
+index 6a10d5a6bb56302190ea81f11025386815e612f0..401595fca54689760ef7bd60a5635af8a46a438f 100644
+--- a/packages/llm/llm-pi-ai/package.json
++++ b/packages/llm/llm-pi-ai/package.json
+@@ -39,6 +39,7 @@
+   },
+   "dependencies": {
+     "@deepseek-ai/dsh-brand": "workspace:^",
++    "@deepseek-ai/dsh-llm-glm-normalize": "workspace:^",
+     "@deepseek-ai/dsh-util-values": "workspace:^",
+     "@deepseek-ai/schemastery": "workspace:^",
+     "@earendil-works/pi-ai": "^0.85.1"
+diff --git a/packages/llm/llm-pi-ai/src/adapter.ts b/packages/llm/llm-pi-ai/src/adapter.ts
+index 8dba978c31510a9a344d09026215e8ccf1d1e846..6cc955fdff48793b88222c9efe03a3028d11bbba 100644
+--- a/packages/llm/llm-pi-ai/src/adapter.ts
++++ b/packages/llm/llm-pi-ai/src/adapter.ts
+@@ -60,6 +60,7 @@ import type { AttachmentStore, ImageAttachmentRef } from '@deepseek-ai/dsh-attac
+ import { idleWatchdog, timeoutOf } from '@deepseek-ai/dsh-timeout'
+ import type { ResolvedPiAiProviderProfile } from './config.ts'
+ import { toPiContext } from './context.ts'
++import type { AssistantEventNormalizer } from './stream.ts'
+ import { toStreamChunks } from './stream.ts'
+ 
+ /** One resolution's frozen view: the profiles and the collection built from them. */
+@@ -101,6 +102,20 @@ export interface PiAiAdapterOptions {
+    * conversion because its stored replay state is unusable by this build.
+    */
+   onReplayDegrade?: (detail: { provider: string; model: string; reason: string }) => void
++  /**
++   * Optional per-provider stream event normalizers composed before chunk
++   * translation. The adapter already applies the built-in GLM gateway folds for
++   * the `glm` route; this hook lets a composition append further provider quirks
++   * (through `dsh-llm-glm-normalize`'s `chainStreamNormalizers`) without editing
++   * the adapter. `undefined` keeps the built-in behavior only.
++   */
++  streamNormalizers?: (provider: string) => AssistantEventNormalizer[]
++  /**
++   * Whether to apply the built-in GLM folds for a route. Omission preserves the
++   * historical provider gate (`provider === 'glm'`); a settings profile may
++   * disable it or explicitly alias it to other routes.
++   */
++  applyGlmNormalizer?: (provider: string) => boolean
+ }
+ 
+ /** The two auth injectables a pi-ai collection is built with. */
+@@ -387,7 +402,15 @@ export class PiAiAdapter extends LlmAdapter {
+         // Harness-owned and therefore win collisions.
+         headers: requestHeaders(profile.headers),
+       })
+-      const iterator = toStreamChunks(events, model.contextWindow, options.signal, model.id)[Symbol.asyncIterator]()
++      const iterator = toStreamChunks(events, model.contextWindow, options.signal, model.id, {
++        provider: options.provider,
++        ...(this.config.applyGlmNormalizer === undefined
++          ? {}
++          : { applyGlmNormalizer: this.config.applyGlmNormalizer(options.provider) }),
++        ...(this.config.streamNormalizers === undefined
++          ? {}
++          : { normalizers: this.config.streamNormalizers(options.provider) }),
++      })[Symbol.asyncIterator]()
+       let exhausted = false
+       try {
+         while (true) {
+diff --git a/packages/llm/llm-pi-ai/src/config.ts b/packages/llm/llm-pi-ai/src/config.ts
+index 2f9e563008f4897f2c4a0d1eb30880c1a0c0df5d..665d9b3010183fcacead084c6fdce6db4edc9871 100644
+--- a/packages/llm/llm-pi-ai/src/config.ts
++++ b/packages/llm/llm-pi-ai/src/config.ts
+@@ -217,6 +217,14 @@ export interface ResolvedPiAiProviderProfile
+   configuredMaxTokens: ReadonlyMap<string, number>
+ }
+ 
++/** Optional built-in stream-normalizer profile. */
++export interface GlmNormalizerProfile {
++  /** Whether the built-in GLM cumulative-text fold is active. Defaults to true. */
++  enabled?: boolean
++  /** Provider routes on which the fold is active; omission means the `glm` route. */
++  providers?: string[]
++}
++
+ /** Plugin configuration: the provider routes this instance owns. */
+ export interface Config {
+   /**
+@@ -225,6 +233,8 @@ export interface Config {
+    * and registers them the moment a settings section supplies profiles.
+    */
+   providers?: Record<string, PiAiProviderProfile>
++  /** Optional normalizer profile; absent preserves the built-in GLM behavior. */
++  streamNormalizers?: { glm?: GlmNormalizerProfile }
+ }
+ 
+ const thinkingBudgets = z.object({
+@@ -344,9 +354,19 @@ const profile = z.object({
+   retryPolicy: RetryPolicySchema,
+ })
+ 
++const glmNormalizerProfile = z.object({
++  enabled: z.boolean().default(true),
++  // Materialize the omitted list to the historical GLM route. An explicit
++  // empty list intentionally disables the built-in fold for every route.
++  providers: z.array(z.string()).default(['glm']),
++})
++
+ /** Runtime schema for {@link Config}. */
+ export const Config: z<Config> = z.object({
+   providers: z.dict(profile).default({}),
++  streamNormalizers: z.object({
++    glm: glmNormalizerProfile,
++  }),
+ })
+ 
+ /**
+diff --git a/packages/llm/llm-pi-ai/src/index.ts b/packages/llm/llm-pi-ai/src/index.ts
+index dfa2a8159eb372d823245108273b5c8c69ee5f07..0dc3147ac792727b396282e03ae84459d21d12cd 100644
+--- a/packages/llm/llm-pi-ai/src/index.ts
++++ b/packages/llm/llm-pi-ai/src/index.ts
+@@ -70,6 +70,8 @@ import type { ResolvedPiAiProviderProfile } from './config.ts'
+ import { discoverModels } from './discovery.ts'
+ import type { StoredModelDiscoveryProfile } from './discovery.ts'
+ import { registerPiAiFlows } from './login.ts'
++import { normalizersFor } from './stream.ts'
++import type { AssistantEventNormalizer } from './stream.ts'
+ 
+ export { PiAiAdapter } from './adapter.ts'
+ export type { PiAiAdapterOptions } from './adapter.ts'
+@@ -86,6 +88,13 @@ export type {
+ } from './config.ts'
+ export { recordKeyFor } from './auth.ts'
+ export { supportedProtocols } from './provider.ts'
++// The stream-normalizer seam: a composition can append provider event quirks
++// (the GLM gateway folds ship in @deepseek-ai/dsh-llm-glm-normalize) without
++// editing this plugin. That package's own `glm-normalize` entry registers the
++// folds through its module registry; this adapter only reads the per-route
++// normalizers.
++export { chainStreamNormalizers, normalizersFor } from './stream.ts'
++export type { AssistantEventNormalizer, StreamFoldOptions } from './stream.ts'
+ 
+ export const name = 'llm-pi-ai'
+ export const inject = ['llm']
+@@ -194,10 +203,27 @@ export function apply(ctx: Context, config: Config): void {
+   // through `ctx` per call, so they stay correct across the collection rebuilds
+   // a configuration change causes, and a sign-in survives one.
+   const auth = { credentials: credentialStoreFrom(ctx), authContext: authContextFrom(ctx) }
++  /**
++   * Resolve the built-in GLM fold gate per request. Keeping this behind the
++   * profile callback makes the normalizer genuinely optional: a composition may
++   * disable it or apply the same folds to an aliased provider without changing
++   * the raw AssistantMessageEvent seam.
++   */
++  const applyGlmNormalizer = (provider: string): boolean => {
++    const profile = current().streamNormalizers?.glm
++    if (profile === undefined) return provider === 'glm'
++    return profile.enabled !== false && (profile.providers ?? ['glm']).includes(provider)
++  }
++
+   const adapter = new PiAiAdapter({
+     profiles,
+     resolveApiKey,
+     auth,
++    applyGlmNormalizer,
++    // Companion plugins register per-provider normalizers through the module
++    // registry (registerStreamNormalizer); those chains run instead of the
++    // built-in GLM folds when they own the route.
++    streamNormalizers: (provider) => (normalizersFor(provider) as AssistantEventNormalizer[] | undefined) ?? [],
+     resolveAttachments: () => ctx.get('attachments'),
+     resolveImageAccess: (attachments, ref) => resolveImageAttachmentAccess(
+       attachments,
+diff --git a/packages/llm/llm-pi-ai/src/stream.ts b/packages/llm/llm-pi-ai/src/stream.ts
+index 9bc2f98c4c16839417d74196bf474e288443d4e6..1c47118724a267963ab13291c60964cb3802b5d1 100644
+--- a/packages/llm/llm-pi-ai/src/stream.ts
++++ b/packages/llm/llm-pi-ai/src/stream.ts
+@@ -13,8 +13,37 @@ import { CONTEXT_WINDOW_EXCEEDED_CODE, EMPTY_RESPONSE_CODE, isContextWindowExcee
+ import type { FinishReason, StreamChunk, TokenUsage, ToolCallId } from '@deepseek-ai/dsh-llm'
+ import { isContextOverflow } from '@earendil-works/pi-ai'
+ import type { AssistantMessage, AssistantMessageEvent, Usage as PiUsage } from '@earendil-works/pi-ai'
++import { chainStreamNormalizers, glmTerminalFold, glmTextFold, normalizersFor } from '@deepseek-ai/dsh-llm-glm-normalize'
++import type { StreamEventNormalizer } from '@deepseek-ai/dsh-llm-glm-normalize'
+ import { toPiReplayState } from './replay.ts'
+ 
++/**
++ * One event-stream normalizer applied before chunk translation. The GLM
++ * gateway folds ship in `@deepseek-ai/dsh-llm-glm-normalize`; a composition can
++ * chain further provider quirks through {@link chainStreamNormalizers} without
++ * editing this module.
++ */
++export type AssistantEventNormalizer = StreamEventNormalizer<AssistantMessageEvent>
++
++export { chainStreamNormalizers, normalizersFor } from '@deepseek-ai/dsh-llm-glm-normalize'
++
++/** Optional folds composed before one route's event stream is translated. */
++export interface StreamFoldOptions {
++  /** Provider route key; the built-in GLM folds apply when it is `glm`. */
++  provider?: string
++  /**
++   * Whether the built-in GLM folds apply to this route. Omission keeps the
++   * historical provider gate (`provider === 'glm'`); a settings profile may
++   * disable them or alias them onto another route.
++   */
++  applyGlmNormalizer?: boolean
++  /**
++   * Extra normalizers composed after the built-in folds. A route already owned
++   * by a registered normalizer set supplies the whole chain instead.
++   */
++  normalizers?: AssistantEventNormalizer[]
++}
++
+ /**
+  * Map pi-ai usage (reasoning folded into output by pi-ai).
+  * @param usage - cumulative usage from the terminal pi-ai event.
+@@ -122,6 +151,14 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
+     }
+     case 'error': {
+       const text = message.errorMessage ?? 'pi-ai stream error'
++      // Vectide's GLM-5.3 (muse-spark backend) ends a stream with [DONE] but
++      // never emits a terminal finish_reason chunk; pi-ai then reports
++      // "Stream ended without finish_reason". The content blocks were already
++      // delivered, so a stream that produced content is a completed stop, not
++      // the transport truncation `classifyPiAiError` would call it.
++      if (/\bStream ended without finish_reason\b/i.test(text) && message.content.length > 0) {
++        return { kind: 'stop' }
++      }
+       return { kind: 'error', failure: { message: text, code: classifyPiAiError(text) } }
+     }
+   }
+@@ -136,6 +173,8 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
+  * @param callerSignal - caller cancellation state; an aborted caller makes any
+  *   in-band terminal error an aborted finish.
+  * @param requestedModel - request model identity for durable replay provenance.
++ * @param folds - optional per-route stream folds; the built-in GLM folds apply
++ *   for the `glm` route unless a registered normalizer set owns it.
+  * @returns the harness chunks, ending with `usage` then `finish`; throws
+  *   `LlmError` (`STREAM_CLOSED`) if the source ends without a terminal event.
+  */
+@@ -144,12 +183,28 @@ export async function* toStreamChunks(
+   contextWindow?: number,
+   callerSignal?: AbortSignal,
+   requestedModel?: string,
++  folds?: StreamFoldOptions,
+ ): AsyncGenerator<StreamChunk> {
++  // The source is composed through the stream-normalizer seam: the GLM gateway
++  // folds apply for the `glm` route by default, and a caller may append its own
++  // normalizers after them. A normalizer chain must preserve stream order and
++  // emit the same terminal events, or translation below loses its guarantees.
++  const builtIn: AssistantEventNormalizer[] = (folds?.provider !== undefined
++    && normalizersFor(folds.provider) !== undefined)
++    // A registered normalizer set (a plugin owning this route, e.g.
++    // dsh-llm-glm-normalize's `glm-normalize` entry) supplies the WHOLE chain
++    // for that route: pre-applying the built-ins would fold the stream twice.
++    ? []
++    : (folds?.applyGlmNormalizer ?? folds?.provider === 'glm') ? [glmTextFold, glmTerminalFold] : []
++  const source = chainStreamNormalizers<AssistantMessageEvent>(
++    ...builtIn,
++    ...(folds?.normalizers ?? []),
++  )(events)
+   // pi-ai contentIndex ↔ our block index map 1:1 (both count blocks from 0
+   // in stream order), but we track ids per index for tool calls.
+   const toolIds = new Map<number, { id: string; name: string }>()
+ 
+-  for await (const event of events) {
++  for await (const event of source) {
+     switch (event.type) {
+       case 'start':
+         break
+diff --git a/packages/llm/llm-pi-ai/tests/glm-normalizer.spec.ts b/packages/llm/llm-pi-ai/tests/glm-normalizer.spec.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..769a3a192e9a40c4511adc5c792cb2a6666a7fa3
+--- /dev/null
++++ b/packages/llm/llm-pi-ai/tests/glm-normalizer.spec.ts
+@@ -0,0 +1,171 @@
++/**
++ * The GLM stream-normalizer seam on the pi-ai adapter: the gateway folds
++ * (`@deepseek-ai/dsh-llm-glm-normalize`) apply per provider route, a profile can
++ * disable or alias them, and caller-supplied normalizers compose after them.
++ *
++ * Ported from the 0.1.1 fork's `convert.spec.ts` additions; the folds are
++ * addressed through `toStreamChunks`' trailing {@link StreamFoldOptions} object
++ * here, because 0.1.5 already spends two positional parameters on the caller
++ * signal and the requested model.
++ */
++import { describe, expect, it } from 'vitest'
++import type { AssistantMessage, AssistantMessageEvent, Usage } from '@earendil-works/pi-ai'
++import { Config } from '../src/config.ts'
++import { toStreamChunks } from '../src/stream.ts'
++import type { AssistantEventNormalizer, StreamFoldOptions } from '../src/stream.ts'
++import type { StreamChunk } from '@deepseek-ai/dsh-llm'
++
++function usage(input = 0, output = 0): Usage {
++  return { input, output, cacheRead: 0, cacheWrite: 0, totalTokens: input + output }
++}
++
++function assistant(overrides: Partial<AssistantMessage> = {}): AssistantMessage {
++  return {
++    role: 'assistant',
++    content: [],
++    api: 'openai-completions',
++    provider: 'glm',
++    model: 'glm-5.3',
++    usage: usage(),
++    stopReason: 'stop',
++    timestamp: 0,
++    ...overrides,
++  }
++}
++
++async function* feed(...events: AssistantMessageEvent[]): AsyncGenerator<AssistantMessageEvent> {
++  for (const event of events) yield event
++}
++
++async function collect(stream: AsyncIterable<StreamChunk>): Promise<StreamChunk[]> {
++  const out: StreamChunk[] = []
++  for await (const chunk of stream) out.push(chunk)
++  return out
++}
++
++/** Run one stream through the seam with explicit fold options. */
++function translate(events: AsyncGenerator<AssistantMessageEvent>, folds?: StreamFoldOptions) {
++  return collect(toStreamChunks(events, undefined, undefined, undefined, folds))
++}
++
++/** A caller-supplied seam normalizer: uppercases text deltas, everything else passes. */
++const uppercaseDeltas: AssistantEventNormalizer = events => ({
++  async *[Symbol.asyncIterator]() {
++    for await (const event of events) {
++      yield event.type === 'text_delta' ? { ...event, delta: event.delta.toUpperCase() } : event
++    }
++  },
++})
++
++const blockEnds = (chunks: StreamChunk[]): StreamChunk[] => chunks.filter(chunk => chunk.type === 'block-end')
++const textDeltas = (chunks: StreamChunk[]): StreamChunk[] => chunks.filter(chunk => chunk.type === 'text-delta')
++
++/** The GLM gateway quirk: a short prefix block, then the complete answer. */
++const COMPLETE = '这是中转站返回的完整回答，内容足够长，应该只显示一次。'
++
++function gatewayQuirk(): AsyncGenerator<AssistantMessageEvent> {
++  return feed(
++    { type: 'start', partial: assistant() },
++    { type: 'text_start', contentIndex: 0, partial: assistant() },
++    { type: 'text_delta', contentIndex: 0, delta: '这是', partial: assistant() },
++    { type: 'text_end', contentIndex: 0, content: '这是', partial: assistant() },
++    { type: 'text_start', contentIndex: 1, partial: assistant() },
++    { type: 'text_end', contentIndex: 1, content: COMPLETE, partial: assistant() },
++    { type: 'done', reason: 'stop', message: assistant({ content: [{ type: 'text', text: COMPLETE }] }) },
++  )
++}
++
++/** A short block followed by a long unrelated one (the stub-replay rule). */
++function stubThenAnswer(): AsyncGenerator<AssistantMessageEvent> {
++  return feed(
++    { type: 'start', partial: assistant() },
++    { type: 'text_start', contentIndex: 0, partial: assistant() },
++    { type: 'text_delta', contentIndex: 0, delta: 'stub', partial: assistant() },
++    { type: 'text_end', contentIndex: 0, content: 'stub', partial: assistant() },
++    { type: 'text_start', contentIndex: 1, partial: assistant() },
++    { type: 'text_end', contentIndex: 1, content: 'x'.repeat(64), partial: assistant() },
++    { type: 'done', reason: 'stop', message: assistant() },
++  )
++}
++
++/** Two short blocks that the fold must leave alone. */
++function twoShortBlocks(): AsyncGenerator<AssistantMessageEvent> {
++  return feed(
++    { type: 'start', partial: assistant() },
++    { type: 'text_start', contentIndex: 0, partial: assistant() },
++    { type: 'text_end', contentIndex: 0, content: 'short', partial: assistant() },
++    { type: 'text_start', contentIndex: 1, partial: assistant() },
++    { type: 'text_end', contentIndex: 1, content: 'complete answer', partial: assistant() },
++    { type: 'done', reason: 'stop', message: assistant() },
++  )
++}
++
++describe('GLM fold gating', () => {
++  it('folds the gateway short-prefix block into the later complete text for the glm route', async () => {
++    const chunks = await translate(gatewayQuirk(), { provider: 'glm' })
++    expect(blockEnds(chunks)).toEqual([
++      { type: 'block-end', index: 0, block: { type: 'text', text: COMPLETE } },
++    ])
++  })
++
++  it('applies the same fold to a glm-aliased route when a profile says so', async () => {
++    const chunks = await translate(stubThenAnswer(), { provider: 'glm-gateway', applyGlmNormalizer: true })
++    expect(blockEnds(chunks)).toEqual([
++      { type: 'block-end', index: 0, block: { type: 'text', text: 'x'.repeat(64) } },
++    ])
++  })
++
++  it('can explicitly disable the built-in fold', async () => {
++    const chunks = await translate(twoShortBlocks(), { provider: 'glm', applyGlmNormalizer: false })
++    expect(blockEnds(chunks)).toHaveLength(2)
++  })
++
++  it('does not apply the fold to another provider', async () => {
++    const chunks = await translate(twoShortBlocks(), { provider: 'easy' })
++    expect(blockEnds(chunks)).toHaveLength(2)
++  })
++})
++
++describe('caller-supplied normalizers', () => {
++  it('compose after the built-in GLM fold', async () => {
++    const chunks = await translate(gatewayQuirk(), { provider: 'glm', normalizers: [uppercaseDeltas] })
++    expect(textDeltas(chunks)).toEqual([{ type: 'text-delta', index: 0, text: '这是'.toUpperCase() }])
++    expect(blockEnds(chunks)).toEqual([
++      { type: 'block-end', index: 0, block: { type: 'text', text: COMPLETE } },
++    ])
++  })
++
++  it('run without the built-in fold on an unowned route', async () => {
++    const chunks = await translate(gatewayQuirk(), { provider: 'easy', normalizers: [uppercaseDeltas] })
++    expect(textDeltas(chunks)).toEqual([{ type: 'text-delta', index: 0, text: '这是'.toUpperCase() }])
++    // No fold: the short prefix block and the complete block both survive.
++    expect(blockEnds(chunks)).toHaveLength(2)
++  })
++
++  it('leave an unnormalized stream untouched when no folds are configured', async () => {
++    const chunks = await translate(gatewayQuirk())
++    expect(blockEnds(chunks)).toHaveLength(2)
++  })
++})
++
++describe('stream normalizer profile', () => {
++  interface Materialized {
++    streamNormalizers?: { glm?: { enabled?: boolean; providers?: string[] } }
++  }
++
++  it('defaults the built-in GLM folds to the glm route', () => {
++    const config = Config({}) as Materialized
++    expect(config.streamNormalizers?.glm).toEqual({ enabled: true, providers: ['glm'] })
++    const configured = Config({ streamNormalizers: { glm: {} } }) as Materialized
++    expect(configured.streamNormalizers?.glm).toEqual({ enabled: true, providers: ['glm'] })
++  })
++
++  it('allows disabling or aliasing the built-in folds', () => {
++    expect(Config({ streamNormalizers: { glm: { enabled: false, providers: [] } } })).toMatchObject({
++      streamNormalizers: { glm: { enabled: false, providers: [] } },
++    })
++    expect(Config({ streamNormalizers: { glm: { providers: ['glm-gateway'] } } })).toMatchObject({
++      streamNormalizers: { glm: { enabled: true, providers: ['glm-gateway'] } },
++    })
++  })
++})
+diff --git a/packages/llm/llm-pi-ai/tsconfig.json b/packages/llm/llm-pi-ai/tsconfig.json
+index c7d43104c0a915a00136ab15cd689c3cb99beb5e..13ee8f187f7fa90d1ec2729624110217b1a9e0e7 100644
+--- a/packages/llm/llm-pi-ai/tsconfig.json
++++ b/packages/llm/llm-pi-ai/tsconfig.json
+@@ -26,6 +26,9 @@
+     {
+       "path": "../../llm/llm"
+     },
++    {
++      "path": "../../llm/llm-glm-normalize"
++    },
+     {
+       "path": "../../attachment/attachment"
+     },
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index f7e108af2c3ec29cf53a7f43909224ef1046e2d5..07f6ecccb8b6b23cce3370d934ed735f0f2e90ed 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -7083,11 +7083,23 @@ importers:
+         specifier: workspace:^
+         version: link:../../util/timeout
+ 
++  packages/llm/llm-glm-normalize:
++    devDependencies:
++      '@deepseek-ai/cordis':
++        specifier: workspace:^
++        version: link:../../../vendor/cordis
++      '@deepseek-ai/dsh-invariants':
++        specifier: workspace:^
++        version: link:../../runtime-diagnostics/invariants
++
+   packages/llm/llm-pi-ai:
+     dependencies:
+       '@deepseek-ai/dsh-brand':
+         specifier: workspace:^
+         version: link:../../util/brand
++      '@deepseek-ai/dsh-llm-glm-normalize':
++        specifier: workspace:^
++        version: link:../llm-glm-normalize
+       '@deepseek-ai/dsh-util-values':
+         specifier: workspace:^
+         version: link:../../util/values
+@@ -14891,10 +14903,6 @@ packages:
+     resolution: {integrity: sha512-nTjqfcBFEipKdXCv4YDQWCfmcLZKm81ldF0pAopTvyrFGVbcR6P/VAAd5G7N+0tTr8QqiU0tFadD6FK4NtJwOA==}
+     engines: {node: '>= 0.6'}
+ 
+-  content-type@2.0.0:
+-    resolution: {integrity: sha512-j/O/d7GcZCyNl7/hwZAb606rzqkyvaDctLmckbxLzHvFBzTJHuGEdodATcP3yIRoDrLHkIATJuvzbFlp/ki2cQ==}
+-    engines: {node: '>=18'}
+-
+   content-type@2.1.0:
+     resolution: {integrity: sha512-mj7UPXE0jaqaOsukNZRUEfEi2AcL7C/vwmwcHV0O97eO1E1pxBZuyjlZrx5seTaNBg1U6+o35wpa35Qfcc+7ag==}
+     engines: {node: '>=18'}
+@@ -21340,7 +21348,7 @@ snapshots:
+   body-parser@2.3.0:
+     dependencies:
+       bytes: 3.1.2
+-      content-type: 2.0.0
++      content-type: 2.1.0
+       debug: 4.4.3(supports-color@9.4.0)
+       http-errors: 2.0.1
+       iconv-lite: 0.7.3
+@@ -21560,8 +21568,6 @@ snapshots:
+ 
+   content-type@1.0.5: {}
+ 
+-  content-type@2.0.0: {}
+-
+   content-type@2.1.0: {}
+ 
+   convert-source-map@2.0.0: {}
+@@ -24874,7 +24880,7 @@ snapshots:
+ 
+   type-is@2.1.0:
+     dependencies:
+-      content-type: 2.0.0
++      content-type: 2.1.0
+       media-typer: 1.1.1
+       mime-types: 3.0.2
+ 
