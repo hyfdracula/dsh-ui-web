@@ -28,9 +28,12 @@ actions, and the update panel that probes and runs the update.
 - **Security**: one active one-time token (a refresh invalidates the old
   link; an accepted token cannot be reused; tokens expire). 停止 revokes
   every paired device and the current token — paired devices are cut off on
-  their next request. When the plugin's `requirePairingForLan` gate is on
-  (default), every non-loopback `/api` request must carry a live paired
-  device cookie, so the QR is the only way into a LAN-exposed dsh web.
+   their next request. The phone channel (`/m/api`) always requires a live
+   paired-device cookie, so 停止 cuts a phone off immediately. Non-loopback
+   `/api` access is fenced by the harness itself: 0.1.5 authenticates every
+   request against the launch-token browser session (401 without it) and
+   rejects an untrusted Host/Origin (403) — the plugin's old LAN veto has
+   no seam left (see "Harness contract dependencies").
 - **Live status**: the desktop panel mirrors the pairing state in real time
   (waiting → connected → disconnected) over an SSE stream.
 - **Remote update**: the download trigger in the sidebar foot (left of the
@@ -58,7 +61,7 @@ sun/moon toggle in every header flips to the dark palette at any time.
   模型 / 权限 chips, and a live stream while the agent works:
   ![Chat](docs/screenshots/mobile-chat.png)
 - **Model picker** — the bottom sheet with a provider-grouped catalog and a
-  思考强度 section per model (the same `session.models` directory the
+  思考强度 section per model (the same `session.modelCatalog` directory the
   desktop uses):
   ![Model sheet](docs/screenshots/mobile-model-sheet.png)
 
@@ -133,9 +136,11 @@ mounts both halves.
    - a composer toolbar carries the **model** picker (provider-grouped
      catalog with a 思考强度 effort section per model) and the **权限**
      picker (permission presets; 完全权限 requires an explicit confirm
-     step). Both ride the host's own `session.models` /
-     `session.selectModel` RPCs and the `/permission` command — the phone
-     changes the same session settings the desktop would.
+     step). Both ride the host's own Remote surface — `session.modelCatalog`
+     plus `session.selectModel` for the model, and the durable
+     `modelSelection` / `permissions` projections for the current values —
+     and the `/permission` command — the phone changes the same session
+     settings the desktop would.
 4. The desktop badge flips to 已连接 in real time; it falls back to
    offline/断开 when the phone leaves.
 5. 刷新二维码 invalidates the old link and issues a new one. 停止 revokes
@@ -144,26 +149,39 @@ mounts both halves.
 
 The mobile surface is fully self-contained in this plugin: the `/m` page
 and its data channel (`/m/api`) are served by the plugin's own routes and
-need **no harness source changes** — the phone's RPC calls ride the
-plugin's `/m/api` proxy (which delegates to the host ApiProxy service and
-pages `session.list` itself), so the tunneled Host never has to enter the
-connection plugin's trust fence. The phone is gated by its paired-device
-cookie and an explicit method allowlist (settings/credentials/host-action
-domains are never reachable from the phone; model reads/writes are limited
-to the advisory `session.models` / `session.selectModel` pair, creation to
-`session.create` (workspace id only — the phone never names a working
-directory of its own), and the permission picker only ever sends the
-mode-agnostic `/permission` command
-through the already-allowlisted `session.prompt`); the live stream arrives
-over Server-Sent Events on `/m/api/events.mux`.
+need **no harness source changes**. Since 0.1.5 the adapter behind `/m/api`
+dispatches the official Remote surface through `ctx.typertGateway` (the
+`ApiProxy` service the old proxy delegated to is gone): `session.list` is
+paged here, `session.page` gets its inclusive tail cut from
+`ctx.sessionQuery` so the phone never has to open a stream before reading
+history, and the workspace roster comes from `ctx.workspaceRegistry`.
+Because the whole channel is plugin-owned, the tunneled Host never enters
+the connection plugin's trust fence. The phone is gated by its
+paired-device cookie and an explicit method allowlist (settings,
+credentials, and host-action domains are never reachable from the phone;
+model reads/writes are limited to the advisory catalog / selection pair,
+creation to `session.create` with a workspace id — the phone never names a
+working directory of its own — and the permission picker only ever sends
+the mode-agnostic `/permission` command through the already-allowlisted
+`session.prompt`).
+
+Live frames ride Server-Sent Events on `/m/api/session.follow?sessionId=…`:
+one `session.follow` Remote stream per open chat, forwarded frame by frame
+(the opening `snapshot` window, durable `{type: 'event'}` frames, and the
+process-local `assistant-stream` chunks that make the reply stream token by
+token), plus projection deltas the adapter pushes when the durable fold
+moves a value — that is what keeps the permission and model chips live.
 
 ### Behavior notes
 
-- Installing this plugin gates non-loopback `/api` access behind pairing
-  (see `requirePairingForLan` in `src/index.ts`). A desktop browser opened
-  via the LAN URL must pair like any remote device; loopback (127.0.0.1)
-  is unaffected. Set `requirePairingForLan: false` in the profile patch to
-  restore the open-LAN behavior while keeping tokens/status/revocation.
+- The plugin no longer gates non-loopback `/api` access: 0.1.5 removed the
+  `api/gate` waterfall and made the /api fence an authentication layer of
+  its own (401 without the launch-token browser session, 403 on an
+  untrusted Host/Origin), and the shared `/api` channel takes exactly one
+  interceptor — the Typert gateway's. `requirePairingForLan` is therefore
+  retired: it still validates and appears in the settings card, but it
+  changes nothing, and setting it to `false` logs a startup warning saying
+  so. The phone surface keeps its own paired-cookie gate on `/m/api`.
 - The QR link is built from the machine's non-internal IPv4 literals; a
   multi-homed host (Wi-Fi + wired, or a proxy/VPN virtual adapter) shows a
   radio picker so you can advertise the network the phone can actually
@@ -248,15 +266,17 @@ Notes:
   Tailscale Serve the mobile chat falls back to polling: the phone still
   sends and receives messages (everything else rides plain HTTP, which does
   forward), only a new message may arrive a few seconds late instead of
-  instantly. The plugin polls `session.history` on a short interval once the
+  instantly. The plugin polls `session.page` on a short interval once the
   SSE channel goes silent, and resumes streaming as soon as SSE works again.
   For true real-time push, point the QR at a tunnel that forwards SSE — a
   Cloudflare **named tunnel** (domain hosted on Cloudflare, see below), or a
   plain TCP port forward (LAN address, the `tailscale up` virtual-interface
   address, or a manual `ssh -L` / cloudflared TCP tunnel to the port).
 - A quick tunnel is public: anyone with the URL can load the static page.
-  The pairing gate is the real fence — unpaired devices get 403 on every
-  `/api` call — so keep `requirePairingForLan` on.
+  The pairing gate is the real fence for the phone surface — unpaired
+  devices get 403 on every `/m/api` call — and the harness's own
+  authentication fence covers `/api` (401 without the launch-token
+  session).
 - For a stable hostname, create a named tunnel from the Cloudflare
   dashboard (Networking → Tunnels; the domain must be hosted on
   Cloudflare) and use its hostname in the same two places. Reachability
@@ -280,7 +300,7 @@ pnpm --filter @captain1275/dsh-remote-web-ui run typecheck
 ```
 
 The peer APIs come from the official NPM SDK: every `@deepseek-ai/*` package
-used here is declared in devDependencies (rc.6), and TypeScript/Vitest resolve
+used here is declared in devDependencies (0.1.5-rc.2), and TypeScript/Vitest resolve
 types straight from node_modules — no DSH source checkout is required. The
 consumer-side `prepare` build (`tsdown.prepare.config.ts`) transpiles without
 type checking, so git installs work without any harness checkout either.
@@ -295,26 +315,36 @@ pnpm run build
 
 ## Harness contract dependencies
 
-This plugin rides three harness seams that may not exist in older checkouts:
+This plugin rides these 0.1.5 harness seams:
 
-- **`api/gate` waterfall** (packages/client/connection): the /api route and
-  event WebSocket upgrades emit this event after the trust fence so plugins
-  can enforce application-level access control. Without it, revocation has
-  no server-side teeth.
-- **`sidebar.remote` foot seat** (packages/client/ui-sidebar): the sidebar
-  declares and renders the seat the phone entry occupies.
-- **LAN runtime connection fixes** (host-apiproxy `mintRpcId` fallback for
-  insecure-context origins; the 20260808-branch connection loop opening the
-  host stream after the mux stream): without them the browser runtime cannot
-  run on a plain-HTTP LAN page at all (the mobile side of this feature).
+- **`sidebar.footer.action` seat** (packages/client/ui-sidebar): the sidebar
+  declares and renders the seat the phone entry occupies (the older
+  `sidebar.remote` seat and its fallback wrapper were removed with it).
+- **`ctx.typertGateway`** (packages/api/gateway): the in-process dispatcher
+  behind every Remote method. The mobile adapter calls
+  `invoke({ namespace, method, args })` for unary work and
+  `stream({ … })` for `session.follow`; `args` keys are the generated
+  descriptor's wire names (`request` for the session verbs, `_request` for
+  `session.list`).
+- **`ctx.sessionQuery`** (packages/session-query): the observation that
+  yields the inclusive tail cut `session.page` demands (`throughSeq`) —
+  `session.follow`'s opening frame is the other source, and the phone must
+  not have to open a stream just to read history.
+- **`ctx.workspaceRegistry`** (packages/workspace): the workspace roster the
+  phone lists. There is no `workspace.list` Remote method in 0.1.5 — the
+  browser client builds its list from the `workspace.follow` baseline — so a
+  host plugin reads the registry directly.
+- **`connection` / `api/gate`**: retired. The connection plugin's /api fence
+  is now real authentication (403 untrusted Host/Origin, 401 without a
+  browser session) and the shared `/api` channel accepts exactly one
+  interceptor (the gateway's), so the plugin's LAN-wide pairing veto has no
+  seam left and was removed.
 
-The fence helpers (`isTrustedApiRequest` / `isLoopbackHostname`) are
-reimplemented locally in `src/gate.ts` / `src/routes.ts`: the 20260810
-upstream moved the trust fence inside the connection plugin and stopped
-exporting them, so the pairing routes carry their own copy scoped to the
-literals the QR links advertise.
-See the Agent Notes `api-gate-and-sidebar-remote-seat` and
-`lan-runtime-connection-fixes` in the harness checkout.
+The fence helpers the pairing routes still use (`isTrustedApiRequest` /
+`isLoopbackClient`) are reimplemented locally in `src/gate.ts` /
+`src/routes.ts`: upstream keeps the trust fence inside the connection plugin
+and does not export it, so the pairing routes carry their own copy scoped to
+the literals the QR links advertise.
 
 ## Manual E2E: LAN pairing round trip
 
@@ -346,6 +376,9 @@ panel still opens at `http://127.0.0.1`.
 
 - **Revocation is per-request**: a paired phone whose request is already in
   flight when 停止 lands completes that request; the next one 403s.
+- **No LAN-wide veto any more**: see "Harness contract dependencies" — the
+  plugin cannot gate `/api` on 0.1.5, and relies on the harness's own
+  authentication fence there.
 - **Device sessions are in-memory**: pairing state (token + devices) resets
   with the `dsh web` process.
 - **No per-device management UI**: the panel shows aggregate status

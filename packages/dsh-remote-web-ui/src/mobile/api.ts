@@ -1,49 +1,54 @@
 /**
- * Mobile-surface business API: the handful of host RPC methods the
- * simplified surface needs. Types come from the harness apiproxy contract
+ * Mobile-surface business API: the handful of host methods the simplified
+ * surface needs, called over the plugin's own `/m/api` channel (see
+ * `mobile-api.ts` host half). Types come from the 0.1.5 Remote contract
  * (type-only imports; the wire schemas stay in the bundle only through the
- * rpc/mux layers).
+ * `wire.ts` guards and the `rpc.ts` envelope).
+ *
+ * The method names are the adapter's own vocabulary — the adapter maps each
+ * one onto the official Remote namespace (`session.page`, `session.follow`,
+ * `session.modelCatalog`, …), fills in what the phone cannot know (the history
+ * tail cursor), and narrows what the phone must not see.
  */
 
-import type { WorkspaceView } from '@deepseek-ai/dsh-host-apiproxy/api/workspace'
-import type { SessionSummary, SessionModels, SessionProjectionsBlock } from '@deepseek-ai/dsh-host-apiproxy/api/sessions'
 import { callUnary } from './rpc.ts'
+import {
+  parseCreatedSession,
+  parseHistoryPage,
+  parseSelectedModel,
+  parseSessionListPage,
+  parseSessionModels,
+  parseWorkspaceRows,
+  type CreatedSession,
+  type HistoryPage,
+  type SessionListPage,
+  type SessionModels,
+  type WorkspaceRow,
+} from './wire.ts'
 
-/** One session.list page. */
-export interface SessionPage {
-  items: SessionSummary[]
-  /** Continuation cursor; undefined once the tail is reached. */
-  nextCursor?: string
-  hasMore: boolean
+export type {
+  CreatedSession,
+  HistoryPage,
+  SessionListPage,
+  SessionModels,
+  WorkspaceRow,
+} from './wire.ts'
+
+/** One selected model triple (the wire `ModelSelection`). */
+export interface ModelSelection {
+  provider: string
+  model: string
+  reasoningEffort?: string
 }
 
-/** The session.create result (the id is the commit the caller navigates to). */
-export interface CreatedSession {
-  sessionId: string
-  /** The composition the new session runs (echoed so the caller can label it). */
-  agentPreset?: string
-}
-
-/** One history page (already bounded to whole messages by the host). */
-export interface HistoryPage {
-  events: import('@deepseek-ai/dsh-host-apiproxy/api/sessions').HistoryEntry[]
-  hasMore: boolean
-  /**
-   * Projection baseline riding the tail page (permissions select etc.);
-   * absent when the deployment mounts no projection registry.
-   */
-  projections?: SessionProjectionsBlock
-}
-
-/** The workspace roster (session ids come back per workspace). */
-export async function listWorkspaces(): Promise<WorkspaceView[]> {
-  const { items } = await callUnary<{ items: WorkspaceView[] }>('workspace.list', {})
-  return items
+/** The workspace roster (the host registry's stable order). */
+export async function listWorkspaces(): Promise<WorkspaceRow[]> {
+  return parseWorkspaceRows(await callUnary<unknown>('workspace.list', {}))
 }
 
 /** One session.list page; omit the cursor for the first page. */
-export async function listSessions(cursor?: string): Promise<SessionPage> {
-  return await callUnary<SessionPage>('session.list', cursor === undefined ? {} : { cursor })
+export async function listSessions(cursor?: string): Promise<SessionListPage> {
+  return parseSessionListPage(await callUnary<unknown>('session.list', cursor === undefined ? {} : { cursor }))
 }
 
 /**
@@ -53,54 +58,50 @@ export async function listSessions(cursor?: string): Promise<SessionPage> {
 export async function createSession(
   options: { workspaceId?: string; cwd?: string } = {},
 ): Promise<CreatedSession> {
-  return await callUnary<CreatedSession>('session.create', options)
+  return parseCreatedSession(await callUnary<unknown>('session.create', options))
 }
 
-/** One history window; omit beforeSeq for the tail page. */
+/**
+ * One message-aligned history window; omit beforeSeq for the tail page. The
+ * host supplies the inclusive tail cut the Remote method demands.
+ */
 export async function history(
   sessionId: string,
   beforeSeq?: number,
   maxMessages = 30,
 ): Promise<HistoryPage> {
-  return await callUnary<HistoryPage>('session.history', {
+  return parseHistoryPage(await callUnary<unknown>('session.page', {
     sessionId,
     maxMessages,
     ...(beforeSeq !== undefined ? { beforeSeq } : {}),
-  })
+  }))
 }
 
 /** Send one text prompt (queued: the agent picks it up in order). */
 export async function prompt(sessionId: string, text: string): Promise<void> {
-  await callUnary<{ accepted: true }>('session.prompt', {
-    sessionId,
-    mode: 'queue',
-    content: [{ type: 'text', text }],
-  })
+  await callUnary<unknown>('session.prompt', { sessionId, text })
 }
 
 /** Send one slash command line (e.g. `/permission workspace-write`). */
 export async function sendCommand(sessionId: string, line: string): Promise<unknown> {
-  return await callUnary<unknown>('session.prompt', {
-    sessionId,
-    mode: 'queue',
-    content: [{ type: 'text', text: line }],
-  })
+  return await callUnary<unknown>('session.prompt', { sessionId, text: line })
 }
 
-/** Fresh advisory model directory for one session (current + groups + failures). */
+/** Fresh advisory model directory for one session (groups + current selection). */
 export async function models(sessionId: string): Promise<SessionModels> {
-  return await callUnary<SessionModels>('session.models', { sessionId })
+  return parseSessionModels(await callUnary<unknown>('session.models', { sessionId }))
 }
 
 /** Select the complete model selection (provider/model/reasoning effort) for a session. */
 export async function selectModel(
   sessionId: string,
-  selection: { provider: string; model: string; reasoningEffort?: string },
-): Promise<{ selected: { provider: string; model: string; reasoningEffort?: string } }> {
-  return await callUnary<{ selected: { provider: string; model: string; reasoningEffort?: string } }>('session.selectModel', {
+  selection: ModelSelection,
+): Promise<{ selected: ModelSelection }> {
+  const value = await callUnary<unknown>('session.selectModel', {
     sessionId,
     provider: selection.provider,
     model: selection.model,
     ...(selection.reasoningEffort !== undefined ? { reasoningEffort: selection.reasoningEffort } : {}),
   })
+  return { selected: parseSelectedModel(value) }
 }

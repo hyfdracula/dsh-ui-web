@@ -2,7 +2,7 @@
  * Pairing state machine: one active one-time token, a device-session table,
  * and presence tracking. Pure TypeScript with injected clock/randomness so
  * the whole security semantics are unit-testable without cordis. The
- * cordis-facing surfaces (routes, the api/gate listener) live next door.
+ * cordis-facing surfaces (routes, the phone data channel) live next door.
  *
  * Security invariants:
  * - One active token at a time; `issue()` replaces it, so a refreshed QR
@@ -271,7 +271,7 @@ export class PairingService {
   }
 
   /**
-   * The api/gate path: record activity for a device id and report whether
+   * The presence path: record activity for a device id and report whether
    * the request may proceed. Unknown or revoked ids (including any device
    * after stop()) are refused.
    * @param deviceId - the cookie value of the requesting device.

@@ -45,7 +45,7 @@ export interface CardShell {
   available: boolean
   /**
    * Whether the namespace is actually served to this client. False when the
-   * Host deployment does not expose it (e.g. the official apiproxy settings
+   * Host deployment does not expose it (the settings surface has no such
    * allowlist omits third-party namespaces): the card renders an explanation
    * instead of its form, so a missing namespace never looks like a missing
    * plugin.

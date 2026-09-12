@@ -4,7 +4,7 @@
  * plugin's /api prefix, so these handlers own the full response lifecycle
  * and apply their own trust fence (loopback-only for control endpoints;
  * loopback-or-LAN for the phone-facing accept/heartbeat/status). The
- * cookie set on accept is the device identity the api/gate listener checks
+ * cookie set on accept is the device identity the phone channel checks
  * on every other /api request.
  */
 

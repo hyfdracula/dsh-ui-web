@@ -12,8 +12,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import type { MuxFrame } from '@deepseek-ai/dsh-host-apiproxy/api/events'
-import type { SessionModels } from '@deepseek-ai/dsh-host-apiproxy/api/sessions'
+import type { MobileFrame, SessionModels } from '../wire.ts'
 import { loadHistory, prompt, type SessionView } from './App.tsx'
 import { errorText, formatTime, staleHostHint } from './App.tsx'
 import { models, selectModel, sendCommand } from '../api.ts'
@@ -27,11 +26,6 @@ export interface ChatViewProps {
   /** The page-lifetime mux client (undefined before the first effect tick). */
   mux?: MuxClient | undefined
   onBack(): void
-}
-
-/** Extract the raw event from one history entry (the fold consumes events only). */
-function eventOf(entry: { event: WireEvent }): WireEvent {
-  return entry.event
 }
 
 /** Defensive runtime guard for projection payloads. */
@@ -118,7 +112,7 @@ export function ChatView({ session, mux, onBack }: ChatViewProps) {
     void loadHistory(session.sessionId).then(
       (page) => {
         if (cancelled) return
-        setMessages(foldEvents(page.events.map(eventOf)))
+        setMessages(foldEvents(page.records.map(record => record.event)))
         setHasOlder(page.hasMore)
         setLoading(false)
         // The history-tail projection baseline seeds the permission picker.
@@ -147,10 +141,10 @@ export function ChatView({ session, mux, onBack }: ChatViewProps) {
   // Live frames: fold session events for this session in as they arrive.
   useEffect(() => {
     if (mux === undefined) return
-    return mux.onFrame((frame: MuxFrame) => {
+    return mux.onFrame((frame: MobileFrame) => {
       if (frame.type === 'session/event') {
         if (frame.sessionId !== session.sessionId) return
-        setMessages(previous => foldEvents([frame.event as WireEvent], previous))
+        setMessages(previous => foldEvents([frame.event], previous))
         return
       }
       // Live projection pushes keep the permission picker current.
@@ -205,7 +199,7 @@ export function ChatView({ session, mux, onBack }: ChatViewProps) {
       (page) => {
         pendingRef.current = false
         setLoading(false)
-        const older = foldEvents(page.events.map(eventOf))
+        const older = foldEvents(page.records.map(record => record.event))
         setMessages(previous => [...older, ...previous])
         setHasOlder(page.hasMore)
       },

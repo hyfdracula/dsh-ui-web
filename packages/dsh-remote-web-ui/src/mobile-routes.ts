@@ -1,11 +1,10 @@
 /**
  * The mobile surface's page routes: `/m` serves the standalone phone UI
  * (an independent bundle, built to lib/mobile.js by the mobile tsdown
- * entry), `/m/mobile.js` serves the bundle itself. The page talks to the
- * host exclusively through the shared /api transport (paired-device cookie
- * already crosses the api/gate fence), so no host-side data plumbing is
- * needed here — only static serving, loopback+paired-fence via the normal
- * webserver route registration.
+ * entry), `/m/mobile.js` serves the bundle itself. The page talks to the host
+ * exclusively through the plugin's own /m/api channel (gated by the
+ * paired-device cookie), so nothing is needed here beyond static serving —
+ * the normal webserver route registration carries both paths.
  */
 
 import { readFile } from 'node:fs/promises'

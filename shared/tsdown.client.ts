@@ -105,14 +105,15 @@ export function clientBundle(
 /**
  * The standalone mobile page bundle (served by the plugin's own route). It
  * boots WITHOUT the main UI's module loader, so everything — React, zod, the
- * harness wire contracts — is inlined into one self-contained module script.
- * The page talks to the host through plain fetch/WebSocket over /api.
+ * wire guards — is inlined into one self-contained module script. The page
+ * talks to the host through its own plugin-owned channel (plain fetch for
+ * unary calls, EventSource for the live stream), never through the shell's
+ * module table.
  * @param id - plugin id (package name), used in tsdown diagnostics.
  * @param entry - the mobile page entry (e.g. `src/mobile/index.tsx`).
  * @returns a fully self-contained browser bundle config.
  */
 export function mobileBundle(id: string, entry: string): UserConfig {
-  const mobileRequire = createRequire(import.meta.url)
   return {
     name: `${id}/mobile`,
     entry: { mobile: entry },
@@ -131,21 +132,6 @@ export function mobileBundle(id: string, entry: string): UserConfig {
       'import.meta.env.MODE': JSON.stringify(process.env.NODE_ENV ?? 'production'),
       'import.meta.env': JSON.stringify({ MODE: process.env.NODE_ENV ?? 'production' }),
     },
-    plugins: [{
-      // Wire contracts resolve through node_modules (the exports map lands on
-      // the real runtime values) instead of the tsconfig paths' declaration
-      // files, which would miss every value export.
-      name: 'dsh-mobile-value-resolution',
-      resolveId(source: string) {
-        const match = /^@deepseek-ai\/dsh-host-apiproxy\/api(?:\/.*)?$/.exec(source)
-        if (match === null) return null
-        try {
-          return mobileRequire.resolve(source)
-        } catch {
-          return null
-        }
-      },
-    }],
     outputOptions: {
       entryFileNames: 'mobile.js',
     },

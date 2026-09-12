@@ -12,8 +12,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { WorkspaceView as WorkspaceRow } from '@deepseek-ai/dsh-host-apiproxy/api/workspace'
-import type { SessionSummary } from '@deepseek-ai/dsh-host-apiproxy/api/sessions'
+import type { SessionRow, WorkspaceRow } from '../wire.ts'
 import { createSession, listSessions, listWorkspaces } from '../api.ts'
 import { errorText, formatTime, staleHostHint, toSessionView, type SessionView } from './App.tsx'
 import { ThemeToggle } from '../theme-toggle.tsx'
@@ -26,10 +25,10 @@ export interface SessionListViewProps {
 }
 
 /** Rows that belong to the opened workspace (its owned session id set). */
-function ownedItems(page: SessionSummary[], workspace: WorkspaceRow): SessionView[] {
-  const owned = new Set(workspace.sessionIds)
+function ownedItems(page: SessionRow[], workspace: WorkspaceRow): SessionView[] {
+  const owned = new Set<string>(workspace.sessionIds)
   return page
-    .filter(item => owned.has(item.sessionId as never))
+    .filter(item => owned.has(item.sessionId))
     .map(item => toSessionView(item))
 }
 

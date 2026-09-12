@@ -1,22 +1,31 @@
 /**
  * Mobile remote control for the dsh web GUI — host half. Mounts the pairing
  * service (one-time tokens, device sessions, revocation), the /api/pair
- * route family (issue/accept/stop/heartbeat/status/events), the api/gate
- * listener that enforces pairing on every other /api request from
- * non-loopback hosts, and the presence sweep. The browser half (the
- * `./client` entry) renders the sidebar entry, the pairing panel, and the
- * phone-side pair/accept + deep-link flow.
+ * route family (issue/accept/stop/heartbeat/status/events), the `/m` phone
+ * surface with its own paired-cookie data channel, and the presence sweep.
+ * The browser half (the `./client` entry) renders the sidebar entry, the
+ * pairing panel, and the phone-side pair/accept + deep-link flow.
+ *
+ * The LAN fence this plugin used to contribute is gone: 0.1.5 dropped the
+ * connection plugin's `api/gate` waterfall AND made the /api fence a real
+ * authentication layer (403 for an untrusted Host/Origin, 401 without a
+ * session cookie minted from the launch token). The shared `/api` channel
+ * takes exactly one interceptor and the Typert gateway owns it, so no
+ * plugin seam for a global veto is left — the phone channel keeps its own
+ * paired-cookie gate instead.
  */
 
 import { createRequire } from 'node:module'
 import { setInterval as nodeSetInterval } from 'node:timers'
 import type { IncomingMessage } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import z from 'schemastery'
 import type {} from '@deepseek-ai/dsh-host-webserver'
+import type {} from '@deepseek-ai/dsh-api-gateway'
+import type {} from '@deepseek-ai/dsh-session-query'
+import type {} from '@deepseek-ai/dsh-workspace'
 import { PairingService } from './pairing.ts'
-import { makeGateListener } from './gate.ts'
 import { isTrustedApiRequest, makeRoutes } from './routes.ts'
 import { makeMobileRoutes } from './mobile-routes.ts'
 import { makeMobileApiRoutes } from './mobile-api.ts'
@@ -32,35 +41,24 @@ import {
 } from './update.ts'
 import { makeUpdateRoutes } from './update-routes.ts'
 
-declare module '@deepseek-ai/cordis' {
-  interface Events {
-    /**
-     * Waterfall seam on the /api transport fence: the connection plugin
-     * fires this per /api request before bridging to the API proxy on
-     * deployments that carry the pairing/revocation seam; call `next()` to
-     * delegate, return false (without calling it) to veto with 403.
-     */
-    'api/gate'(
-      this: Context,
-      request: IncomingMessage,
-      method: string | undefined,
-      next: () => boolean | Promise<boolean>,
-    ): boolean | Promise<boolean>
-  }
-}
-
 /** Stable cordis plugin name. */
 export const name = 'remote-web-ui'
 
-/** Services required before the pairing surfaces can mount. */
-export const inject = ['webServer', 'apiProxy']
+/**
+ * Services required before the pairing surfaces can mount: the webserver
+ * carries every route, and the mobile data channel needs the Remote
+ * dispatcher, the session query engine (history tail cursors), and the
+ * workspace registry (roster) — all three are base/web-bundle services.
+ */
+export const inject = ['webServer', 'typertGateway', 'sessionQuery', 'workspaceRegistry']
 
 /**
  * Settings namespace of the remote-control capability — the section the web
- * settings surface edits. Spelled here rather than imported: the browser
- * half spells the same value and must not depend on a Host package.
+ * settings surface edits. A plain literal since 0.1.5 (the settings service
+ * names namespaces directly); the browser half spells the same value and
+ * must not depend on a Host package.
  */
-export const REMOTE_WEB_UI_SETTINGS_NAMESPACE = settingsNamespace('remote-web-ui')
+export const REMOTE_WEB_UI_SETTINGS_NAMESPACE = 'remote-web-ui'
 
 /** Plugin config, validated by the same-named schemastery schema. */
 export interface Config {
@@ -73,10 +71,11 @@ export interface Config {
   /** Cookie name carrying the paired device id. */
   cookieName?: string
   /**
-   * When true (default), every non-loopback /api request must carry a live
-   * paired-device cookie — the QR is the only way into a LAN-exposed dsh
-   * web, and stop() genuinely cuts paired devices off. Set false to keep
-   * the fence's open-LAN behavior and use pairing only for tokens/status.
+   * Retired in 0.1.5: kept so existing settings keep validating, but it no
+   * longer changes /api access. The harness authenticates every /api request
+   * itself now (launch token → session cookie, 401 otherwise), and the
+   * pairing plugin has no seam left for a global veto; the phone surface is
+   * gated by its paired cookie on `/m/api` either way.
    */
   requirePairingForLan?: boolean
   /**
@@ -151,7 +150,7 @@ export function apply(ctx: Context, config?: Config): void {
   }
   // The live source the pairing service and the gate read: the settings
   // section once the web settings surface is served, the composition entry
-  // otherwise (installSettingsSection swaps it when the namespace registers).
+  // otherwise (the settings service swaps it when the namespace registers).
   let current: () => Config = () => config ?? {}
   const resolve = (): ResolvedConfig => {
     const value = current()
@@ -210,21 +209,17 @@ export function apply(ctx: Context, config?: Config): void {
   service.setLanBases(lanBases)
   const lanAddresses = lanBases.map(entry => entry.address)
 
-  // Push a committed settings section into the service and gate. The service
-  // config object is read per operation (token mint, touch, sweep), and the
-  // gate re-reads its fence flag per request, so a live edit takes effect
-  // without a restart. When `enabled` turns off, the pairing routes and
-  // sweep timer are dropped and all device/token state is revoked, but the
-  // gate listener stays mounted so a LAN-exposed /api stays behind pairing
-  // (now vetoing every non-loopback request) instead of opening the fence.
+  // Push a committed settings section into the service. The service config
+  // object is read per operation (token mint, touch, sweep), so a live edit
+  // takes effect without a restart. When `enabled` turns off the pairing
+  // routes and the sweep timer are dropped and all device/token state is
+  // revoked — the phone surface then refuses every request, while /api stays
+  // behind the harness's own authentication fence.
   let disposeRoutes: (() => void) | undefined
   let disposeSweep: (() => void) | undefined
   // The phone's data channel: pairing routes + the /m page + the /m/api
-  // proxy (which needs the host ApiProxy service; the plugin injects it).
-  const apiProxy = ctx.get('apiProxy')
-  if (apiProxy === undefined) {
-    console.warn('remote-web-ui: apiProxy service unavailable — the mobile data channel is disabled')
-  }
+  // adapter, which dispatches the allowlisted Remote methods through the
+  // Typert gateway (0.1.5 retired the ApiProxy service this used to proxy).
   // ── remote update ────────────────────────────────────────────────────────
   // The dsh-web-ui self-update surface: probe the npm registry for family
   // releases and run `pnpm update` in the owning profile. Resolutions anchor
@@ -267,11 +262,21 @@ export function apply(ctx: Context, config?: Config): void {
   const routes = [
     ...makeRoutes({ service, lanAddresses }),
     ...makeMobileRoutes(),
-    ...(apiProxy !== undefined ? makeMobileApiRoutes({ service, apiProxy }) : []),
+    ...makeMobileApiRoutes({
+      service,
+      gateway: ctx.typertGateway,
+      sessionQuery: ctx.sessionQuery,
+      workspaces: ctx.workspaceRegistry,
+    }),
     ...updateRoutes,
   ]
-  const gate = makeGateListener(service, () => resolve().requirePairingForLan, () => resolve().enabled)
-  ctx.effect(() => ctx.on('api/gate', gate), 'remote-web-ui: api gate')
+  // `requirePairingForLan` no longer has a seam to act on: 0.1.5 removed the
+  // `api/gate` waterfall and made the /api fence an authentication layer of
+  // its own. An explicit opt-out is reported once so nobody believes this
+  // switch still opens or closes the LAN.
+  if (config?.requirePairingForLan === false) {
+    console.warn('remote-web-ui: requirePairingForLan is retired in 0.1.5 — the harness now authenticates every /api request itself (launch token → session cookie), and the phone surface always requires its paired cookie')
+  }
   const sync = (): void => {
     const value = resolve()
     service.config = {
@@ -328,12 +333,17 @@ export function apply(ctx: Context, config?: Config): void {
       disposeSweep = undefined
     }
   }
-  installSettingsSection(ctx, REMOTE_WEB_UI_SETTINGS_NAMESPACE, Config, config ?? {}, {
-    setSource: (source) => {
-      current = source
-      sync()
-    },
-    onChange: sync,
+  // 0.1.5 moved section installation behind the settings service: the old
+  // `installSettingsSection(ctx, settingsNamespace(ns), …)` helper pair is
+  // gone and the namespace is a plain lowercase-hyphenated literal.
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, REMOTE_WEB_UI_SETTINGS_NAMESPACE, Config, config ?? {}, {
+      setSource: (source) => {
+        current = source
+        sync()
+      },
+      onChange: sync,
+    })
   })
   sync()
 }

@@ -82,15 +82,17 @@ export interface ToolCallInfo {
 
 /**
  * The session event envelope as the mobile fold sees it. `data` is kept wide
- * (unknown) so the fold reads fields defensively; `surfaceOp` / `sourceEventSeqs`
- * are envelope metadata unrelated to message rendering and are ignored here.
+ * (unknown) so the fold reads fields defensively, and `surfaceOp` /
+ * `sourceEventSeqs` stay opaque: they are envelope metadata unrelated to
+ * message rendering and are ignored here. Every field is wider than the
+ * official `SessionWireEvent`, so the wire type assigns to this one.
  */
 export interface WireEvent {
   readonly type: string
   readonly seq: number
   readonly time: number
   readonly data: unknown
-  readonly sourceEventSeqs?: number[]
+  readonly sourceEventSeqs?: unknown
   readonly surfaceOp?: unknown
   readonly ignorable?: true
 }

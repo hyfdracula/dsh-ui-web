@@ -2,10 +2,9 @@
 /** ChatView: collapsible message folds, toolbar chips, and the bottom sheets. */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { SessionModels } from '@deepseek-ai/dsh-host-apiproxy/api/sessions'
 import { ChatView } from './ChatView.tsx'
 import { type SessionView } from './App.tsx'
-import type { HistoryPage } from '../api.ts'
+import type { HistoryPage, SessionModels } from '../wire.ts'
 import type { WireEvent } from '../messages.ts'
 
 // The api module is fully mocked; App.tsx's history wrapper is overridden to
@@ -41,7 +40,7 @@ function makeEntry(type: string, data: unknown, seq: number): { event: WireEvent
 
 /** Build a history page from loose wire events (the host union is strict). */
 function historyPage(events: Array<{ event: WireEvent }>, extra: Record<string, unknown> = {}): HistoryPage {
-  return { events: events as never, hasMore: false, ...extra } as HistoryPage
+  return { records: events as never, hasMore: false, ...extra } as unknown as HistoryPage
 }
 
 /** A full turn: user message, reasoning + text chunks, tool calls, final message. */
@@ -75,7 +74,6 @@ const loadHistoryMock = vi.mocked(loadHistory)
 beforeEach(() => {
   modelsMock.mockResolvedValue({
     current: { provider: 'fx', model: 'fx-1' },
-    routable: true,
     groups: [
       {
         id: 'fx',
@@ -208,7 +206,6 @@ describe('ChatView model sheet', () => {
     // The current model already is the effort-capable one.
     modelsMock.mockResolvedValue({
       current: { provider: 'fx', model: 'fx-2', reasoningEffort: 'high' },
-      routable: true,
       groups: [
         {
           id: 'fx',

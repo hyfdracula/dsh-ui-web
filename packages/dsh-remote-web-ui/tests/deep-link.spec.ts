@@ -84,42 +84,44 @@ describe('runPairBootFlow', () => {
     expect(reload).not.toHaveBeenCalled()
   })
 
-  it('deep-links into the workspace when paired (no pair param)', async () => {
+  it('deep-links into the workspace draft session when paired (no pair param)', async () => {
     const { page, replaceState } = fakePage('?workspace=ws-7')
     const opened: string[] = []
     const ctx = {
       get(name: string): unknown {
         if (name === 'workspaces') {
-          return {
-            list: { getSnapshot: () => ({ items: [{ workspaceId: 'ws-7' }] }) },
-            connectWorkspace: async (id: string) => { opened.push(id); return 'session-9' },
-          }
+          return { list: { getSnapshot: () => ({ items: [{ workspaceId: 'ws-7', sessionIds: ['s-draft'] }] }) } }
         }
         if (name === 'sessions') {
-          return { list: { getSnapshot: () => ({ current: undefined }) }, open: (id: string) => { opened.push(id) } }
+          return {
+            list: { getSnapshot: () => ({ current: undefined, byId: { 's-draft': { blank: true } } }) },
+            create: async (opts: { workspaceId?: string }) => { opened.push(opts.workspaceId ?? ''); return 's-new' },
+            open: (id: string) => { opened.push(id) },
+          }
         }
         return undefined
       },
     }
     runPairBootFlow(ctx as never, '?workspace=ws-7', page)
-    await vi.waitFor(() => expect(opened).toEqual(['ws-7', 'session-9']))
+    await vi.waitFor(() => expect(opened).toEqual(['s-draft']))
     await vi.waitFor(() => expect(replaceState).toHaveBeenCalledWith('/'))
   })
 
-  it('waits for the target workspace to appear in the list before connecting', async () => {
+  it('waits for the target workspace to appear before creating its session', async () => {
     const { page, replaceState } = fakePage('?workspace=ws-7')
     const opened: string[] = []
-    let items: Array<{ workspaceId: string }> = []
+    let items: Array<{ workspaceId: string; sessionIds: string[] }> = []
     const ctx = {
       get(name: string): unknown {
         if (name === 'workspaces') {
-          return {
-            list: { getSnapshot: () => ({ items }) },
-            connectWorkspace: async (id: string) => { opened.push(id); return 'session-9' },
-          }
+          return { list: { getSnapshot: () => ({ items }) } }
         }
         if (name === 'sessions') {
-          return { list: { getSnapshot: () => ({ current: undefined }) }, open: (id: string) => { opened.push(id) } }
+          return {
+            list: { getSnapshot: () => ({ current: undefined, byId: {} }) },
+            create: async (opts: { workspaceId?: string }) => { opened.push(opts.workspaceId ?? ''); return 's-new' },
+            open: (id: string) => { opened.push(id) },
+          }
         }
         return undefined
       },
@@ -127,8 +129,8 @@ describe('runPairBootFlow', () => {
     runPairBootFlow(ctx as never, '?workspace=ws-7', page)
     await new Promise(resolve => setTimeout(resolve, 400))
     expect(opened).toEqual([])
-    items = [{ workspaceId: 'ws-7' }]
-    await vi.waitFor(() => expect(opened).toEqual(['ws-7', 'session-9']))
+    items = [{ workspaceId: 'ws-7', sessionIds: [] }]
+    await vi.waitFor(() => expect(opened).toEqual(['ws-7', 's-new']))
     await vi.waitFor(() => expect(replaceState).toHaveBeenCalledWith('/'))
   })
 })

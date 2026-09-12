@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { PairingPhase } from '../pairing.ts'
 import { RemotePanel, type PanelState } from './RemotePanel.tsx'
 import { copyText, issuePair, stopPair, type IssueResponse, type PairStateFrame, type TunnelStatusFrame } from './pair-api.ts'
@@ -17,8 +17,26 @@ import { PhoneIcon } from './PhoneIcon.tsx'
 import { UpdateEntry } from './UpdateEntry.tsx'
 import css from './remote.module.css'
 
-/** Entry props: the sidebar column state + the standard locale seat. */
-export type RemoteEntryProps = PropsRuntime<'sidebar.remote'> & PropsLocale<'remote'>
+/**
+ * Injected face of the remote-control entry: where a minted QR link points.
+ * The sidebar foot seat supplies display state only, and 0.1.5 removed the
+ * recent-workspace projection the entry used to read, so the target is
+ * resolved from the live client services at mint time.
+ */
+export interface RemoteEntryFace {
+  /**
+   * The workspace the QR deep link opens: the workspace owning the current
+   * session, else the registry's first workspace.
+   * @returns the workspace id, or undefined when no workspace is registered.
+   */
+  resolveWorkspaceId(): string | undefined
+}
+
+/** Entry props: the sidebar foot seat's display state + the injected face + the locale seat. */
+export type RemoteEntryProps =
+  PropsRuntime<'sidebar.footer.action'>
+  & InjectFace<RemoteEntryFace>
+  & PropsLocale<'remote'>
 
 /** Apply one status frame onto the current ready state. */
 function mergeFrame(state: PanelState, frame: PairStateFrame): PanelState {
@@ -37,15 +55,15 @@ function mergeFrame(state: PanelState, frame: PairStateFrame): PanelState {
  * @param props - composed slot props (contract in this package).
  * @returns the entry element tree.
  */
-export function RemoteEntry({ wide, useWorkspaces, t }: RemoteEntryProps) {
+export function RemoteEntry({ wide, resolveWorkspaceId, t }: RemoteEntryProps) {
   const [open, setOpen] = useState(false)
   const [state, setState] = useState<PanelState>({ kind: 'lan-required' })
   const [copied, setCopied] = useState(false)
   const eventSource = useRef<EventSource | undefined>(undefined)
 
-  // The current workspace (the recent-workspace projection the shell's New
-  // Session flow targets) — the deep-link target for the phone.
-  const workspaceId = useWorkspaces(s => s.recentWorkspaceId)
+  // The deep-link target for the phone, read at mint time so a workspace
+  // switch on the desktop is reflected by the next QR link.
+  const workspaceIdOf = useCallback((): string | undefined => resolveWorkspaceId(), [resolveWorkspaceId])
 
   const closeEventSource = useCallback(() => {
     eventSource.current?.close()
@@ -55,7 +73,7 @@ export function RemoteEntry({ wide, useWorkspaces, t }: RemoteEntryProps) {
   const mint = useCallback(async (address?: string): Promise<PanelState> => {
     let result: IssueResponse
     try {
-      result = await issuePair(workspaceId, address)
+      result = await issuePair(workspaceIdOf(), address)
     } catch {
       // Fetch/network failure: show an explicit state instead of silently
       // leaving the panel on its initial banner.
@@ -86,7 +104,7 @@ export function RemoteEntry({ wide, useWorkspaces, t }: RemoteEntryProps) {
       address: address ?? result.lanAddresses[0] ?? '',
       lanAddresses: result.lanAddresses,
     }
-  }, [workspaceId])
+  }, [workspaceIdOf])
 
   const openPanel = useCallback(async (): Promise<void> => {
     setOpen(true)

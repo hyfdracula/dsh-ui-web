@@ -1,18 +1,15 @@
 /**
- * The `api/gate` listener: application-level access control layered on top
- * of the transport fence (the fence is Host/Origin based and explicitly not
- * an authentication layer — packages/client/connection documents this
- * event as the sanctioned seam for pairing/revocation).
+ * Request-identity helpers for the pairing routes and the phone data
+ * channel: cookie parsing plus the loopback classification the /api/pair
+ * mint endpoints fence on.
  *
- * Policy: loopback requests (the desktop) pass without a device identity;
- * every non-loopback /api request must carry a live, non-revoked device
- * cookie. This makes the QR the only way into a LAN-exposed dsh web and
- * gives "停止" real teeth: revoked devices 403 on their next request,
- * including the mux/SSE stream (which then dies on reconnect).
+ * The `api/gate` waterfall this module also served is gone in 0.1.5 (the
+ * connection plugin removed the event and turned the /api fence into a real
+ * authentication layer), so the pairing gate is now the phone channel's own
+ * paired-cookie check in `mobile-api.ts`.
  */
 
 import type { IncomingMessage } from 'node:http'
-import type { PairingService } from './pairing.ts'
 
 /**
  * Whether a normalized URL hostname names the local loopback authority.
@@ -89,33 +86,4 @@ export function isLoopbackClient(request: IncomingMessage): boolean {
   return isLoopbackAddress(socket?.remoteAddress)
 }
 
-/**
- * Build the api/gate listener for one pairing service.
- * @param service - the pairing service.
- * @param requirePairingForLan - when false, non-loopback requests pass
- * without a device cookie (the feature then only manages tokens/status;
- * revocation of paired devices still holds). A function is re-read per
- * request, so a settings edit takes effect without a restart. Defaults to true.
- * @param enabled - when false, every non-loopback request is vetoed while
- * loopback stays available. A function is re-read per request so the fence
- * stays mounted for the plugin lifetime and disabling the plugin cannot open
- * a LAN-exposed /api. Defaults to true.
- * @returns the cordis waterfall listener: call `next()` to delegate,
- * return false (without calling it) to veto with 403.
- */
-export function makeGateListener(
-  service: PairingService,
-  requirePairingForLan: boolean | (() => boolean) = true,
-  enabled: boolean | (() => boolean) = true,
-): (request: IncomingMessage, method: string | undefined, next: () => boolean | Promise<boolean>) => boolean | Promise<boolean> {
-  return (request, _method, next) => {
-    if (isLoopbackClient(request)) return next()
-    const active = typeof enabled === 'function' ? enabled() : enabled
-    if (!active) return false
-    const require = typeof requirePairingForLan === 'function' ? requirePairingForLan() : requirePairingForLan
-    if (!require) return next()
-    const deviceId = readCookie(request.headers.cookie, service.config.cookieName)
-    if (deviceId === undefined) return false
-    return service.touchDevice(deviceId) ? next() : false
-  }
-}
+

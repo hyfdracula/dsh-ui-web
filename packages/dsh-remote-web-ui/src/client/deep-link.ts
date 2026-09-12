@@ -12,6 +12,10 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace'
+// Type-only: 0.1.5 declares `ctx.workspaces` / `ctx.sessions` in these client
+// contracts; the deep link reads the workspace roster and opens a session.
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { acceptPair, readPairParams } from './pair-api.ts'
 
 /** sessionStorage key for the failed-pair notice. */
@@ -112,15 +116,24 @@ async function runDeepLink(ctx: Context, workspaceId: string, page: PageSurface)
   const deadline = Date.now() + SERVICE_WAIT_MS
   while (Date.now() < deadline) {
     const workspaces = ctx.get('workspaces')
-    const sessions = ctx.get('sessions') as { open(id: string): void } | undefined
+    const sessions = ctx.get('sessions') as {
+      create(opts?: { workspaceId?: WorkspaceId }): Promise<string>
+      open(id: string): void
+      list: { getSnapshot(): { byId: Record<string, { blank?: boolean } | undefined> } }
+    } | undefined
     if (workspaces !== undefined && sessions !== undefined) {
-      const items = workspaces.list.getSnapshot().items
-      if (items.some(item => item.workspaceId === target)) {
+      const workspace = workspaces.list.getSnapshot().items.find(item => item.workspaceId === target)
+      if (workspace !== undefined) {
         try {
-          // Open unconditionally: a host-side "current" session may already
-          // exist (multi-client mirroring), but the QR's workspace target is
-          // explicit user intent and must win.
-          const sessionId = await workspaces.connectWorkspace(target)
+          // 0.1.5 dropped `workspaces.connectWorkspace`: the workspace is named
+          // on session creation instead. Prefer the workspace's own draft
+          // session, then its most recent one, and only mint a new session when
+          // it has none — the same "connect the workspace, open its session"
+          // intent the QR carries.
+          const known = sessions.list.getSnapshot().byId
+          const owned = workspace.sessionIds.filter(id => known[id] !== undefined)
+          const draft = owned.find(id => known[id]?.blank === true)
+          const sessionId = draft ?? owned[0] ?? await sessions.create({ workspaceId: target })
           sessions.open(sessionId)
         } catch {
           // Unknown workspace or a failed connect: fall through to the

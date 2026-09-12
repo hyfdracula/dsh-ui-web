@@ -1,10 +1,10 @@
 /**
- * Mobile-surface unary RPC over the shared /api transport: the four-quadrant
- * envelope (client-request → server-response), minted rpcIds, and typed
- * error mapping. This is a thin, self-contained slice of the harness
- * apiproxy fetch carrier — the mobile page is an independent bundle and must
- * not depend on the main UI's module loader, so the wire contract is
- * reimplemented here over plain fetch.
+ * Mobile-surface unary RPC over the plugin's own /m/api channel: the
+ * four-quadrant envelope (client-request → server-response), minted rpcIds,
+ * and typed error mapping — the same envelope the harness connection carrier
+ * uses on /api, reimplemented here over plain fetch because the mobile page
+ * is an independent bundle that must not depend on the main UI's module
+ * loader or on that carrier's trust fence.
  */
 
 /** Transport-level failure (network, HTTP status, malformed envelope). */

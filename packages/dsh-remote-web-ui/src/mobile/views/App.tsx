@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { WorkspaceView as WorkspaceRow } from '@deepseek-ai/dsh-host-apiproxy/api/workspace'
+import type { SessionRow, WorkspaceRow } from '../wire.ts'
 import { history as fetchHistory, listSessions, listWorkspaces, prompt } from '../api.ts'
 import { MuxClient } from '../mux.ts'
 import { RpcCallError, RpcTransportError } from '../rpc.ts'
@@ -43,15 +43,8 @@ export interface RenderMessage {
 }
 
 /** Map a list row to the surface model; the title comes from projections when present. */
-export function toSessionView(item: {
-  sessionId: string
-  updatedAt: number
-  running: boolean
-  blank: boolean
-  cwd?: string
-  projections?: { values?: Record<string, unknown> }
-}): SessionView {
-  const titleValue = item.projections?.values?.title
+export function toSessionView(item: SessionRow): SessionView {
+  const titleValue = item.projections?.values?.['title']
   const title = typeof titleValue === 'string' && titleValue !== ''
     ? titleValue
     : item.cwd !== undefined ? item.cwd.split('/').filter(Boolean).at(-1) ?? item.cwd : '新会话'
@@ -85,20 +78,21 @@ export function App() {
   const [route, setRoute] = useState<Route>({ kind: 'workspaces' })
   const muxRef = useRef<MuxClient | undefined>(undefined)
 
-  // The mux stream lives for the page lifetime: session events keep the
-  // open chat live, and reconnect is automatic.
+  // The mux client lives for the page lifetime; one session stream is open
+  // at a time (0.1.5 `session.follow` is addressed, not global) and
+  // EventSource reconnects by itself.
   useEffect(() => {
     const mux = new MuxClient()
     muxRef.current = mux
-    mux.start()
     return () => { mux.stop() }
   }, [])
 
-  // Keep the live-event client pointed at the session currently on screen so
-  // its polling fallback can keep that chat fresh over SSE-impairing tunnels
-  // (quick tunnel / Tailscale Serve do not forward Server-Sent Events).
+  // Point the live stream at the session currently on screen (undefined
+  // closes it). The stream carries the opening window AND the live frames,
+  // and its polling fallback covers SSE-impairing tunnels (quick tunnel /
+  // Tailscale Serve do not forward Server-Sent Events).
   useEffect(() => {
-    muxRef.current?.observe(route.kind === 'chat' ? route.session.sessionId : undefined)
+    muxRef.current?.open(route.kind === 'chat' ? route.session.sessionId : undefined)
   }, [route])
 
   const back = useCallback(() => {
