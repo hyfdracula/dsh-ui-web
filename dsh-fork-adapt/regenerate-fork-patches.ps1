@@ -174,6 +174,14 @@ try {
     $diff = git diff --no-color origin/master -- $files 2>$null
     if ($LASTEXITCODE -ne 0) { throw "git diff failed for $name" }
     $content = ($diff -join "`n") + "`n"
+    # CRITICAL: normalizing the line endings is what makes `git apply` succeed.
+    # Capturing a native command's stdout gives back lines that may still carry a
+    # trailing CR (the CRLF that was measured on every patch before 2026-09-12),
+    # and a CR-terminated context line never matches the LF working tree the
+    # repo's `.gitattributes` (`* text=auto eol=lf`) enforces — so the patch
+    # failed to apply even on its own baseline. Normalize here, once, instead of
+    # relying on the caller to pass --ignore-whitespace.
+    $content = ($content -replace "`r`n", "`n") -replace "`r", "`n"
     $target = Join-Path $PatchDir $name
     # No BOM + LF: the whole reason `git apply` fails otherwise.
     [IO.File]::WriteAllText($target, $content, [Text.UTF8Encoding]::new($false))

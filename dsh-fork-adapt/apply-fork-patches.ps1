@@ -38,6 +38,16 @@ Get-ChildItem (Join-Path $PatchDir '*.patch') -ErrorAction SilentlyContinue | So
   try {
     $out = git apply --3way $patch 2>&1
     $code = $LASTEXITCODE
+    if ($code -ne 0) {
+      # Safety net for patches generated before 2026-09-12: those files were
+      # CRLF, and a CR-terminated context line never matches this repo's LF
+      # working tree (.gitattributes: * text=auto eol=lf), so even --3way gave up.
+      # Normal handling is plain --3way above; this retry only forgives the
+      # line-ending artifact, and the new regenerate script no longer produces it.
+      Log "  ~ first attempt failed, retrying with --ignore-whitespace"
+      $out = git apply --3way --ignore-whitespace $patch 2>&1
+      $code = $LASTEXITCODE
+    }
     if ($code -eq 0) {
       $applied++
       Log "  + applied cleanly"
