@@ -17,7 +17,7 @@
 - 校验：`git apply --check` 干跑 + 每套一个补丁就 `git add -A && git write-tree`，
   与对应提交的 tree 逐字节比对（见文末验证记录）
 
-## 补丁清单（4 个）
+## 补丁清单（6 个）
 
 | 补丁 | fork 提交 | 功能 | 字节 | 行数 | 文件 |
 | --- | --- | --- | --- | --- | --- |
@@ -25,6 +25,16 @@
 | `020-fork-f9-web-restart-launchers.patch` | `90fef94` | F9 | 53408 | 1354 LF / 0 CR | 16 |
 | `030-fork-f7-glm-normalizer.patch` | `c41e032` | F7 | 60032 | 1401 LF / 0 CR | 17 |
 | `040-fork-f6-turn-recovery.patch` | `8016f4f` | F6 | 28143 | 690 LF / 0 CR | 16 |
+| `050-fork-desktop-entry-and-telemetry.patch` | `0e0f067` | 桌面入口 + 遥测退出 + host 键 | 7871 | 见 `regenerate -Verify` 输出 | 4 |
+| `060-fork-aggregate-refs-and-spec-fixture.patch` | `ecccb30` | 两个聚合 tsconfig 引用 + GLM 规格夹具 | 2444 | 同上 | 3 |
+
+最后两个补丁是迁移收尾时加的：`050` 给桌面快捷方式一个能用的入口（`dsh-web-open.ps1/.vbs`：读 `dsh-web-service.json`、
+必要时经同一 funnel 拉起 Host、再从 `dsh-web.log` 取带 token 的 URL 开浏览器），并把 `DSH_TELEMETRY_DISABLED=1`
+写进 `dsh-web-host-launch.ps1`、给服务配置加了可选 `host` 键（**不要填 0.0.0.0**：0.1.5 的 CLI 会直接拒绝启动）。
+`060` 把 fork 新增的两个包接进聚合工程（`tsconfig.host.json` → `packages/host/web-restart`；
+`tsconfig.client.json` → `packages/client/ui-turn-recovery/tsconfig.client.json`，该包是 solution 式 tsconfig，
+必须引用它自己的 client program），并给 `llm-pi-ai` 的 GLM 规格补上 pi-ai 0.85 起强制要求的 `Usage.cost`。
+两者都由 `regenerate-fork-patches.ps1 -Verify` 实测重放到各自 commit 的 tree。
 
 ### 1. 客户端四条 fork 特性 — `010-fork-f1-f4-client-features.patch`
 

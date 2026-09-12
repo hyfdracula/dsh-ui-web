@@ -1,4 +1,4 @@
-# One-click replay of the DSH fork adaptation set onto the 0.1.5 checkout.
+﻿# One-click replay of the DSH fork adaptation set onto the 0.1.5 checkout.
 #
 # WHAT THIS IS
 #   dsh-fork-adapt/ is the local patch set for the DSH fork checkout
@@ -116,6 +116,20 @@ $patches = @(
     Tree = '07b6d638e32489299a18ef9a1697b811f7c29a07'
     What = 'F6 interrupted-turn recovery panel (ui-turn-recovery) wired into the web-app bundle'
   }
+  [pscustomobject]@{
+    Name = '050-fork-desktop-entry-and-telemetry.patch'
+    From = '8016f4fdc2bbb4b537d293f43cf2e85a481a9302'
+    To   = '0e0f0673ca6cc8c3144a94d7391258757ab4c3fb'
+    Tree = '3467a62b95372358f387bb06de8b57c0a7ac1aae'
+    What = 'desktop entry point (dsh-web-open.ps1/.vbs), DSH_TELEMETRY_DISABLED opt-out, service-config host key'
+  }
+  [pscustomobject]@{
+    Name = '060-fork-aggregate-refs-and-spec-fixture.patch'
+    From = '0e0f0673ca6cc8c3144a94d7391258757ab4c3fb'
+    To   = 'ecccb300f1e092d6950ddc79a7f2996e2743b9f9'
+    Tree = '8d1d68bc297c4a5210a90bd243027af5849d4745'
+    What = 'host/client aggregate references for the two fork packages plus the pi-ai Usage.cost spec fixture'
+  }
 )
 $tipCommit = $patches[-1].To
 
@@ -178,7 +192,7 @@ Log "patch files OK ($($patches.Count) files, LF, no BOM)"
 # --- 2. Already integrated? --------------------------------------------------
 $tipReachable = Invoke-Git $rootFull @('merge-base', '--is-ancestor', $tipCommit, 'HEAD')
 if ($tipReachable.Code -eq 0) {
-  Log "all four fork commits are already in HEAD history -- nothing to apply."
+  Log "all fork commits are already in HEAD history -- nothing to apply."
   Write-Host ""
   Write-Host "Result: already integrated (no changes made)." -ForegroundColor Green
   exit 0

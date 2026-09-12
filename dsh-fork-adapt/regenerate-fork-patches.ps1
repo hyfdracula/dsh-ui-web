@@ -110,6 +110,16 @@ $chain = @(
     Commit  = '8016f4fdc2bbb4b537d293f43cf2e85a481a9302'
     Feature = 'F6 ui-turn-recovery panel wired into the web-app bundle'
   }
+  [pscustomobject]@{
+    Name    = '050-fork-desktop-entry-and-telemetry.patch'
+    Commit  = '0e0f0673ca6cc8c3144a94d7391258757ab4c3fb'
+    Feature = 'desktop entry point (dsh-web-open.ps1/.vbs), DSH_TELEMETRY_DISABLED opt-out and the service-config host key'
+  }
+  [pscustomobject]@{
+    Name    = '060-fork-aggregate-refs-and-spec-fixture.patch'
+    Commit  = 'ecccb300f1e092d6950ddc79a7f2996e2743b9f9'
+    Feature = 'host/client aggregate references for the two fork packages + the pi-ai Usage.cost spec fixture'
+  }
 )
 
 Log "=== regenerate DSH fork patches (0.1.5) ==="

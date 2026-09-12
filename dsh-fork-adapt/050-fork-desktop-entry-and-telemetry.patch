@@ -1,0 +1,173 @@
+diff --git a/dsh-web-host-launch.ps1 b/dsh-web-host-launch.ps1
+index 7c7d7feea50162bf1d1ab78cf7a4b65df1ece168..75bd5c39b0b3b2e1f7064720c15ab876dd741a94 100644
+--- a/dsh-web-host-launch.ps1
++++ b/dsh-web-host-launch.ps1
+@@ -41,6 +41,13 @@ if ($Port -le 0) { $Port = [int]$config.port }
+ $node = [string]$config.node
+ if ([string]::IsNullOrEmpty($node)) { $node = 'node' }
+ 
++# Telemetry opt-out (decision D4): the CLI turns ANY non-empty
++# DSH_TELEMETRY_DISABLED into a `session-telemetry-otel: disabled` boot patch,
++# so the hosted process never exports session logs. Set here as well as in the
++# user environment so every launch path (shortcut, restart worker, autostart)
++# behaves the same.
++$env:DSH_TELEMETRY_DISABLED = '1'
++
+ $cliDir = Join-Path $root 'apps\cli'
+ $stdout = Join-Path $root 'dsh-web.log'
+ $stderr = Join-Path $root 'dsh-web.err.log'
+@@ -62,6 +69,11 @@ Set-Content -LiteralPath $stdout -Value ("{0:yyyy-MM-dd HH:mm:ss} launching host
+ # cmd /d /s /c "…" keeps one command line: the /s form lets the outer quotes wrap
+ # the whole command, so the inner quoted paths survive verbatim.
+ $inner = '"' + $node + '" "lib/bin.js" --profile ' + $Profile + ' --port ' + $Port + ' --no-open'
++# Optional bind host (dsh-web-service.json `host`): the phone surface /m is only
++# reachable when the Host binds a LAN address; the CLI's own browser-trust fence
++# then derives the LAN authorities. Absent = the CLI default (loopback only).
++$bindHost = [string]$config.host
++if (-not [string]::IsNullOrEmpty($bindHost)) { $inner += ' --host ' + $bindHost }
+ $inner += ' 1>>"' + $stdout + '" 2>>"' + $stderr + '"'
+ 
+ $psi = [System.Diagnostics.ProcessStartInfo]::new()
+diff --git a/dsh-web-open.ps1 b/dsh-web-open.ps1
+new file mode 100644
+index 0000000000000000000000000000000000000000..6e1f394de4f665e5cf43c3aa05d9673f8defac0f
+--- /dev/null
++++ b/dsh-web-open.ps1
+@@ -0,0 +1,107 @@
++# DeepSeek Harness Web launcher for THIS checkout (0.1.5).
++#
++# Used by the desktop shortcut: makes sure the Host for the profile/port in
++# dsh-web-service.json is running, then opens the browseable URL.
++#
++# 0.1.5 differences from the 0.1.1 launcher:
++#   - 0.1.5 answers an unauthenticated request with 401 (the auth fence), so a
++#     bare http://127.0.0.1:<port>/ can never be opened directly: the launch
++#     token printed by the Host (`dsh web: http://…/?token=…`) is the only URL
++#     a browser can use, and every start mints a new one. This script therefore
++#     reads the token line out of dsh-web.log after readiness.
++#   - profile/port/node come from the sibling dsh-web-service.json, so a
++#     cutover stays one file edit.
++#   - the Host itself runs --no-open; this launcher is the browser owner.
++#
++#   powershell -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File dsh-web-open.ps1
++#   powershell -NoProfile -ExecutionPolicy Bypass -File dsh-web-open.ps1 -NoBrowser
++#
++# Keep this file ASCII-only.
++[CmdletBinding()]
++param(
++  [switch]$NoBrowser
++)
++
++$ErrorActionPreference = 'Continue'
++$root = $PSScriptRoot
++if ([string]::IsNullOrEmpty($root)) { $root = 'C:\Users\19161\deepseek-harness-next' }
++
++$configPath = Join-Path $root 'dsh-web-service.json'
++if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
++  Write-Error "dsh-web-open: service config not found: $configPath"
++  exit 1
++}
++$config = Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json
++$port = [int]$config.port
++$stdout = Join-Path $root 'dsh-web.log'
++
++function Test-Listening {
++  try {
++    $client = [System.Net.Sockets.TcpClient]::new()
++    $client.Connect('127.0.0.1', $port)
++    $client.Dispose()
++    return $true
++  } catch {
++    return $false
++  }
++}
++
++# Readiness on 0.1.5: an unauthenticated / answers 401 (auth fence live), and a
++# tokenized request answers 200/303. Anything else means the HTTP layer is not
++# up yet.
++function Test-HostReady {
++  try {
++    $page = Invoke-WebRequest ("http://127.0.0.1:$port/") -UseBasicParsing -TimeoutSec 3
++    return ([int]$page.StatusCode -in 200, 303)
++  } catch {
++    $response = $_.Exception.Response
++    if ($null -ne $response -and [int]$response.StatusCode -eq 401) { return $true }
++    return $false
++  }
++}
++
++# The tokenized URL of the Host that is running now. The current log wins; the
++# rotated one is only a fallback for a Host started before this launcher ran.
++function Get-LaunchUrl {
++  foreach ($log in @($stdout, (Join-Path $root 'dsh-web.previous.log'))) {
++    if (-not (Test-Path -LiteralPath $log -PathType Leaf)) { continue }
++    $hit = Select-String -LiteralPath $log -Pattern 'dsh web: (http://127\.0\.0\.1:\d+/\?token=[A-Za-z0-9_\-]+)' |
++      Select-Object -Last 1
++    if ($null -ne $hit) { return [string]$hit.Matches[0].Groups[1].Value }
++  }
++  return ''
++}
++
++if (-not (Test-Listening)) {
++  # Same funnel as the restart worker and the autostart task: the host launcher
++  # owns "never start a second Host for this port" and the readiness wait.
++  $hostLauncher = Join-Path $root 'dsh-web-host-launch.ps1'
++  & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File $hostLauncher
++  if ($LASTEXITCODE -ne 0 -and -not (Test-Listening)) {
++    Add-Content -LiteralPath $stdout -Value ("{0:yyyy-MM-dd HH:mm:ss} dsh-web-open: host did not come up on {1}" -f (Get-Date), $port)
++    exit 1
++  }
++}
++
++$ready = $false
++$deadline = (Get-Date).AddSeconds(90)
++do {
++  $ready = Test-HostReady
++  if (-not $ready) { Start-Sleep -Milliseconds 500 }
++} while (-not $ready -and (Get-Date) -lt $deadline)
++
++if (-not $ready) {
++  Add-Content -LiteralPath $stdout -Value ("{0:yyyy-MM-dd HH:mm:ss} dsh-web-open: not ready after 90s" -f (Get-Date))
++  exit 1
++}
++
++$url = Get-LaunchUrl
++if ([string]::IsNullOrEmpty($url)) { $url = "http://127.0.0.1:$port/" }
++
++if ($NoBrowser) {
++  Write-Output $url
++  exit 0
++}
++if ($config.openBrowser -eq $false) { exit 0 }
++Start-Process $url
++exit 0
+diff --git a/dsh-web-open.vbs b/dsh-web-open.vbs
+new file mode 100644
+index 0000000000000000000000000000000000000000..4f4a9a6fd3462cb716a8c45b13a70df5d66e6f94
+--- /dev/null
++++ b/dsh-web-open.vbs
+@@ -0,0 +1,12 @@
++' DSH Web desktop launcher (0.1.5 checkout).
++' GUI-subsystem bootstrap: ensures the Host for the profile/port in
++' dsh-web-service.json is running and opens the tokenized URL in the default
++' browser. No console window appears (SW_HIDE at process creation).
++Option Explicit
++
++Dim shell, root, command
++Set shell = CreateObject("WScript.Shell")
++root = "C:\Users\19161\deepseek-harness-next"
++
++command = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File """ & root & "\dsh-web-open.ps1"""
++shell.Run command, 0, False
+diff --git a/dsh-web-service.json b/dsh-web-service.json
+index 8730c1c200708b6196da73b800afc1c6b0ff3b82..c7cf4b824f867b26565eda804b73404902e4d6d4 100644
+--- a/dsh-web-service.json
++++ b/dsh-web-service.json
+@@ -3,5 +3,6 @@
+   "port": 3081,
+   "openBrowser": true,
+   "node": "C:\\Users\\19161\\AppData\\Local\\Programs\\kimi-desktop\\resources\\resources\\runtime\\node.exe",
+-  "_comment": "Single source of truth for the DSH Web service in THIS checkout. At cutover set profile=web and port=3080, then update the web-restart row in the profile's cordis.patch.yml to match."
++  "_comment": "Single source of truth for the DSH Web service in THIS checkout. At cutover set profile=web and port=3080, then update the web-restart row in the profile's cordis.patch.yml to match.",
++  "_host": "Do NOT add a `host` key with 0.0.0.0: the 0.1.5 CLI refuses it on purpose ('--host 0.0.0.0 is intentionally not supported yet for safety: it would expose remote code execution to the network; use 127.0.0.1 instead'), and the launcher would then fail to start at all. The mobile surface therefore needs the plugin's public/tunnel base instead of a LAN bind."
+ }

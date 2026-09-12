@@ -1,0 +1,51 @@
+diff --git a/packages/llm/llm-pi-ai/tests/glm-normalizer.spec.ts b/packages/llm/llm-pi-ai/tests/glm-normalizer.spec.ts
+index 769a3a192e9a40c4511adc5c792cb2a6666a7fa3..a7c04a409447d584eb6b8ea7426056a5dd1be668 100644
+--- a/packages/llm/llm-pi-ai/tests/glm-normalizer.spec.ts
++++ b/packages/llm/llm-pi-ai/tests/glm-normalizer.spec.ts
+@@ -16,7 +16,15 @@ import type { AssistantEventNormalizer, StreamFoldOptions } from '../src/stream.
+ import type { StreamChunk } from '@deepseek-ai/dsh-llm'
+ 
+ function usage(input = 0, output = 0): Usage {
+-  return { input, output, cacheRead: 0, cacheWrite: 0, totalTokens: input + output }
++  return {
++    input,
++    output,
++    cacheRead: 0,
++    cacheWrite: 0,
++    totalTokens: input + output,
++    // pi-ai 0.85 made `cost` mandatory on Usage; this spec never asserts on it.
++    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
++  }
+ }
+ 
+ function assistant(overrides: Partial<AssistantMessage> = {}): AssistantMessage {
+diff --git a/tsconfig.client.json b/tsconfig.client.json
+index 8ffb94127aa081947137ee3b88d3dce0c71fbe0c..b9b86c7bfb87448282e9804514b5427357891339 100644
+--- a/tsconfig.client.json
++++ b/tsconfig.client.json
+@@ -1,4 +1,4 @@
+-{
++﻿{
+   // Client-side typecheck aggregate: packages/client tests and top-level Client benchmarks.
+   // Split from the host aggregate because both sides merge cordis Context
+   // under the same keys (sessions, loader) with different services; shared
+@@ -73,6 +73,7 @@
+     { "path": "./packages/client/ui-brand-official" },
+     { "path": "./packages/client/ui-approval" },
+     { "path": "./packages/client/ui-chat" },
++    { "path": "./packages/client/ui-turn-recovery/tsconfig.client.json" },
+     { "path": "./packages/client/ui-conversation" },
+     { "path": "./packages/client/ui-tool" },
+     { "path": "./packages/client/ui-deliverables/tsconfig.client.json" },
+diff --git a/tsconfig.host.json b/tsconfig.host.json
+index c5a3f118b3c64682bfe595cb260ffbb6f760522c..60faec73fe0587e114e51603406346588c129056 100644
+--- a/tsconfig.host.json
++++ b/tsconfig.host.json
+@@ -351,6 +351,7 @@
+     { "path": "./packages/host/plugin-inventory" },
+     { "path": "./packages/llm/plugin-package-inventory-deepseek" },
+     { "path": "./packages/host/webserver" },
++    { "path": "./packages/host/web-restart" },
+     { "path": "./packages/sdk/client" },
+     { "path": "./packages/sdk/protocol" },
+     { "path": "./packages/lsp/lsp" },
