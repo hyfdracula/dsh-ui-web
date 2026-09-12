@@ -1,4 +1,4 @@
-﻿# One-click replay of the DSH fork adaptation set onto the 0.1.5 checkout.
+# One-click replay of the DSH fork adaptation set onto the 0.1.5 checkout.
 #
 # WHAT THIS IS
 #   dsh-fork-adapt/ is the local patch set for the DSH fork checkout
@@ -213,6 +213,13 @@ $patches = @(
     To   = '442038267167362ba049c8c2176dba87370f0d11'
     Tree = '760bc584c93e24f667791e0a81e1ef070fd2ab20'
     What = 'remove the -QuickSend switch from the restart worker'
+  }
+  [pscustomobject]@{
+    Name = '190-fork-idle-wait-no-limit.patch'
+    From = '442038267167362ba049c8c2176dba87370f0d11'
+    To   = '5677d3b97354fadfc523b04e480bd8e3dca347dc'
+    Tree = '6c49b8bd9a40f1e7e2801b80ab2255e49e575ff1'
+    What = 'the restart keeper waits for idle with no upper bound'
   }
 )
 $tipCommit = $patches[-1].To

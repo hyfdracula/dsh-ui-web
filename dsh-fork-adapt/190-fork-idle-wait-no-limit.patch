@@ -1,0 +1,81 @@
+diff --git a/dsh-restart-agent.ps1 b/dsh-restart-agent.ps1
+index a58272ce209c4e1674a9f36499585e3f0b415b5c..bbec0c5027f95cfe80e7e7e8b6f7669a79c2f0c3 100644
+--- a/dsh-restart-agent.ps1
++++ b/dsh-restart-agent.ps1
+@@ -11,9 +11,13 @@
+ #      or profile changed      agent, a plugin, a tool, or a newer profile/bundle
+ #                              manifest than the running Host's start time.
+ #   3. Wait for idle        -> before bouncing, ask the Host's own API whether any
+-#                              Session is running, and wait out the grace window
+-#                              so no in-flight turn is ever interrupted (nothing
+-#                              has to be re-sent by hand afterwards).
++#                              Session is running. While one is, the queue simply
++#                              waits -- there is NO upper bound, because a restart
++#                              must never interrupt a turn and nothing should have
++#                              to be re-sent by hand. The only exception is a probe
++#                              that cannot answer at all (no token, Host wedged):
++#                              after -UnreachableGraceSeconds of that, a bounce is
++#                              the recovery, so it proceeds.
+ #   4. Bounce               -> hand the work to dsh-web-restart.ps1, which owns the
+ #                              Scheduled-Task worker: stop -> start -> wait for the
+ #                              auth fence -> replace the browser window.
+@@ -33,7 +37,7 @@ param(
+   [string]$Profile = '',
+   [switch]$Once,
+   [int]$IntervalSeconds = 30,
+-  [int]$IdleGraceSeconds = 900,
++  [int]$UnreachableGraceSeconds = 600,
+   [switch]$DryRun,
+   [switch]$NoBrowser,
+   [string]$Log = '',
+@@ -195,15 +199,37 @@ function Invoke-Cycle {
+ 
+   $state = Read-State
+   $pendingSince = if ($null -ne $state -and $null -ne $state.pendingSince) { [datetime]$state.pendingSince } else { Get-Date }
+-  if ($null -eq $state -or $null -eq $state.pendingSince) { Write-State ([pscustomobject]@{ pendingSince = $pendingSince.ToString('o'); reasons = $reasons }) }
++  if ($null -eq $state -or $null -eq $state.pendingSince) {
++    Write-State ([pscustomobject]@{ pendingSince = $pendingSince.ToString('o'); unreachableSince = $null; reasons = $reasons })
++  }
+ 
+   $busy = Test-SessionBusy
+   $waited = ((Get-Date) - $pendingSince).TotalSeconds
+-  if ($busy -ne $false -and $waited -lt $IdleGraceSeconds) {
+-    Write-Log ("restart pending ({0}); waiting for idle ({1:N0}s of {2}s, busy={3})" -f ($reasons -join '; '), $waited, $IdleGraceSeconds, $(if ($null -eq $busy) { 'unknown' } else { 'yes' }))
++
++  # The user's rule: a restart NEVER interrupts a running turn. While any Session
++  # reports a running Agent we wait, with no upper bound -- the queue simply sits
++  # there until everything is idle. The one exception is a probe that cannot
++  # answer at all (no token, Host half-dead): that is exactly when a bounce is
++  # needed, so a sustained inability to observe counts as "not busy" after the
++  # unreachable window instead of blocking recovery forever.
++  if ($busy -eq $true) {
++    Write-Log ("restart pending ({0}); a session is still running, waiting (already {1:N1} min)" -f ($reasons -join '; '), ($waited / 60))
+     return
+   }
+-  if ($busy -eq $true) { Write-Log ("grace window elapsed with a running turn; bouncing anyway ({0})" -f ($reasons -join '; ')) }
++  if ($null -eq $busy) {
++    $unreachableSince = if ($null -ne $state -and $null -ne $state.unreachableSince) { [datetime]$state.unreachableSince } else { Get-Date }
++    if ($null -eq $state -or $null -eq $state.unreachableSince) {
++      Write-State ([pscustomobject]@{ pendingSince = $pendingSince.ToString('o'); unreachableSince = $unreachableSince.ToString('o'); reasons = $reasons })
++    }
++    $unreachable = ((Get-Date) - $unreachableSince).TotalSeconds
++    if ($unreachable -lt $UnreachableGraceSeconds) {
++      Write-Log ("restart pending ({0}); cannot ask the Host whether it is idle yet, waiting ({1:N0}s of {2}s)" -f ($reasons -join '; '), $unreachable, $UnreachableGraceSeconds)
++      return
++    }
++    Write-Log ("the Host has not answered the idle probe for {0:N0}s; bouncing anyway ({1})" -f $unreachable, ($reasons -join '; '))
++  } else {
++    Write-Log ("everything is idle now; bouncing ({0})" -f ($reasons -join '; '))
++  }
+ 
+   Write-Log ("restarting unattended: {0}" -f ($reasons -join '; '))
+   if ($DryRun) { Write-Log 'dry-run: would bounce the Host now'; return }
+@@ -220,7 +246,7 @@ if ($Once) {
+   exit 0
+ }
+ 
+-Write-Log ("restart agent started (port={0} profile={1} interval={2}s grace={3}s dryRun={4})" -f $Port, $Profile, $IntervalSeconds, $IdleGraceSeconds, [bool]$DryRun)
++Write-Log ("restart agent started (port={0} profile={1} interval={2}s unreachableGrace={3}s dryRun={4})" -f $Port, $Profile, $IntervalSeconds, $UnreachableGraceSeconds, [bool]$DryRun)
+ while ($true) {
+   try { Invoke-Cycle } catch { Write-Log ("cycle failed: {0}" -f $_.Exception.Message) }
+   Start-Sleep -Seconds $IntervalSeconds

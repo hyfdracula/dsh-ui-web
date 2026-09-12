@@ -17,7 +17,7 @@
 - 校验：`git apply --check` 干跑 + 每套一个补丁就 `git add -A && git write-tree`，
   与对应提交的 tree 逐字节比对（见文末验证记录）
 
-## 补丁清单（18 个）
+## 补丁清单（19 个）
 
 | 补丁 | fork 提交 | 功能 | 字节 | 行数 | 文件 |
 | --- | --- | --- | --- | --- | --- |
@@ -39,9 +39,10 @@
 | `160-fork-edge-app-window.patch` | `568dc1c` | 窗口用 Edge（Chrome 仅兜底） | 1235 | 29 LF / 0 CR | 1 |
 | `170-fork-drop-quick-send-box.patch` | `ff9ad76` | 删掉原生快捷发送脚本 | 12406 | 328 LF / 0 CR | 3 |
 | `180-fork-drop-quick-send-switch.patch` | `4420382` | 删掉 worker 里的 `-QuickSend` 开关 | 1146 | 30 LF / 0 CR | 1 |
+| `190-fork-idle-wait-no-limit.patch` | `5677d3b` | 巡检只等空闲、不再有上限（唯一例外：探测不到宿主超过 10 分钟） | 5081 | 81 LF / 0 CR | 1 |
 
-`070`–`180` 是 2026-09-12 晚上补进来的 12 个提交（迁移收尾 3 个 + 启动器/巡检 9 个），
-一次 `regenerate-fork-patches.ps1 -Verify` 重放全部 18 个补丁并逐提交比对 tree。
+`070`–`190` 是 2026-09-12 晚上补进来的 13 个提交（迁移收尾 3 个 + 启动器/巡检 10 个），
+一次 `regenerate-fork-patches.ps1 -Verify` 重放全部 19 个补丁并逐提交比对 tree。
 
 
 最后两个补丁是迁移收尾时加的：`050` 给桌面快捷方式一个能用的入口（`dsh-web-open.ps1/.vbs`：读 `dsh-web-service.json`、

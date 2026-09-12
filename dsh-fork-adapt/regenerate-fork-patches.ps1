@@ -1,4 +1,4 @@
-﻿# Regenerate the DSH fork adaptation patches from the fork checkout's commits.
+# Regenerate the DSH fork adaptation patches from the fork checkout's commits.
 #
 # WHAT THIS IS
 #   The 0.1.5 fork work lives as real commits on branch fork/0.1.5-rc.2 in
@@ -179,6 +179,11 @@ $chain = @(
     Name    = '180-fork-drop-quick-send-switch.patch'
     Commit  = '442038267167362ba049c8c2176dba87370f0d11'
     Feature = 'remove the -QuickSend switch from the restart worker'
+  }
+  [pscustomobject]@{
+    Name    = '190-fork-idle-wait-no-limit.patch'
+    Commit  = '5677d3b97354fadfc523b04e480bd8e3dca347dc'
+    Feature = 'the restart keeper waits for idle with no upper bound'
   }
 )
 
