@@ -28,3 +28,8 @@ REVIEW-PROMPT.md
 # under packages/skins/*/preview/ are the safe README visuals)
 docs/screenshots/
 docs/dsh-web-ui-banner.png
+
+# Nested clones of this same project (each carries its own .git; never repo
+# content, and `git add -A` must not pick them up as gitlinks)
+dsh-ui-web/
+dsh-ui-web.archived-*/
