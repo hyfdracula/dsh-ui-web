@@ -9,12 +9,22 @@
  *
  * Division of labour with a skin (for example Aqua):
  *   - this layer owns SHAPE: insets, corner radius, which boxes stay
- *     transparent, the hairline between panes, and a neutral fill/blur that is
- *     only a fallback;
- *   - the skin owns MATERIAL: the glass recipe, the blur knob, typography and
- *     any brand flourishes. A skin overrides the fallback simply by setting the
- *     same properties from its own (equally specific) rules — so this bundle
- *     must be listed BEFORE the skin in `dsh.profile.bundles`.
+ *     transparent, the seam hairline, the top-row alignment;
+ *   - the skin owns MATERIAL: the glass recipe, the blur slider, typography and
+ *     any brand flourishes. A skin hands its material over through the knobs
+ *     below, which it declares from `[data-…][data-dsh-pane-shape]` (0-2-0) —
+ *     one step above this file's own knob defaults, so the material wins no
+ *     matter which of the two bundles is listed first.
+ *
+ * WHY the gate is `:root[data-dsh-pane-shape]` (0-2-0) rather than just
+ * `[data-dsh-pane-shape]`: the shell's own card rules for the frame and the
+ * sidebar column (`[data-dsh-float] [class*="sidebarCol"] { box-shadow: …;
+ * padding: … }`) are 0-2-0 AND land in the document after this bundle, so at
+ * equal specificity they won the ties — the column kept the shell's 10px top
+ * padding and its own card shadow (measured: brand row 35px instead of 25px).
+ * One extra step of specificity lets the layer state its shape over the shell's
+ * defaults. A skin that needs to override a SHAPE property per element must
+ * therefore also reach 0-3-0 (knobs stay 0-2-0, so they are unaffected).
  *
  * Every rule is gated on `data-dsh-pane-shape`, which the browser half puts on
  * <html> while the plugin is mounted; removing the plugin removes the layer.
@@ -26,49 +36,64 @@
   /* Knobs a skin can override without touching this file. */
   --dsh-pane-inset: 12px;
   --dsh-pane-radius: 24px;
+  /* Non-docked presentations (float / fullscreen) hug the window edges and only
+     keep a corner on the edge that faces the conversation. */
+  --dsh-pane-radius-flush: 18px;
   --dsh-pane-blur: 14px;
   --dsh-pane-fill: color-mix(in srgb, rgb(255 255 255) 55%, transparent);
+  /* `-hairline` draws the seam between panes, `-divider` the softer line inside
+     one pane (the right column's tab strip). Two knobs because skins give them
+     different alphas. */
   --dsh-pane-hairline: rgba(19, 45, 83, 0.22);
+  --dsh-pane-divider: rgba(19, 45, 83, 0.12);
   --dsh-pane-shadow: 0 8px 28px rgba(19, 45, 83, 0.1);
 }
 
 [data-dsh-pane-shape] body[data-ds-dark-theme] {
   --dsh-pane-fill: color-mix(in srgb, rgb(28 32 40) 55%, transparent);
   --dsh-pane-hairline: rgba(148, 180, 220, 0.3);
+  --dsh-pane-divider: rgba(148, 180, 220, 0.16);
   --dsh-pane-shadow: 0 8px 28px rgba(2, 6, 14, 0.4);
 }
 
 /* ---------- One radius for every card-like pane: the conversation header card,
    the sidebar column, the right column's docked bubble. ---------- */
-[data-dsh-pane-shape] [data-phase] header,
-[data-dsh-pane-shape] [data-dsh-pane-shape-col],
-[data-dsh-pane-shape] [data-sidebar-right-panel='push'] {
+:root[data-dsh-pane-shape] [data-phase] header,
+:root[data-dsh-pane-shape] [data-dsh-pane-shape-col],
+:root[data-dsh-pane-shape] [data-sidebar-right-panel='push'] {
   border-radius: var(--dsh-pane-radius);
 }
 
 /* ---------- Right column: the panel paints its own opaque base fill, so the
    ambient background never reaches it. Lift it onto the fallback material and
    keep the boxes inside it transparent. ---------- */
-[data-dsh-pane-shape] [data-sidebar-right-panel] {
+:root[data-dsh-pane-shape] [data-sidebar-right-panel] {
   background: var(--dsh-pane-fill);
   border-left: 1px solid var(--dsh-pane-hairline);
   backdrop-filter: blur(var(--dsh-pane-blur));
 }
 
-[data-dsh-pane-shape] [data-sidebar-right-panel] [data-dockkit-surface],
-[data-dsh-pane-shape] [data-sidebar-right-panel] [data-dockkit-pane] {
+:root[data-dsh-pane-shape] [data-sidebar-right-panel] [data-dockkit-surface],
+:root[data-dsh-pane-shape] [data-sidebar-right-panel] [data-dockkit-pane] {
   background: transparent;
 }
 
-[data-dsh-pane-shape] [data-sidebar-right-panel] [data-dockkit-strip] {
-  border-bottom: 1px solid var(--dsh-pane-hairline);
+:root[data-dsh-pane-shape] [data-sidebar-right-panel] [data-dockkit-strip] {
+  border-bottom: 1px solid var(--dsh-pane-divider);
+}
+
+/* ---------- Right column in the suite's other presentations (float / fullscreen):
+   those cover the window, so only the edge facing the conversation keeps a corner.
+   Moved here unchanged from the skin, which used to draw it. ---------- */
+:root[data-dsh-pane-shape] [data-sidebar-right-panel]:not([data-sidebar-right-panel='push']) {
+  border-radius: var(--dsh-pane-radius-flush) 0 0 var(--dsh-pane-radius-flush);
 }
 
 /* ---------- Right column as a bubble, matching the sidebar column and the
    conversation header card (both inset by 12px). Scoped to the docked `push`
    presentation: the suite's own fullscreen/overlay modes must keep covering the
    window exactly as they were designed. ---------- */
-[data-dsh-pane-shape] [data-sidebar-right-panel='push'] {
+:root[data-dsh-pane-shape] [data-sidebar-right-panel='push'] {
   margin: 0;
   inset: var(--dsh-pane-inset) var(--dsh-pane-inset) var(--dsh-pane-inset) auto;
   height: auto;
@@ -78,7 +103,7 @@
 /* ---------- Sidebar column: the one pane without the frosted material, which
    is what made it read as flat paint; and its top row sits lower than the other
    two, so pull the brand row up until the three top rows share one line. ---------- */
-[data-dsh-pane-shape] [data-dsh-pane-shape-col] {
+:root[data-dsh-pane-shape] [data-dsh-pane-shape-col] {
   backdrop-filter: blur(var(--dsh-pane-blur));
   box-shadow: var(--dsh-pane-shadow);
   padding-top: 0;
@@ -91,14 +116,14 @@
    the filter on, that overlay resolved against the ~256px column instead of the
    viewport and the whole settings panel collapsed into the sidebar. Dropping the
    filter only while a modal is inside keeps the frost everywhere else. */
-[data-dsh-pane-shape] [data-dsh-pane-shape-col]:has([aria-modal='true']) {
+:root[data-dsh-pane-shape] [data-dsh-pane-shape-col]:has([aria-modal='true']) {
   backdrop-filter: none;
 }
 
-[data-dsh-pane-shape] [data-dsh-pane-shape-col] > * > *:first-child {
+:root[data-dsh-pane-shape] [data-dsh-pane-shape-col] > * > *:first-child {
   padding-top: 0;
 }
 
-[data-dsh-pane-shape] [data-dsh-pane-shape-brand] {
+:root[data-dsh-pane-shape] [data-dsh-pane-shape-brand] {
   margin-top: -13px;
 }
