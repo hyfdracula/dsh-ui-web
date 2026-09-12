@@ -1,0 +1,4 @@
+# aqua skin bundle patch: inserts its client row into the web plugin roster.
+- insert:
+    - id: ui-skin-aqua
+      name: '@captain1275/dsh-client-ui-skin-aqua'

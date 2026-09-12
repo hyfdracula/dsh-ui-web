@@ -17,6 +17,12 @@ SSH 运维、右侧文件/变更面板、Git 图谱、移动端远程控制、De
 
 ![aurora-light](packages/skins/aurora/preview/light.png)
 
+**玻璃 Aqua 皮肤效果（深色 / 浅色）**
+
+![aqua-dark](packages/skins/aqua/preview/dark.png)
+
+![aqua-light](packages/skins/aqua/preview/light.png)
+
 ## 特性
 
 ### 极光（Aurora）皮肤（支持动态背景）
@@ -30,6 +36,17 @@ SSH 运维、右侧文件/变更面板、Git 图谱、移动端远程控制、De
 ![推理等级滑块](docs/effort-slider.png)
 
 - **用户消息气泡毛玻璃**：与输入框统一的玻璃质感
+
+### 玻璃（Aqua）皮肤
+
+- **云母 / 兼容双模式**：云母＝整套界面换成悬浮磨砂卡片；兼容＝保持官方排版、只把材质换成玻璃，
+  任何消费官方 design token 的插件都能一起沾到玻璃质感
+- **流体背景**：WebGL 流体着色器铺满全屏（也可换成自定义壁纸，带模糊 / 遮罩调节），
+  深浅两套深海调色板、色相可调
+- **粒子鲸鱼**：聊天区中央的粒子鲸鱼，跟随鼠标游动
+- **字标徽章**：带 HARNESS 铭牌的旧词标会换成官方 Harness 药丸；0.1.5 的鲸鱼词标保持原样
+- **一键回到官方外观**：模糊 / 磨砂 / 色相 / 亮度四个旋钮落在「通用设置 → 外观」下方，
+  插件卡片里是总开关；关掉即完全还原（所有写入都是可回收的 effect）
 
 ### DeepSeek 看板娘（养成系）
 
@@ -75,11 +92,15 @@ SSH 运维、右侧文件/变更面板、Git 图谱、移动端远程控制、De
 
 ### 皮肤中心
 
-10 套皮肤（ths / xp / blue-fantasy / dragon-heir / minecraft / miku / trading / whale-song /
-aurora / skin-center），支持皮肤启用互斥管理与一键切换。
+10 套皮肤（aqua / aurora / ths / xp / blue-fantasy / dragon-heir / minecraft / miku /
+trading / whale-song），支持皮肤启用互斥管理与一键切换。
 
-其余皮肤（ths / xp / blue-fantasy / dragon-heir / minecraft / miku / trading / whale-song）
-为上游 dsh-web-ui 自带皮肤。
+- **玻璃 Aqua（aqua）**：全局玻璃拟态——云母（悬浮磨砂卡片）/ 兼容（原版排版换材质）双模式、
+  WebGL 流体背景或自定义壁纸、深海鲸鱼粒子、字标徽章，深浅两套深海调色板，
+  模糊 / 磨砂 / 色相 / 亮度全部可调；设置项落在「外观」行下方与插件卡片里。
+  该皮肤客户端包依赖 react/react-dom，无法在在线画廊的模拟器里试穿，预览图取自真实 GUI。
+- 其余皮肤（ths / xp / blue-fantasy / dragon-heir / minecraft / miku / trading / whale-song）
+  为上游 dsh-web-ui 自带皮肤。
 
 ## 安装
 

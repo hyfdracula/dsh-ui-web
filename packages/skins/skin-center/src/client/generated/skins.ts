@@ -37,6 +37,8 @@ export interface SkinCenterEntry {
 
 /** Every skin, ordered by packages/skins/<name>/skin.json `order`. */
 export const SKIN_CENTER_ENTRIES: readonly SkinCenterEntry[] = [
+  {"id":"aqua","name":"玻璃 · Aqua","nameEn":"Aqua","author":"dsh-web-ui-custom","tagline":"玻璃拟态 · 流体背景 · 粒子鲸鱼 · 云母/兼容双模式","description":"全局玻璃拟态皮肤：把整套界面换成悬浮磨砂卡片（云母模式）或保持原版排版只换材质（兼容模式）；流体着色器背景或自定义壁纸、深海鲸鱼粒子、字标徽章，深浅两套深海调色板，模糊/磨砂/色相/亮度全部可调。","tags":["aqua","glass","mica","fluid","whale","webgl"],"accent":"#3F76D8","bodyAttr":"data-dsh-aqua","package":"@captain1275/dsh-client-ui-skin-aqua","order":1.2},
+
   {"id":"aurora","name":"极光 · Aurora","nameEn":"Aurora","author":"dsh-web-ui-custom","tagline":"自定义背景图 · 毛玻璃面板 · 极光渐变","description":"支持自定义背景图片的极光皮肤：在设置中填入任意背景图 URL（或使用内置极光渐变），配合半透明毛玻璃面板与深浅两套极光调色板，背景随心换。","tags":["aurora","custom-background","glass","gradient"],"accent":"#7aa2ff","bodyAttr":"data-dsh-aurora","package":"@captain1275/dsh-client-ui-skin-aurora","order":1.5},
 
   {"id":"ths","name":"同花顺风格","nameEn":"Tonghuashun Trading","author":"dsh-web-ui","tagline":"品牌红标题栏 · 实时行情状态栏 · 灰蓝数据终端","description":"同花顺风格炒股主题：品牌红标题栏带上证指数行情签，状态栏红涨绿跌，自选股风格的侧边栏和交易终端面板，写代码也像盯盘。","tags":["stock","trading","terminal","red"],"accent":"#e60012","bodyAttr":"data-dsh-ths","package":"@captain1275/dsh-client-ui-skin-ths","order":2},

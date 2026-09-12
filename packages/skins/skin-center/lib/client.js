@@ -10,6 +10,26 @@ window.__ModuleLoader__.load({
 		/** Every skin, ordered by packages/skins/<name>/skin.json `order`. */
 		const SKIN_CENTER_ENTRIES = [
 			{
+				"id": "aqua",
+				"name": "玻璃 · Aqua",
+				"nameEn": "Aqua",
+				"author": "dsh-web-ui-custom",
+				"tagline": "玻璃拟态 · 流体背景 · 粒子鲸鱼 · 云母/兼容双模式",
+				"description": "全局玻璃拟态皮肤：把整套界面换成悬浮磨砂卡片（云母模式）或保持原版排版只换材质（兼容模式）；流体着色器背景或自定义壁纸、深海鲸鱼粒子、字标徽章，深浅两套深海调色板，模糊/磨砂/色相/亮度全部可调。",
+				"tags": [
+					"aqua",
+					"glass",
+					"mica",
+					"fluid",
+					"whale",
+					"webgl"
+				],
+				"accent": "#3F76D8",
+				"bodyAttr": "data-dsh-aqua",
+				"package": "@captain1275/dsh-client-ui-skin-aqua",
+				"order": 1.2
+			},
+			{
 				"id": "aurora",
 				"name": "极光 · Aurora",
 				"nameEn": "Aurora",
