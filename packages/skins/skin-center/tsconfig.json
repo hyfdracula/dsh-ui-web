@@ -12,6 +12,8 @@
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowImportingTsExtensions": true,
+    // Node globals and node: builtins resolve only through this seat.
+    "types": ["node"],
     "strict": true,
     "noEmit": true
   },
