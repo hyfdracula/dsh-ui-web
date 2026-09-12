@@ -8,24 +8,24 @@ import { describe, expect, it } from 'vitest'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { mkdirSync, rmSync } from 'node:fs'
-import { foldSessionUsage, scanAndBackfill, scanTitle, type PersistenceLike, type ScanEventLike } from './scan.ts'
+import { canScan, foldSessionUsage, scanAndBackfill, scanTitle, type PersistenceLike, type ScanEventLike } from './scan.ts'
 import { readUsage, runScan } from './index.ts'
 
 const usage = (i: number, o: number, c = 0): { inputTokens: number; outputTokens: number; cacheReadTokens: number } => ({ inputTokens: i, outputTokens: o, cacheReadTokens: c })
 
 type UsageShape = { inputTokens: number; outputTokens: number; cacheReadTokens?: number }
 
-function step(key: string): ScanEventLike {
+function step(key: string, time?: number): ScanEventLike {
   const [turn, step] = key.split(':').map(Number)
-  return { type: 'step/end', data: { turn, step } }
+  return { type: 'step/end', time, data: { turn, step } }
 }
-function chunk(key: string, u: UsageShape): ScanEventLike {
+function chunk(key: string, u: UsageShape, time?: number): ScanEventLike {
   const [turn, step] = key.split(':').map(Number)
-  return { type: 'assistant/chunk', data: { turn, step, chunk: { type: 'usage', usage: u } } }
+  return { type: 'assistant/chunk', time, data: { turn, step, chunk: { type: 'usage', usage: u } } }
 }
-function message(key: string, u: UsageShape): ScanEventLike {
+function message(key: string, u: UsageShape, time?: number): ScanEventLike {
   const [turn, step] = key.split(':').map(Number)
-  return { type: 'assistant/message', data: { turn, step, usage: u } }
+  return { type: 'assistant/message', time, data: { turn, step, usage: u } }
 }
 
 describe('foldSessionUsage', () => {
@@ -64,6 +64,60 @@ describe('foldSessionUsage', () => {
     const events: ScanEventLike[] = [step('1:1'), step('1:2'), step('2:1')]
     expect(foldSessionUsage(events).steps).toBe(3)
   })
+
+  it('attributes tokens to the event day and to the model in effect at that moment', () => {
+    const day1 = new Date('2026-09-11T23:50:00').getTime()
+    const day2 = new Date('2026-09-12T00:10:00').getTime()
+    const events: ScanEventLike[] = [
+      { type: 'request/header', time: day1, data: { header: { config: { model: 'deepseek-flash' } } } },
+      step('1:1', day1), chunk('1:1', usage(100, 10, 50), day1),
+      { type: 'request/header', time: day2, data: { header: { config: { model: 'deepseek-v4-pro' } } } },
+      step('1:2', day2), chunk('1:2', usage(200, 20), day2),
+    ]
+    const out = foldSessionUsage(events)
+    // 历史补录落在事件真正发生的日期，而不是"扫描那一刻"。
+    expect(out.days['2026-09-11']?.['deepseek-flash']).toEqual({ inputTokens: 100, outputTokens: 10, cacheReadTokens: 50, cacheWriteTokens: 0, calls: 1 })
+    expect(out.days['2026-09-12']?.['deepseek-v4-pro']).toEqual({ inputTokens: 200, outputTokens: 20, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 1 })
+    expect(out.model).toBe('deepseek-v4-pro')
+    // 归属合计与会话合计恒等。
+    const sum = Object.values(out.days).flatMap((m) => Object.values(m)).reduce(
+      (acc, b) => ({ i: acc.i + b.inputTokens, o: acc.o + b.outputTokens, c: acc.c + b.cacheReadTokens, calls: acc.calls + b.calls }),
+      { i: 0, o: 0, c: 0, calls: 0 },
+    )
+    expect(sum).toEqual({ i: out.inputTokens, o: out.outputTokens, c: out.cacheReadTokens, calls: out.steps })
+  })
+
+  it('takes the model from each assistant message source (v3 logs barely have request/header)', () => {
+    const day = new Date('2026-09-12T10:00:00').getTime()
+    const events: ScanEventLike[] = [
+      {
+        type: 'assistant/message',
+        time: day,
+        data: { turn: 1, step: 1, usage: usage(100, 10), message: { source: { provider: 'deepseek-official', model: 'deepseek-flash' } } },
+      },
+      step('1:1', day),
+      {
+        type: 'assistant/message',
+        time: day,
+        data: { turn: 1, step: 2, usage: usage(200, 20), message: { source: { model: 'glm-5.3' } } },
+      },
+      step('1:2', day),
+    ]
+    const out = foldSessionUsage(events)
+    // 一个会话跨模型：每步的用量归到该步真正用的模型上（旧实现只认
+    // request/header，整段会落成 unknown 或过期的旧模型）。
+    expect(out.days['2026-09-12']?.['deepseek-flash']).toEqual({ inputTokens: 100, outputTokens: 10, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 1 })
+    expect(out.days['2026-09-12']?.['glm-5.3']).toEqual({ inputTokens: 200, outputTokens: 20, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 1 })
+    expect(out.model).toBe('glm-5.3')
+    expect(out.inputTokens).toBe(300)
+  })
+
+  it('falls back to the caller timestamp when events carry no time', () => {
+    const fallback = new Date('2026-09-12T08:00:00').getTime()
+    const out = foldSessionUsage([step('1:1'), chunk('1:1', usage(10, 1))], fallback)
+    expect(Object.keys(out.days)).toEqual(['2026-09-12'])
+    expect(out.days['2026-09-12']?.unknown?.calls).toBe(1)
+  })
 })
 
 describe('scanTitle', () => {
@@ -77,12 +131,16 @@ describe('scanTitle', () => {
 
 describe('scanAndBackfill (watermark incremental)', () => {
   const fakePersistence = (logs: Record<string, ScanEventLike[]>): PersistenceLike => ({
-    listSnapshots: async () =>
+    // 0.1.5 API：list() + open(id,'read') + handle.read() + close()
+    list: async () =>
       Object.entries(logs).map(([id, events], idx) => ({
         header: { id, origin: id.includes('child') ? 'subagent' : undefined, delegationDepth: id.includes('child') ? 1 : undefined, parentSession: id.includes('child') ? 'parent' : undefined },
         revision: `rev-${idx}:${events.length}`,
       })),
-    readFrom: async (id) => ({ events: logs[id] ?? [] }),
+    open: async (id) => ({
+      read: async () => ({ events: logs[id] ?? [] }),
+      close: async () => {},
+    }),
   })
 
   it('cold start backfills every session; unchanged revisions are skipped on the next pass', async () => {
@@ -98,6 +156,28 @@ describe('scanAndBackfill (watermark incremental)', () => {
     // 同 revision 再来一次：无输出。
     const second = await scanAndBackfill(persistence, first.revisions)
     expect(second.outcomes).toHaveLength(0)
+  })
+
+  it('still reads the legacy 0.1.1 interface (listSnapshots + readFrom)', async () => {
+    const legacy: PersistenceLike = {
+      listSnapshots: async () => [{ header: { id: 'old' }, revision: 'r1' }],
+      readFrom: async () => ({ events: [step('1:1'), chunk('1:1', usage(7, 3))] }),
+    }
+    expect(canScan(legacy)).toBe(true)
+    const res = await scanAndBackfill(legacy, {})
+    expect(res.outcomes).toHaveLength(1)
+    expect(res.outcomes[0]?.inputTokens).toBe(7)
+  })
+
+  it('flags an unusable service instead of silently no-oping', async () => {
+    // 形状不认识（宿主换了 API 名字）：canScan 必须为 false，宿主据此告警，
+    // 否则扫描会静默空转、水位被写成空表而看板毫无提示。
+    const weird = { whatever: async () => [] } as unknown as PersistenceLike
+    expect(canScan(weird)).toBe(false)
+    expect(canScan(undefined)).toBe(false)
+    const res = await scanAndBackfill(weird, {})
+    expect(res.outcomes).toHaveLength(0)
+    expect(res.total).toBe(0)
   })
 })
 
@@ -123,11 +203,15 @@ describe('runScan integration (backfill into usage.json)', () => {
         ],
       }
       const persistence: PersistenceLike = {
-        listSnapshots: async () => Object.keys(logs).map((id, idx) => ({
+        // 0.1.5 API（宿主实际注入的形状）
+        list: async () => Object.keys(logs).map((id, idx) => ({
           header: { id, origin: id === 'child' ? 'subagent' : undefined, delegationDepth: id === 'child' ? 1 : undefined, parentSession: id === 'child' ? 'parent' : undefined },
           revision: `v${idx}`,
         })),
-        readFrom: async (id) => ({ events: logs[id] ?? [] }),
+        open: async (id) => ({
+          read: async () => ({ events: logs[id] ?? [] }),
+          close: async () => {},
+        }),
       }
       const scanned = await runScan(persistence)
       expect(scanned).toBe(2)

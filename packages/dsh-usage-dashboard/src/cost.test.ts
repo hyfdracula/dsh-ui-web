@@ -15,7 +15,7 @@ vi.hoisted(() => {
   process.env.DSH_HOME = 'dsh-test-home-nonexistent'
 })
 
-const { DEEPSEEK_FLASH_RATES, DEEPSEEK_REASONER_RATES, GENERIC_RATES, estimateCost, ratesForModel } = await import('./cost.ts')
+const { DEEPSEEK_FLASH_RATES, DEEPSEEK_OFFICIAL_RATES, DEEPSEEK_RATES, DEEPSEEK_REASONER_RATES, GENERIC_RATES, estimateCost, ratesForModel } = await import('./cost.ts')
 
 const GPT4O_RATES = { inputPerM: 18, outputPerM: 72, cachePerM: 9, cacheWritePerM: 18 }
 
@@ -37,8 +37,50 @@ describe('ratesForModel (pricing table)', () => {
     expect(ratesForModel('mycorp-relay/gpt-4o')).toEqual(GPT4O_RATES)
   })
 
-  it('matches snapshot-native DeepSeek rows', () => {
-    expect(ratesForModel('deepseek-v4-flash')).toEqual({ inputPerM: 1.008, outputPerM: 2.016, cachePerM: 0.0202, cacheWritePerM: 1.008 })
+  it('matches snapshot rows for models outside the official DeepSeek table', () => {
+    // deepseek-v4-flash 现在由官方表接管（见下一个 describe），这里用未被接管的
+    // 快照行验证「快照精确匹配 -> entryToRates」链路仍然工作。
+    expect(ratesForModel('deepseek/deepseek-reasoner')).toEqual({ inputPerM: 2.016, outputPerM: 3.024, cachePerM: 0.2016, cacheWritePerM: 2.016 })
+  })
+})
+
+describe('ratesForModel (DeepSeek official model ids)', () => {
+  it('prices deepseek-flash (DeepSeek-V4.1-Flash) at the official peak rates', () => {
+    // 高峰：缓存未命中 2 / 输出 8 / 缓存命中 0.04，缓存写入按输入价。
+    expect(ratesForModel('deepseek-flash')).toEqual({ inputPerM: 2, outputPerM: 8, cachePerM: 0.04, cacheWritePerM: 2 })
+    expect(ratesForModel('deepseek-flash')).toBe(DEEPSEEK_FLASH_RATES)
+  })
+
+  it('prices deepseek-v4-pro (DeepSeek-V4-Pro-0813) at the official peak rates', () => {
+    // 高峰：缓存未命中 9 / 输出 27 / 缓存命中 0.3。
+    expect(ratesForModel('deepseek-v4-pro')).toEqual({ inputPerM: 9, outputPerM: 27, cachePerM: 0.3, cacheWritePerM: 9 })
+    expect(ratesForModel('deepseek-v4-pro')).toBe(DEEPSEEK_RATES)
+  })
+
+  it('lets the official table win over the snapshot row for the same model', () => {
+    // 快照里的 deepseek/deepseek-v4-pro 仍是转售商旧价（3.132/6.264），必须让位官方价；
+    // 带 provider 前缀与大小写变体都归一到同一个官方条目。
+    expect(ratesForModel('deepseek/deepseek-v4-pro')).toBe(DEEPSEEK_RATES)
+    expect(ratesForModel('tencent/deepseek-v4-pro')).toBe(DEEPSEEK_RATES)
+    expect(ratesForModel('deepseek-official/deepseek-flash')).toBe(DEEPSEEK_FLASH_RATES)
+    expect(ratesForModel('DeepSeek-Flash')).toBe(DEEPSEEK_FLASH_RATES)
+  })
+
+  it('covers exactly the official ids the DSH deepseek-official catalog sends verbatim', () => {
+    // flash 家族（deepseek-flash 与模型目录里的旧 id v4-flash / vision-exp）同价，
+    // pro 单独一档。
+    expect(Object.keys(DEEPSEEK_OFFICIAL_RATES).sort()).toEqual([
+      'deepseek-flash',
+      'deepseek-v4-flash',
+      'deepseek-v4-flash-vision-exp',
+      'deepseek-v4-pro',
+    ])
+  })
+
+  it('prices the legacy v4-flash ids at the official flash peak rates, not the stale override', () => {
+    // 用户级覆盖里的旧价 3/9/0.1 与官方账单矛盾（见 cost.ts 注释），必须让位官方价。
+    expect(ratesForModel('deepseek-v4-flash')).toEqual({ inputPerM: 2, outputPerM: 8, cachePerM: 0.04, cacheWritePerM: 2 })
+    expect(ratesForModel('deepseek-v4-flash-vision-exp')).toBe(DEEPSEEK_FLASH_RATES)
   })
 })
 
@@ -78,18 +120,18 @@ describe('ratesForModel (fallbacks)', () => {
 })
 
 describe('estimateCost', () => {
-  it('computes 1M uncached input at the flash rate = 1 yuan', () => {
-    expect(estimateCost('any-model', 1_000_000, 0, 0, 0, DEEPSEEK_FLASH_RATES)).toBe(1)
+  it('computes 1M uncached input at the flash peak rate = 2 yuan', () => {
+    expect(estimateCost('any-model', 1_000_000, 0, 0, 0, DEEPSEEK_FLASH_RATES)).toBe(2)
   })
 
-  it('computes flash output and cache portions (output 2/M, cache 0.02/M)', () => {
-    // 1M input(1) + 1M output(2) + 1M cache(0.02) = 3.02
-    expect(estimateCost('any-model', 1_000_000, 1_000_000, 1_000_000, 0, DEEPSEEK_FLASH_RATES)).toBe(3.02)
+  it('computes flash output and cache portions (output 8/M, cache 0.04/M)', () => {
+    // 1M input(2) + 1M output(8) + 1M cache(0.04) = 10.04
+    expect(estimateCost('any-model', 1_000_000, 1_000_000, 1_000_000, 0, DEEPSEEK_FLASH_RATES)).toBe(10.04)
   })
 
   it('bills cache writes at the cacheWritePerM rate (M2)', () => {
-    // flash 写=读：1M cache write at 1/M = 1 yuan
-    expect(estimateCost('any-model', 0, 0, 0, 1_000_000, DEEPSEEK_FLASH_RATES)).toBe(1)
+    // flash 写=读：1M cache write at 2/M = 2 yuan
+    expect(estimateCost('any-model', 0, 0, 0, 1_000_000, DEEPSEEK_FLASH_RATES)).toBe(2)
     // Anthropic：快照 w 12.5 USD/M * 7.2 = 90? 用显式 rates 验证一点：
     // input 0 / write 1M at cacheWritePerM 32.4 = 32.4
     expect(estimateCost('any-model', 0, 0, 0, 1_000_000, { inputPerM: 25.92, outputPerM: 129.6, cachePerM: 2.592, cacheWritePerM: 32.4 })).toBe(32.4)
@@ -105,12 +147,12 @@ describe('estimateCost', () => {
   })
 
   it('handles fractional token counts', () => {
-    expect(estimateCost('any-model', 250_000, 0, 0, 0, DEEPSEEK_FLASH_RATES)).toBe(0.25)
+    expect(estimateCost('any-model', 250_000, 0, 0, 0, DEEPSEEK_FLASH_RATES)).toBe(0.5)
   })
 
   it('returns the exact value without intermediate rounding (M4)', () => {
-    expect(estimateCost('any-model', 12345, 0, 0, 0, DEEPSEEK_FLASH_RATES)).toBe(0.012345)
-    expect(estimateCost('any-model', 3, 7, 0, 0, DEEPSEEK_FLASH_RATES)).toBe(3 / 1_000_000 + 14 / 1_000_000)
+    expect(estimateCost('any-model', 12345, 0, 0, 0, DEEPSEEK_FLASH_RATES)).toBe(12345 * 2 / 1_000_000)
+    expect(estimateCost('any-model', 3, 7, 0, 0, DEEPSEEK_FLASH_RATES)).toBe(3 * 2 / 1_000_000 + 7 * 8 / 1_000_000)
   })
 
   it('uses table rates for snapshot-backed models (gpt-4o: 18/72/9/18)', () => {

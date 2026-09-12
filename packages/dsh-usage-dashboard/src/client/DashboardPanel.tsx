@@ -15,10 +15,10 @@ import { fmt, fmtCost, padRecentDays, type RecentDay } from './dashboard-format.
 export interface UsageSummary {
   total: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; calls: number }
   byModel: Record<string, { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number; calls: number }>
-  recent: Array<{ day: string; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens?: number; calls: number }>
+  recent: Array<{ day: string; inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens?: number; calls: number; cost?: number }>
   sessions: Array<{ id: string; title: string; model: string; lastTs: number; totalTokens: number; calls: number; cost: number }>
   byDayCount: number
-  cost: { total: number; byModel: Record<string, number> }
+  cost: { total: number; byModel: Record<string, number>; byDay?: Record<string, number>; today?: number }
 }
 
 /** 一个聚合桶的总 token（输入 + 输出 + 缓存读 + 缓存写），与会话排行口径一致。 */
@@ -51,6 +51,7 @@ function sanitizeSummary(raw: unknown): UsageSummary | null {
   if (typeof raw !== 'object' || raw === null) return null
   const s = raw as Partial<UsageSummary>
   if (typeof s.total !== 'object' || s.total === null) return null
+  const cost = typeof s.cost === 'object' && s.cost !== null ? s.cost : undefined
   return {
     total: {
       inputTokens: toNonNegNum(s.total.inputTokens),
@@ -63,9 +64,14 @@ function sanitizeSummary(raw: unknown): UsageSummary | null {
     recent: Array.isArray(s.recent) ? s.recent : [],
     sessions: Array.isArray(s.sessions) ? s.sessions : [],
     byDayCount: typeof s.byDayCount === 'number' ? s.byDayCount : 0,
-    cost: typeof s.cost === 'object' && s.cost !== null
-      ? { total: toNonNegNum(s.cost.total), byModel: typeof s.cost.byModel === 'object' && s.cost.byModel !== null ? s.cost.byModel : {} }
-      : { total: 0, byModel: {} },
+    cost: {
+      total: toNonNegNum(cost?.total),
+      byModel: typeof cost?.byModel === 'object' && cost.byModel !== null ? cost.byModel : {},
+      // 旧宿主没有 byDay/today：缺失即不展开该字段（exactOptionalPropertyTypes
+      // 下不能显式赋 undefined），卡片回退为 0。
+      ...typeof cost?.byDay === 'object' && cost.byDay !== null ? { byDay: cost.byDay } : {},
+      ...cost?.today === undefined ? {} : { today: toNonNegNum(cost.today) },
+    },
   }
 }
 
@@ -141,7 +147,7 @@ function TrendChart(props: { recent: UsageSummary['recent'] }): ReactElement {
           // 键带索引兜底，防重复 day key 告警（D3）。
           <g key={`${d.day}-${i}`}>
             <rect x={x + barW * 0.18} y={y} width={barW * 0.64} height={h} rx={3} fill={color}>
-              <title>{`${d.day}: ${fmt(total)} tokens\n${t('usage.input')} ${fmt(d.inputTokens)} / ${t('usage.output')} ${fmt(d.outputTokens)} / ${t('usage.cache')} ${fmt(d.cacheReadTokens)}`}</title>
+              <title>{`${d.day}: ${fmt(total)} tokens\n${t('usage.input')} ${fmt(d.inputTokens)} / ${t('usage.output')} ${fmt(d.outputTokens)} / ${t('usage.cache')} ${fmt(d.cacheReadTokens)}\n${t('usage.cost')} ${fmtCost(d.cost ?? 0)}`}</title>
             </rect>
             {data.length <= 14 && (i % 2 === 0) && (
               <text x={x + barW / 2} y={H - 8} textAnchor="middle" className={css.axisLabel}>
@@ -259,8 +265,7 @@ export function DashboardPanel(props: { onClose: () => void }): ReactElement {
           <div className={css.body}>
             <div className={css.statGrid}>
               <StatCard label={t('usage.total')} value={fmt(totalTokens)} sub={`${fmt(summary.total.inputTokens)} in / ${fmt(summary.total.outputTokens)} out`} color={PALETTE[0]} />
-              <StatCard label={t('usage.calls')} value={fmt(summary.total.calls)} sub={t('usage.daysRecorded', { days: summary.byDayCount })} color={PALETTE[1]} />
-              <StatCard label={t('usage.cache')} value={fmt(summary.total.cacheReadTokens)} sub={t('usage.cacheHit')} color={PALETTE[2]} />
+              <StatCard label={t('usage.costToday')} value={fmtCost(summary.cost.today ?? 0)} sub={t('usage.costTodayHint')} color={PALETTE[5]} />
               <StatCard label={t('usage.cost')} value={fmtCost(summary.cost?.total ?? 0)} sub={t('usage.costHint')} color={PALETTE[3]} />
             </div>
 

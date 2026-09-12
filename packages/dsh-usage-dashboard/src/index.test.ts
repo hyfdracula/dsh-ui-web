@@ -13,14 +13,46 @@ import {
   dayKey,
   emptyUsage,
   normalizeRecord,
+  readScanWatermark,
   readUsage,
   recentDays,
   sessionRanking,
+  UNATTRIBUTED_DAY,
   usagePath,
   writeUsage,
+  type TokenBucket,
   type UsageRecord,
+  type UsageStore,
 } from './index.ts'
 import { mergeFreshSnapshot } from './pricing.ts'
+
+/** 一个会话归属表（days）各桶之和：用于校验「会话行合计 == 归属合计」不变量。 */
+function dayTotals(store: UsageStore, sessionId: string): TokenBucket {
+  const out: TokenBucket = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 0 }
+  for (const models of Object.values(store.bySession[sessionId]?.days ?? {})) {
+    for (const b of Object.values(models)) {
+      out.inputTokens += b.inputTokens
+      out.outputTokens += b.outputTokens
+      out.cacheReadTokens += b.cacheReadTokens
+      out.cacheWriteTokens += b.cacheWriteTokens
+      out.calls += b.calls
+    }
+  }
+  return out
+}
+
+/** 聚合表（日/模型）各桶之和。 */
+function sumBuckets(table: Record<string, TokenBucket>): TokenBucket {
+  const out: TokenBucket = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, calls: 0 }
+  for (const b of Object.values(table)) {
+    out.inputTokens += b.inputTokens
+    out.outputTokens += b.outputTokens
+    out.cacheReadTokens += b.cacheReadTokens
+    out.cacheWriteTokens += b.cacheWriteTokens
+    out.calls += b.calls
+  }
+  return out
+}
 
 const base: UsageRecord = {
   sessionId: 's1',
@@ -70,14 +102,16 @@ describe('usage aggregation', () => {
     expect(store.total.inputTokens).toBe(150)
   })
 
-  it('clamps at zero when a projection resets (no subtraction)', () => {
+  it('keeps the session snapshot monotone when a projection regresses', () => {
     const store = emptyUsage()
     applyRecord(store, base)
     const before = store.total.inputTokens
-    // A reset snapshot (smaller) must not subtract from totals.
+    // 投影回退（压缩/重算）报来更小的累计值：v2 一律取大，会话行与派生聚合都不
+    // 缩水（v1 会把会话行覆盖成 10，后续扫描"补差"时聚合被重复累加）。
     applyRecord(store, { ...base, inputTokens: 10, outputTokens: 5 })
     expect(store.total.inputTokens).toBe(before)
-    expect(store.bySession['s1']?.inputTokens).toBe(10)
+    expect(store.bySession['s1']?.inputTokens).toBe(100)
+    expect(dayTotals(store, 's1').inputTokens).toBe(100)
   })
 
   it('does not inflate calls on a re-uploaded identical snapshot', () => {
@@ -295,6 +329,104 @@ describe('persistence (H1)', () => {
       writeUsage(read)
       const after = readdirSync(home)
       expect(after.filter((f) => f.startsWith('usage.json.corrupt-'))).toHaveLength(1)
+    } finally {
+      delete process.env.DSH_HOME
+      rmSync(home, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('v2 单账本不变量（聚合一律由会话行派生）', () => {
+  it('会话行合计 == 归属表合计 == total == Σ byDay == Σ byModel', () => {
+    const store = emptyUsage()
+    applyRecord(store, base)
+    applyRecord(store, { ...base, sessionId: 's2', sessionTitle: '会话 B', model: 'deepseek/deepseek-reasoner', inputTokens: 200, outputTokens: 30 })
+    // 跨天：同一会话第二天继续增长
+    applyRecord(store, { ...base, ts: base.ts + 86_400_000, inputTokens: 400, outputTokens: 90 })
+
+    for (const id of ['s1', 's2']) {
+      const row = store.bySession[id]
+      expect(row).toBeDefined()
+      const days = dayTotals(store, id)
+      expect(days.inputTokens).toBe(row?.inputTokens)
+      expect(days.outputTokens).toBe(row?.outputTokens)
+      expect(days.cacheReadTokens).toBe(row?.cacheReadTokens)
+      expect(days.cacheWriteTokens).toBe(row?.cacheWriteTokens)
+      expect(days.calls).toBe(row?.calls)
+    }
+    expect(sumBuckets(store.byDay)).toEqual(store.total)
+    expect(sumBuckets(store.byModel)).toEqual(store.total)
+    // 跨天确实落到了两个不同的日桶
+    expect(Object.keys(store.bySession['s1']?.days ?? {})).toHaveLength(2)
+  })
+
+  it('权威扫描记录整行替换，之后 recorder 上报不再计入 token/调用（消除棘轮）', () => {
+    const store = emptyUsage()
+    applyRecord(store, base) // recorder 先看到一小段
+    expect(store.total.inputTokens).toBe(100)
+
+    // 日志扫描给出权威累计 + 真实归属（口径与 recorder 不同，值更大）
+    applyRecord(store, {
+      ...base,
+      reset: true,
+      inputTokens: 300,
+      outputTokens: 150,
+      cacheReadTokens: 60,
+      steps: 7,
+      days: { [dayKey(base.ts)]: { 'deepseek/deepseek-chat': { inputTokens: 300, outputTokens: 150, cacheReadTokens: 60, cacheWriteTokens: 0, calls: 7 } } },
+    })
+    expect(store.total.inputTokens).toBe(300)
+    expect(store.total.calls).toBe(7)
+    expect(store.bySession['s1']?.authority).toBe('scan')
+
+    // 此后 recorder 反复上报（含更大的投影值）都不再累加 token/calls —— v1 正是
+    // 在这里被反复"补差"，聚合单调膨胀。
+    applyRecord(store, { ...base, inputTokens: 320, outputTokens: 160, cacheReadTokens: 70, steps: 8 })
+    applyRecord(store, { ...base, inputTokens: 340, outputTokens: 170, cacheReadTokens: 80, steps: 9 })
+    expect(store.total.inputTokens).toBe(300)
+    expect(store.total.calls).toBe(7)
+    expect(sumBuckets(store.byDay).inputTokens).toBe(300)
+    expect(dayTotals(store, 's1').inputTokens).toBe(300)
+  })
+})
+
+describe('v1 -> v2 迁移', () => {
+  it('丢弃被污染的双账本聚合、把旧累计挂到「日期未知」、备份旧文件并清空扫描水位', () => {
+    const home = join(tmpdir(), `usage-migrate-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}`)
+    mkdirSync(home, { recursive: true })
+    process.env.DSH_HOME = home
+    try {
+      const ts = Date.now()
+      const inflated = { inputTokens: 999_999, outputTokens: 999_999, cacheReadTokens: 999_999, cacheWriteTokens: 0, calls: 999_999 }
+      const v1 = {
+        bySession: {
+          s1: { title: '旧会话', lastModel: 'deepseek-flash', lastTs: ts, inputTokens: 100, outputTokens: 20, cacheReadTokens: 5, cacheWriteTokens: 0, steps: 3, calls: 3 },
+        },
+        byDay: { [dayKey(ts)]: inflated },
+        byModel: { 'deepseek-flash': inflated },
+        total: inflated,
+      }
+      writeFileSync(usagePath(), JSON.stringify(v1), 'utf8')
+      writeFileSync(join(home, 'usage-scan.json'), JSON.stringify({ s1: 'rev-1' }), 'utf8')
+
+      const store = readUsage()
+      expect(store.version).toBe(2)
+      // 膨胀的旧聚合不再被采信
+      expect(store.total.inputTokens).toBe(100)
+      expect(store.total.calls).toBe(3)
+      // 归属表补一张「日期未知」兜底：会话合计 == 归属合计，但**不**伪造某一天的用量
+      expect(Object.keys(store.bySession['s1']?.days ?? {})).toEqual([UNATTRIBUTED_DAY])
+      expect(dayTotals(store, 's1')).toEqual({ inputTokens: 100, outputTokens: 20, cacheReadTokens: 5, cacheWriteTokens: 0, calls: 3 })
+      expect(store.bySession['s1']?.authority).toBe('live')
+      // 总额/模型分布保留，按天视图为空（等全量扫描按日志重建）
+      expect(store.byModel['deepseek-flash']?.inputTokens).toBe(100)
+      expect(store.byDay).toEqual({})
+      // 旧文件留档可查 + 水位清空（下一次全量扫描按日志重建真实归属）
+      expect(readdirSync(home).some((f) => f.startsWith('usage.json.v1-'))).toBe(true)
+      expect(readScanWatermark()).toEqual({})
+      // 迁移只发生一次：v2 文件再读不会重复备份
+      readUsage()
+      expect(readdirSync(home).filter((f) => f.startsWith('usage.json.v1-'))).toHaveLength(1)
     } finally {
       delete process.env.DSH_HOME
       rmSync(home, { recursive: true, force: true })

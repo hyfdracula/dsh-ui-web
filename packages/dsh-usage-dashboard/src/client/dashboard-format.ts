@@ -26,6 +26,8 @@ export interface RecentDay {
   cacheReadTokens: number
   cacheWriteTokens?: number
   calls: number
+  /** 当天估算费用（元）；旧宿主不返回此字段。 */
+  cost?: number
 }
 
 /**
@@ -43,6 +45,7 @@ export function padRecentDays(recent: RecentDay[], min: number): RecentDay[] {
     cacheReadTokens: 0,
     cacheWriteTokens: 0,
     calls: 0,
+    cost: 0,
   }))
   return [...zeros, ...recent]
 }
