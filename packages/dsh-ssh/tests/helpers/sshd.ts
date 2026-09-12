@@ -2,16 +2,66 @@
  * Standalone real-sshd harness: spawns /usr/sbin/sshd as the current user
  * with a sandboxed config, host key, and a generated client keypair (key
  * auth only). Gives the SFTP tests a production-grade server.
+ *
+ * POSIX-only: probeRealSshd() below is the capability check callers must gate
+ * the specs on, so hosts without Linux sshd (Windows) skip instead of failing.
  */
 
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process'
-import { chmodSync, createWriteStream, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { accessSync, chmodSync, constants, createWriteStream, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { connect } from 'node:net'
 
+/** The sshd binary this harness spawns (override with DSH_SSH_SSHD). */
+export const SSHD_PATH = process.env.DSH_SSH_SSHD?.trim() || '/usr/sbin/sshd'
+
 /** Every spawned sshd (orphan cleanup if the test process dies early). */
 const spawned: ChildProcess[] = []
+
+/** Result of the real-sshd capability probe. */
+export interface RealSshdProbe {
+  /** Whether the real-sshd specs can run on this host. */
+  enabled: boolean
+  /** Human-readable verdict, surfaced in the skip diagnostics. */
+  reason: string
+}
+
+/** True when `path` names an existing executable file. */
+function isExecutable(path: string): boolean {
+  try {
+    accessSync(path, constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Probe the host for the real-sshd specs: a Linux platform plus an executable
+ * sshd binary (the harness also shells out to ssh-keygen). Windows has neither,
+ * so callers must SKIP there instead of failing - see the guard in
+ * tests/engine.test.ts.
+ *
+ * DSH_SSH_E2E=1 forces the specs on (an explicit opt-in must fail loudly rather
+ * than skip silently); DSH_SSH_E2E=0 forces them off.
+ */
+export function probeRealSshd(): RealSshdProbe {
+  const override = (process.env.DSH_SSH_E2E ?? '').trim().toLowerCase()
+  if (override === '0' || override === 'false' || override === 'no') {
+    return { enabled: false, reason: 'DSH_SSH_E2E disables the real-sshd specs' }
+  }
+  if (override === '1' || override === 'true' || override === 'yes') {
+    return { enabled: true, reason: 'DSH_SSH_E2E forces the real-sshd specs on' }
+  }
+  if (process.platform !== 'linux') {
+    return { enabled: false, reason: `the real-sshd specs need Linux (platform: ${process.platform})` }
+  }
+  if (!isExecutable(SSHD_PATH)) {
+    return { enabled: false, reason: `${SSHD_PATH} is missing or not executable` }
+  }
+  return { enabled: true, reason: `${SSHD_PATH} is executable` }
+}
 
 /** Wait until the port accepts TCP connections (aborts on a spawn error). */
 async function waitPort(port: number, timeoutMs: number, spawnError?: () => Error | undefined): Promise<void> {
@@ -80,7 +130,7 @@ export class TestSshd {
     writeFileSync(join(dir, 'sshd_config'), config + '\n', 'utf8')
     const log = join(dir, 'sshd.log')
     const logStream = createWriteStream(log)
-    const child = spawn('/usr/sbin/sshd', ['-D', '-e', '-f', join(dir, 'sshd_config')], {
+    const child = spawn(SSHD_PATH, ['-D', '-e', '-f', join(dir, 'sshd_config')], {
       stdio: ['ignore', 'ignore', 'pipe'],
     })
     spawned.push(child)
@@ -90,7 +140,7 @@ export class TestSshd {
     child.once('error', (error) => { spawnError = error })
     try {
       await waitPort(port, 8_000, () => spawnError !== undefined
-        ? new Error(`failed to spawn /usr/sbin/sshd: ${spawnError.message}`)
+        ? new Error(`failed to spawn ${SSHD_PATH}: ${spawnError.message}`)
         : undefined)
     } catch (error) {
       child.kill()

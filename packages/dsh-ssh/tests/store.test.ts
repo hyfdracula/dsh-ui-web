@@ -106,7 +106,9 @@ describe('CRUD', () => {
     const store = makeStore()
     const entry = store.create({ ...basePayload, auth: { kind: 'key', keyPath: '~/keys/id' } })
     expect(entry.auth.keyPath).not.toContain('~')
-    expect(entry.auth.keyPath).toContain('keys/id')
+    // expandHome keeps the platform separator (backslashes on Windows), so the
+    // suffix is compared in POSIX form.
+    expect(entry.auth.keyPath?.replace(/\\/g, '/')).toContain('keys/id')
   })
 })
 
@@ -180,7 +182,10 @@ describe('import from ssh config', () => {
 })
 
 describe('file safety', () => {
-  it('writes the store with owner-only permissions', () => {
+  // POSIX mode bits only: Windows has no 0o600 (chmod toggles the read-only
+  // flag and statSync reports 0o666), so this spec is skipped there instead of
+  // failing on an assertion the platform cannot satisfy.
+  it.skipIf(process.platform === 'win32')('writes the store with owner-only permissions', () => {
     const store = makeStore()
     store.create(basePayload)
     const mode = statSync(store.path).mode & 0o777
@@ -239,7 +244,8 @@ describe('partial updates', () => {
     const store = makeStore()
     store.create({ ...basePayload, auth: { kind: 'key', keyPath: '~/keys/old', passphrase: 'secret' } })
     const switched = store.update('web-01', { auth: { kind: 'key', keyPath: '~/keys/new' } })
-    expect(switched.auth.keyPath).toContain('keys/new')
+    // Platform separator, as in 'expands ~ in key paths' above.
+    expect(switched.auth.keyPath?.replace(/\\/g, '/')).toContain('keys/new')
     expect(switched.auth.passphrase).toBeUndefined()
   })
 
