@@ -45,9 +45,25 @@ export interface ExecutionHistoryEvent {
   data?: unknown
 }
 
-/** Optional raw-history face used to detect failures of never-opened sessions. */
+/** Optional failure-face used to detect failures of never-opened sessions. */
 export interface HistoryExecutionFace {
-  loadTail(sessionId: string): Promise<{ events: readonly ExecutionHistoryEvent[] } | undefined>
+  /**
+   * Whether the session's own state reports an agent failure.
+   *
+   * 0.1.5's client serves no raw history for an arbitrary session, but the
+   * session face carries `lastAgentError` — the same fact the old
+   * `turn/end`-with-error probe reconstructed from the log tail.
+   * @param sessionId - session whose failure state to read.
+   * @returns true when an agent error is recorded for that session.
+   */
+  showsFailure?(sessionId: string): Promise<boolean>
+  /**
+   * Legacy raw-history probe, kept for callers that still have a history
+   * carrier (tests, or a build whose client still exposes one).
+   * @param sessionId - session whose log tail to read.
+   * @returns the tail events, or undefined when unavailable.
+   */
+  loadTail?(sessionId: string): Promise<{ events: readonly ExecutionHistoryEvent[] } | undefined>
 }
 
 /** The behavior verbs the service invokes on an execution session. */
@@ -183,11 +199,15 @@ export class ExecutionService {
     return { kind: 'settled', taskId: task.id, executionId: execution.id, outcome: 'succeeded' }
   }
 
-  /** Best-effort failure probe over the raw history tail (false when unavailable). */
+  /** Best-effort failure probe (false when unavailable). */
   private async historyShowsFailure(sessionId: string): Promise<boolean> {
     const history = this.env.history
     if (history === undefined) return false
     try {
+      // The session-state probe first: it is the 0.1.5 carrier, and it answers
+      // for sessions the client has never opened.
+      if (history.showsFailure !== undefined) return await history.showsFailure(sessionId)
+      if (history.loadTail === undefined) return false
       const tail = await history.loadTail(sessionId)
       if (tail === undefined) return false
       return tail.events.some(event => event.type === 'turn/end' && isErrorTurnEnd(event.data))

@@ -9,10 +9,9 @@
  * plugin must not take the GUI down.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SettingsScope, SettingsScopeSpec } from '@deepseek-ai/dsh-client-ui-settings/client'
-import type { WorkspaceId } from '@deepseek-ai/dsh-workspace'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale) and its
 // LocaleNamespaceMap merge table.
@@ -20,7 +19,7 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: pulls the settings-surface Context merge (ctx.settingsScope).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { BoardController } from '../core/controller.ts'
-import { ExecutionService } from '../core/execution.ts'
+import { ExecutionService, type SessionDriver } from '../core/execution.ts'
 import { SchedulerService } from '../core/scheduler.ts'
 import { LocalStorageTaskStore } from '../core/store.ts'
 import { mountBoard } from './board-mount.tsx'
@@ -30,6 +29,12 @@ import { en, zh, type TaskBoardKey } from './locales.ts'
 // Type-only: 0.1.5 declares `ctx.slots` in ui-renderer's Context merge (ui-slots
 // keeps the slot contracts).
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+// Type-only: the CLIENT controller declares Context.sessions/workspaces
+// (ISessions), which is the face this half drives. The branded ids above come
+// from the packages' /types entries so the HOST declaration
+// (Context.sessions: SessionStore) stays out of this program.
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 
 /** Locale namespace this plugin owns. */
 const NS = 'task-board'
@@ -101,31 +106,49 @@ export function apply(ctx: ClientContext): void {
   let uiDisposer: (() => void) | undefined
   const mountUi = (): void => {
     if (uiDisposer !== undefined) return
-    const sessions = ctx.sessions
-    const workspaces = ctx.workspaces
-    const connection = ctx.get('connection') as ConnectionHandle
+    // The client contracts, named at the access point: this combined program also
+    // sees the HOST declaration (Context.sessions: SessionStore), and the client
+    // shape is the one that exists at runtime.
+    const sessions = ctx.sessions as unknown as ISessions
+    const workspaces = ctx.workspaces as unknown as IWorkspaces
+
+    /** The workspace the current session's directory belongs to (0.1.5 has no
+     *  recentWorkspaceId fact; the current session's cwd is the same signal). */
+    const recentWorkspaceId = (): string | undefined => {
+      const list = sessions.list.getSnapshot()
+      const cwd = list.current === undefined ? undefined : list.byId[list.current]?.cwd
+      if (cwd === undefined) return undefined
+      const match = workspaces.list.getSnapshot().items.find(item => item.path === cwd)
+      return match === undefined ? undefined : String(match.workspaceId)
+    }
 
     // Core wiring: real runtime faces into the framework-free services.
     const store = new LocalStorageTaskStore()
     const exec = new ExecutionService({
       sessions: {
         list: sessions.list,
-        binding: id => sessions.binding(id as SessionId),
+        // The client face, narrowed to the service's own structural driver.
+        binding: id => sessions.binding(id as SessionId) as unknown as { session: SessionDriver } | undefined,
       },
       workspaces: {
-        list: workspaces.list,
-        connectWorkspace: id => workspaces.connectWorkspace(id as WorkspaceId),
+        list: {
+          getSnapshot: () => {
+            const snapshot = workspaces.list.getSnapshot()
+            return {
+              items: snapshot.items.map(item => ({ workspaceId: String(item.workspaceId) })),
+              recentWorkspaceId: recentWorkspaceId(),
+            }
+          },
+        },
+        // Creating/adopting a session in a workspace is the sessions service's
+        // job in 0.1.5 (it reuses a blank session targeting the same workspace).
+        connectWorkspace: async id => String(await sessions.create({ workspaceId: id as WorkspaceId })),
       },
       history: {
-        loadTail: async sessionId => {
-          const response = await connection.api.sessions.history({
-            sessionId: sessionId as SessionId,
-            maxMessages: 20,
-          })
-          return response.result.ok
-            ? { events: response.result.value.events.map(entry => entry.event) }
-            : undefined
-        },
+        // 0.1.5's client no longer serves a raw history tail for an arbitrary
+        // session; the session face carries the failure fact outright.
+        showsFailure: async sessionId =>
+          sessions.binding(sessionId as SessionId)?.session.getSnapshot().lastAgentError != null,
       },
     })
     const controller = new BoardController({
