@@ -18,10 +18,18 @@
 
 ### 例外：dsh-fork-adapt 一键适配目录
 
-- 本仓库允许保留 **`dsh-fork-adapt/`** 作为 DSH 官方源码的本地补丁适配集（010-080，相对
-  `origin/master` 的 `git diff` 生成的 `*.patch` + `FORK-CHANGES.md` + `apply/regenerate` 脚本）。
-  该目录**不参与本仓库的插件构建与发布**，仅作为“克隆后一键重放”工具，使 `https://github.com/hyfdracula/dsh-ui-web.git`
-  克隆即直接可用（5插件 + 8补丁）；补丁在用户本地 checkout 上 `git apply` 重放，不改本仓库的插件源码边界。
+- 本仓库允许保留 **`dsh-fork-adapt/`** 作为 DSH 官方源码的本地补丁适配集。当前基线是
+  0.1.5 checkout（`C:\Users\19161\deepseek-harness-next`，tag `dsh-v0.1.5-rc.2` = `fb2c4b9`），
+  一个 fork commit 一个补丁：`010-fork-f1-f4-client-features` / `020-fork-f9-web-restart-launchers` /
+  `030-fork-f7-glm-normalizer` / `040-fork-f6-turn-recovery`（全部 LF、无 BOM）。
+  0.1.1 时代的 8 个补丁与旧启动器副本移入 `archive-0.1.1/`，逐条取代关系写在该目录的 README 与
+  `FORK-CHANGES.md` 里。
+- 该目录**不参与本仓库的插件构建与发布**，仅作为“克隆后一键重放”工具，使
+  `https://github.com/hyfdracula/dsh-ui-web.git` 克隆即直接可用；补丁在用户本地 checkout 上
+  `git apply` 重放，不改本仓库的插件源码边界。
+- 用法：`powershell -File apply-fork-patches.ps1 -Check`（只读试算）、`-VerifyTree`（重放后与各
+  fork commit 的树逐一比对）、`-Build` / `-Restart`（可选）；`regenerate-fork-patches.ps1` 从
+  commit 重新生成（幂等，SHA256 不变）。
 - 该例外仅限 `dsh-fork-adapt/` 目录；其余 `packages/` 仍严格遵守本节的 SDK-only 与零写入规则。
 
 ## 新包命名统一 dsh- 前缀
