@@ -7,6 +7,7 @@
 # web-ui.plugin.item 子槽位，其余插件的设置卡再注入（slots.inject 声明感知，
 # 但更早的声明让设置组在任何卡片之前就位，避免观感上的注册顺序歧义）。
 patchFrom:
+  - ../dsh-bilibili-download
   - ../dsh-web-ui-settings
   - ../dsh-aionui-panel
   - ../dsh-task-board
@@ -20,6 +21,7 @@ patchFrom:
 self:
   - ui-web-ui-compat
 deps:
+  - ../dsh-bilibili-download
   - ../dsh-aionui-panel
   - ../dsh-task-board
   - ../dsh-git-graph

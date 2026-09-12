@@ -20,6 +20,7 @@
   },
   "license": "Apache-2.0",
   "dependencies": {
+    "@captain1275/dsh-bilibili-download": "workspace:*",
     "@captain1275/dsh-client-ui-aionui-panel": "workspace:*",
     "@captain1275/dsh-client-ui-task-board": "workspace:*",
     "@captain1275/dsh-client-ui-git-graph": "workspace:*",

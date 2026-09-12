@@ -8,8 +8,8 @@
  */
 
 import { Context } from '@deepseek-ai/cordis'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-host-webserver'
+import type {} from '@deepseek-ai/dsh-settings'
 import z from 'schemastery'
 import { PetService, PET_SETTINGS_NAMESPACE, type PetConfig, type PetSettingsSection } from './service.ts'
 import { makePetRoutes, petPackageRoot } from './routes.ts'
@@ -135,14 +135,19 @@ export function apply(ctx: Context, config: PetConfig = {}): void {
       disposeRoutes = undefined
     }
   }
-  installSettingsSection(ctx, settingsNamespace(PET_SETTINGS_NAMESPACE), PET_SETTINGS_SCHEMA, base, {
-    setSource: (source) => { current = source },
-    onChange: () => {
-      const section = current()
-      service.applySettingsSection(section)
-      service.setEnabled(section.enabled ?? true)
-      syncRoutes()
-    },
+  // 0.1.5 moved section installation behind the settings service: the old
+  // `installSettingsSection(ctx, settingsNamespace(ns), ...)` helpers are gone,
+  // and the namespace is now a plain lowercase-hyphenated literal.
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, PET_SETTINGS_NAMESPACE, PET_SETTINGS_SCHEMA, base, {
+      setSource: (source) => { current = source },
+      onChange: () => {
+        const section = current()
+        service.applySettingsSection(section)
+        service.setEnabled(section.enabled ?? true)
+        syncRoutes()
+      },
+    })
   })
   syncRoutes()
 }

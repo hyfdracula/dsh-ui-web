@@ -1,0 +1,454 @@
+/* dsh-bilibili-download — panel, modal, settings card and sidebar entry styling */
+
+/* -------- Settings plugin card -------- */
+.card {
+  list-style: none;
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.22));
+  border-radius: 8px;
+  background: var(--bg-1, rgba(128, 128, 128, 0.06));
+  overflow: hidden;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-0, #e6e6e6);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.cardHeader:hover {
+  background: var(--bg-2, rgba(128, 128, 128, 0.1));
+}
+
+.cardHeadText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cardName {
+  font-weight: 600;
+  color: var(--text-0, #fff);
+}
+
+.cardDescription {
+  font-size: 12px;
+  color: var(--text-2, #8a8f98);
+  line-height: 1.5;
+}
+
+.cardChevron {
+  flex-shrink: 0;
+  color: var(--text-2, #8a8f98);
+  transition: transform 0.15s ease;
+}
+
+.cardChevronOpen {
+  flex-shrink: 0;
+  color: var(--text-2, #8a8f98);
+  transform: rotate(180deg);
+}
+
+.cardBody {
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cardHint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-2, #8a8f98);
+  line-height: 1.5;
+}
+
+/* -------- Full-screen modal -------- */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 11, 14, 0.82);
+  padding: 24px;
+}
+
+.modal {
+  width: min(760px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(128, 128, 128, 0.28);
+  background: var(--bg-0, #17181c);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+  color: var(--text-0, #e6e6e6);
+}
+
+/* -------- Sidebar entry row (legacy; no longer injected) -------- */
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--text-1, #d0d3d6);
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.entry:hover {
+  background: var(--bg-2, rgba(128, 128, 128, 0.12));
+}
+
+.entry[data-active='true'] {
+  background: var(--bg-2, rgba(128, 128, 128, 0.18));
+  color: var(--text-0, #fff);
+}
+
+.entryIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.entryLabel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* -------- Panel container (center column takeover) -------- */
+.view {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 20px 24px;
+  box-sizing: border-box;
+  background: var(--bg-0, #17181c);
+  color: var(--text-0, #e6e6e6);
+}
+
+/* -------- Panel layout -------- */
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding-top: 8px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.title {
+  font-size: 17px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-0, #fff);
+}
+
+.closeBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-2, #8a8f98);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.closeBtn:hover {
+  background: var(--bg-2, rgba(128, 128, 128, 0.2));
+  color: var(--text-0, #fff);
+}
+
+/* Environment row */
+.envRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--bg-1, rgba(128, 128, 128, 0.08));
+}
+
+.envLabel {
+  color: var(--text-2, #8a8f98);
+}
+
+.envOk {
+  color: #4caf50;
+  font-weight: 500;
+}
+
+.envFail {
+  color: #f44336;
+  font-weight: 500;
+}
+
+.envUnknown {
+  color: var(--text-2, #8a8f98);
+}
+
+/* Field rows */
+.fieldRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--text-2, #8a8f98);
+  font-weight: 500;
+}
+
+.input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+  border-radius: 6px;
+  background: var(--bg-2, rgba(128, 128, 128, 0.1));
+  color: var(--text-0, #fff);
+  font-size: 13px;
+  font-family: inherit;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.input:focus {
+  border-color: var(--accent, #4d9fff);
+}
+
+.input::placeholder {
+  color: var(--text-3, #5a5f66);
+}
+
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cookieGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+/* Remember-cookie row */
+.rememberRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-2, #8a8f98);
+}
+
+.rememberHint {
+  color: var(--text-2, #8a8f98);
+}
+
+.rememberErr {
+  color: #f44336;
+}
+
+.btnSmall {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+  background: var(--bg-2, rgba(128, 128, 128, 0.12));
+  color: var(--text-0, #fff);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btnSmall:hover {
+  background: var(--bg-2, rgba(128, 128, 128, 0.2));
+}
+
+.btnSmall:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.25));
+  border-radius: 6px;
+  background: var(--bg-2, rgba(128, 128, 128, 0.1));
+  color: var(--text-0, #fff);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+}
+
+/* Formats list */
+.formatDetails {
+  font-size: 12px;
+}
+
+.formatSummary {
+  cursor: pointer;
+  color: var(--text-2, #8a8f98);
+  padding: 4px 0;
+  user-select: none;
+}
+
+.formatList {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border, rgba(128, 128, 128, 0.2));
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 4px;
+}
+
+.formatRow {
+  padding: 4px 6px;
+  border-radius: 4px;
+  color: var(--text-1, #c8ccd0);
+}
+
+.formatRow:hover {
+  background: var(--bg-2, rgba(128, 128, 128, 0.15));
+}
+
+/* Progress */
+.progressSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progressBar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-2, rgba(128, 128, 128, 0.15));
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #4d9fff, #7c4dff);
+  transition: width 0.3s ease;
+}
+
+.progressText {
+  font-size: 12px;
+  color: var(--text-2, #8a8f98);
+  font-family: ui-monospace, monospace;
+}
+
+/* Error / result */
+.errorBox {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(244, 67, 54, 0.12);
+  border: 1px solid rgba(244, 67, 54, 0.3);
+  color: #f8715f;
+  font-size: 12.5px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.resultBox {
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(76, 175, 80, 0.12);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  color: #7bd88a;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.resultPath {
+  margin-top: 6px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--text-1, #c8ccd0);
+  word-break: break-all;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.btn, .btnPrimary, .btnDanger {
+  padding: 8px 18px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.btn {
+  background: var(--bg-2, rgba(128, 128, 128, 0.12));
+  color: var(--text-0, #fff);
+}
+
+.btn:hover {
+  background: var(--bg-2, rgba(128, 128, 128, 0.2));
+}
+
+.btnPrimary {
+  background: var(--accent, #4d9fff);
+  color: #fff;
+}
+
+.btnPrimary:hover {
+  filter: brightness(1.1);
+}
+
+.btnPrimary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnDanger {
+  background: #d32f2f;
+  color: #fff;
+}
+
+.btnDanger:hover {
+  background: #b71c1c;
+}

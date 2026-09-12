@@ -1,0 +1,8 @@
+# dsh-web-access bundle patch: inserts the /web command plugin row into the
+# web profile roster. The row is a bare host plugin by package name — the
+# node half (exports ".") runs in the host process and registers the `/web`
+# slash command through ctx.commands. No browser half: the command hands the
+# instruction to the model, which drives the browser via the web-access skill.
+- insert:
+    - id: web-access
+      name: '@captain1275/dsh-web-access'

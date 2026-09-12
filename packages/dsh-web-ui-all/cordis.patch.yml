@@ -7,6 +7,11 @@
     - id: ui-web-ui-compat
       name: '@captain1275/dsh-web-ui-all'
 
+# from ../dsh-bilibili-download
+- insert:
+    - id: ui-bilibili-download
+      name: '@captain1275/dsh-bilibili-download'
+
 # from ../dsh-web-ui-settings
 - insert:
     - id: ui-web-ui-settings

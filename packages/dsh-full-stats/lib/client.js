@@ -6,8 +6,8 @@ window.__ModuleLoader__.load({
 		Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 		let react = require("react");
 		let react_jsx_runtime = require("react/jsx-runtime");
-		//#region \0dsh-css:C:\Users\19161\Documents\dsh-work\dsh-ui-web\packages\dsh-full-stats\src\client\card.module.css.mjs
-		const css = ".Qk3cNW_card{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:8px;list-style:none;transition:border-color .16s,background .16s;overflow:hidden}.Qk3cNW_cardOpen{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-label-dimmed)}.Qk3cNW_header{cursor:pointer;text-align:left;width:100%;font:inherit;background:0 0;border:0;align-items:center;gap:8px;padding:10px 14px;transition:background .12s;display:flex}.Qk3cNW_header:hover{background:var(--dsw-alias-interactive-bg-hover)}.Qk3cNW_header:active{background:var(--dsw-alias-interactive-bg-hover-solid)}.Qk3cNW_header:focus-visible{box-shadow:inset 0 0 0 2px var(--dsw-alias-button-info-fill);outline:none}.Qk3cNW_headText{flex-direction:column;flex:1;gap:2px;min-width:0;display:flex}.Qk3cNW_name{color:var(--dsw-alias-label-primary);font-weight:600}.Qk3cNW_description{color:var(--dsw-alias-label-tertiary);font-size:12px}.Qk3cNW_chevron{color:var(--dsw-alias-label-tertiary);transition:transform .12s}.Qk3cNW_chevronOpen{transform:rotate(180deg)}.Qk3cNW_body{flex-direction:column;gap:12px;padding:0 14px 14px;display:flex}.Qk3cNW_desc{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:1.6}.Qk3cNW_field{flex-direction:column;gap:3px;display:flex}.Qk3cNW_fieldLabel{color:var(--dsw-alias-label-secondary);font-size:12px}.Qk3cNW_input{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);border-radius:6px;padding:5px 8px;font-size:13px}.Qk3cNW_input::placeholder{color:var(--dsw-alias-label-tertiary)}.Qk3cNW_actions{align-items:center;gap:10px;display:flex}.Qk3cNW_saveBtn{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:6px;padding:4px 12px;font-size:12px}.Qk3cNW_saveBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.Qk3cNW_saveBtn:disabled{opacity:.6;cursor:default}.Qk3cNW_savedHint{color:var(--dsw-alias-state-success-primary);font-size:12px}";
+		//#region \0dsh-css:C:\Users\19161\Documents\dsh-work\packages\dsh-full-stats\src\client\card.module.css.mjs
+		const css = ".hb9xxW_card{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-3);border-radius:8px;list-style:none;transition:border-color .16s,background .16s;overflow:hidden}.hb9xxW_cardOpen{background:var(--dsw-alias-bg-layer-2);border-color:var(--dsw-alias-label-dimmed)}.hb9xxW_header{cursor:pointer;text-align:left;width:100%;font:inherit;background:0 0;border:0;align-items:center;gap:8px;padding:10px 14px;transition:background .12s;display:flex}.hb9xxW_header:hover{background:var(--dsw-alias-interactive-bg-hover)}.hb9xxW_header:active{background:var(--dsw-alias-interactive-bg-hover-solid)}.hb9xxW_header:focus-visible{box-shadow:inset 0 0 0 2px var(--dsw-alias-button-info-fill);outline:none}.hb9xxW_headText{flex-direction:column;flex:1;gap:2px;min-width:0;display:flex}.hb9xxW_name{color:var(--dsw-alias-label-primary);font-weight:600}.hb9xxW_description{color:var(--dsw-alias-label-tertiary);font-size:12px}.hb9xxW_chevron{color:var(--dsw-alias-label-tertiary);transition:transform .12s}.hb9xxW_chevronOpen{transform:rotate(180deg)}.hb9xxW_body{flex-direction:column;gap:12px;padding:0 14px 14px;display:flex}.hb9xxW_desc{color:var(--dsw-alias-label-tertiary);margin:0;font-size:12px;line-height:1.6}.hb9xxW_field{flex-direction:column;gap:3px;display:flex}.hb9xxW_fieldLabel{color:var(--dsw-alias-label-secondary);font-size:12px}.hb9xxW_input{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);border-radius:6px;padding:5px 8px;font-size:13px}.hb9xxW_input::placeholder{color:var(--dsw-alias-label-tertiary)}.hb9xxW_actions{align-items:center;gap:10px;display:flex}.hb9xxW_saveBtn{border:1px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);cursor:pointer;border-radius:6px;padding:4px 12px;font-size:12px}.hb9xxW_saveBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}.hb9xxW_saveBtn:disabled{opacity:.6;cursor:default}.hb9xxW_savedHint{color:var(--dsw-alias-state-success-primary);font-size:12px}";
 		const tagId = "@captain1275/dsh-full-stats/card.module.css";
 		if (typeof document !== "undefined" && document.querySelector("style[data-plugin-css=" + JSON.stringify(tagId) + "]") === null) {
 			const tag = document.createElement("style");
@@ -17,22 +17,22 @@ window.__ModuleLoader__.load({
 			document.head.appendChild(tag);
 		}
 		var card_module_css_default = {
-			"actions": "Qk3cNW_actions",
-			"body": "Qk3cNW_body",
-			"card": "Qk3cNW_card",
-			"cardOpen": "Qk3cNW_cardOpen",
-			"chevron": "Qk3cNW_chevron",
-			"chevronOpen": "Qk3cNW_chevronOpen",
-			"desc": "Qk3cNW_desc",
-			"description": "Qk3cNW_description",
-			"field": "Qk3cNW_field",
-			"fieldLabel": "Qk3cNW_fieldLabel",
-			"headText": "Qk3cNW_headText",
-			"header": "Qk3cNW_header",
-			"input": "Qk3cNW_input",
-			"name": "Qk3cNW_name",
-			"saveBtn": "Qk3cNW_saveBtn",
-			"savedHint": "Qk3cNW_savedHint"
+			"actions": "hb9xxW_actions",
+			"body": "hb9xxW_body",
+			"card": "hb9xxW_card",
+			"cardOpen": "hb9xxW_cardOpen",
+			"chevron": "hb9xxW_chevron",
+			"chevronOpen": "hb9xxW_chevronOpen",
+			"desc": "hb9xxW_desc",
+			"description": "hb9xxW_description",
+			"field": "hb9xxW_field",
+			"fieldLabel": "hb9xxW_fieldLabel",
+			"headText": "hb9xxW_headText",
+			"header": "hb9xxW_header",
+			"input": "hb9xxW_input",
+			"name": "hb9xxW_name",
+			"saveBtn": "hb9xxW_saveBtn",
+			"savedHint": "hb9xxW_savedHint"
 		};
 		//#endregion
 		//#region src/client/FullStatsSettingsCard.tsx
