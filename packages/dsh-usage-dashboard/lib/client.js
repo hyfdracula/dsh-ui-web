@@ -363,7 +363,7 @@ window.__ModuleLoader__.load({
 						height: h,
 						rx: 3,
 						fill: color,
-						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `${d.day}: ${fmt(total)} tokens\n${t("usage.input")} ${fmt(d.inputTokens)} / ${t("usage.output")} ${fmt(d.outputTokens)} / ${t("usage.cache")} ${fmt(d.cacheReadTokens)}\n${t("usage.cost")} ${fmtCost(d.cost ?? 0)}` })
+						children: /* @__PURE__ */ (0, react_jsx_runtime.jsx)("title", { children: `${d.day}: ${fmt(total)} tokens\n${t("usage.input")} ${fmt(d.inputTokens)} / ${t("usage.output")} ${fmt(d.outputTokens)}\n${t("usage.cost")} ${fmtCost(d.cost ?? 0)}` })
 					}), data.length <= 14 && i % 2 === 0 && /* @__PURE__ */ (0, react_jsx_runtime.jsx)("text", {
 						x: x + barW / 2,
 						y: H - 8,
@@ -594,15 +594,9 @@ window.__ModuleLoader__.load({
 																	className: usage_module_css_default.sessionName,
 																	children: s.title
 																}),
-																/* @__PURE__ */ (0, react_jsx_runtime.jsxs)("div", {
+																/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 																	className: usage_module_css_default.sessionMeta,
-																	children: [
-																		s.model,
-																		" · ",
-																		s.calls,
-																		" ",
-																		t("usage.calls")
-																	]
+																	children: s.model
 																}),
 																/* @__PURE__ */ (0, react_jsx_runtime.jsx)("div", {
 																	className: usage_module_css_default.sessionBar,

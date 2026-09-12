@@ -147,7 +147,7 @@ function TrendChart(props: { recent: UsageSummary['recent'] }): ReactElement {
           // 键带索引兜底，防重复 day key 告警（D3）。
           <g key={`${d.day}-${i}`}>
             <rect x={x + barW * 0.18} y={y} width={barW * 0.64} height={h} rx={3} fill={color}>
-              <title>{`${d.day}: ${fmt(total)} tokens\n${t('usage.input')} ${fmt(d.inputTokens)} / ${t('usage.output')} ${fmt(d.outputTokens)} / ${t('usage.cache')} ${fmt(d.cacheReadTokens)}\n${t('usage.cost')} ${fmtCost(d.cost ?? 0)}`}</title>
+              <title>{`${d.day}: ${fmt(total)} tokens\n${t('usage.input')} ${fmt(d.inputTokens)} / ${t('usage.output')} ${fmt(d.outputTokens)}\n${t('usage.cost')} ${fmtCost(d.cost ?? 0)}`}</title>
             </rect>
             {data.length <= 14 && (i % 2 === 0) && (
               <text x={x + barW / 2} y={H - 8} textAnchor="middle" className={css.axisLabel}>
@@ -293,7 +293,7 @@ export function DashboardPanel(props: { onClose: () => void }): ReactElement {
                         <span className={css.sessionRank} style={{ color }}>{i + 1}</span>
                         <div className={css.sessionInfo}>
                           <div className={css.sessionName}>{s.title}</div>
-                          <div className={css.sessionMeta}>{s.model} · {s.calls} {t('usage.calls')}</div>
+                          <div className={css.sessionMeta}>{s.model}</div>
                           <div className={css.sessionBar}>
                             <div className={css.sessionBarFill} style={{ width: `${pct}%`, background: color }} />
                           </div>
