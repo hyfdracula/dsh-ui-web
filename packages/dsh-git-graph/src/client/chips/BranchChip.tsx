@@ -1,14 +1,15 @@
 /**
- * The git branch selector chip, mounted above the input card. Preferred
- * seat is the selector row's context hole
- * (`conversation.input.selector.context`, session-maybe) right beside the
- * official workspace selector; on shells that dropped the hole (rc.6) the
- * chip falls back to `conversation.input.dock` (session-scoped), so it
- * mounts once a session is active there. The session-maybe seat keeps the
- * chip mounted in every phase — hero (blank session) included — and the
- * chip hides itself only when its data source is absent (no session cwd,
- * or not a git repository). The component consumes only the props common
- * to both seats (the session id, the inject face, the locale seat).
+ * The git branch selector chip, mounted above the input card in
+ * `conversation.input.dock`. The dock entry's owner share is the input
+ * zone the conversation root publishes (`{ session, input }`), so the chip
+ * reads its session id off `props.session.sessionId` and consumes nothing
+ * else from that share: every git verb arrives through the inject face and
+ * is keyed by the session id.
+ *
+ * The dock is session-scoped, so the chip mounts once a session is active
+ * (a blank session included — it owns a zone) and hides itself only when
+ * its data source is absent (no session cwd, or not a git repository).
+ * Only the cold start (no session at all) has no seat.
  * @module dsh-git-graph/client/chips/BranchChip
  */
 
@@ -23,9 +24,9 @@ import { CreateBranchDialog } from './CreateBranchDialog.tsx'
 import { GraphDialog } from '../graph/GraphDialog.tsx'
 import css from './context.module.css'
 
-/** Full props of the branch chip: either seat's runtime share (the session-maybe context hole or the session-scoped dock fallback) + the git-graph inject face + the locale seat. */
+/** Full props of the branch chip: the dock entry's owner share (the published input zone) + the git-graph inject face + the locale seat. */
 export type BranchChipProps =
-  (PropsRuntime<'conversation.input.selector.context'> | PropsRuntime<'conversation.input.dock'>)
+  PropsRuntime<'conversation.input.dock'>
   & GitGraphInjected
   & PropsLocale<'git-graph'>
 
@@ -34,6 +35,8 @@ export type BranchChipProps =
  * @param props - the composed entry props of whichever seat it mounted in.
  */
 export function BranchChip(props: BranchChipProps) {
+  /** The session the dock zone publishes; every git verb below is keyed by it. */
+  const sessionId = props.session.sessionId
   /** Repository state: undefined = loading, null = not a repository, else the snapshot. */
   const [repo, setRepo] = useState<RepoStatus | null | undefined>(undefined)
   /** Fresh branch list, fetched when the branch popover opens. */
@@ -44,25 +47,25 @@ export function BranchChip(props: BranchChipProps) {
 
   const refetch = useCallback(() => {
     let live = true
-    props.repoStatus(props.sessionId)
+    props.repoStatus(sessionId)
       .then((status) => { if (live) setRepo(status) })
       .catch(() => { if (live) setRepo(null) })
     return () => { live = false }
-  }, [props.repoStatus, props.sessionId])
+  }, [props.repoStatus, sessionId])
 
   // Initial load + host-pushed external changes + focus refresh. A session
-  // switch changes props.sessionId and re-fetches through the session-keyed
+  // switch changes sessionId and re-fetches through the session-keyed
   // verbs.
   useEffect(() => refetch(), [refetch])
   useEffect(() => {
-    const unsubscribe = props.subscribeChanges(props.sessionId, () => { refetch() })
+    const unsubscribe = props.subscribeChanges(sessionId, () => { refetch() })
     const onFocus = (): void => { refetch() }
     window.addEventListener('focus', onFocus)
     return () => {
       unsubscribe()
       window.removeEventListener('focus', onFocus)
     }
-  }, [props.subscribeChanges, props.sessionId, refetch])
+  }, [props.subscribeChanges, sessionId, refetch])
 
   const closeCreate = (): void => {
     setCreateOpen(false)
@@ -76,9 +79,9 @@ export function BranchChip(props: BranchChipProps) {
     if (!branchOpen) return
     let live = true
     setBranchesView(null)
-    props.branches(props.sessionId).then((view) => { if (live) setBranchesView(view) })
+    props.branches(sessionId).then((view) => { if (live) setBranchesView(view) })
     return () => { live = false }
-  }, [branchOpen, props.branches, props.sessionId])
+  }, [branchOpen, props.branches, sessionId])
 
   // Loading or not a repository: no chip (no dead control). A workspace that
   // becomes a repository appears on the next refresh.
@@ -100,7 +103,7 @@ export function BranchChip(props: BranchChipProps) {
       {branchOpen && branchesView !== null && (
         <BranchPopover
           view={branchesView}
-          onSwitch={(branch) => props.switchBranch(props.sessionId, branch)}
+          onSwitch={(branch) => props.switchBranch(sessionId, branch)}
           onSwitched={refetch}
           onCreate={() => {
             setBranchOpen(false)
@@ -116,14 +119,14 @@ export function BranchChip(props: BranchChipProps) {
       )}
       {createOpen && (
         <CreateBranchDialog
-          onCreate={(name) => props.createBranch(props.sessionId, name)}
+          onCreate={(name) => props.createBranch(sessionId, name)}
           onClose={closeCreate}
           t={props.t}
         />
       )}
       {graphOpen && (
         <GraphDialog
-          graph={(limit) => props.graph(props.sessionId, limit)}
+          graph={(limit) => props.graph(sessionId, limit)}
           onClose={() => { setGraphOpen(false) }}
           t={props.t}
         />

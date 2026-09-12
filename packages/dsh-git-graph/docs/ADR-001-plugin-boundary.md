@@ -2,7 +2,7 @@
 
 状态：已实现。日期：2026-08-09。
 
-> 修正（2026-08）：分支 chip 挂载槽位为官方声明的 `conversation.input.selector.context`（list、session-maybe 作用域），与官方工作区选择胶囊并排。此前 acbcf80 曾把 chip 迁到 `conversation.input.dock`，理由是「selector-context 洞在 rc.6 从未声明」——该前提不成立：随发行 shell 的 apply.ts 同时声明了 selector-context（session-maybe）与 dock（session），selector-context 才是分支 chip 的正确席位，现已回迁。hero（空白会话）与 active 会话相位都挂载；见 README 挂载 seam。
+> 修正（2026-09，0.1.5 迁移）：分支 chip 的唯一挂载席位是 `conversation.input.dock`（list、session 作用域）。两版历史结论都不成立：acbcf80 迁到 dock 的方向正确，0be6546 以「随发行 shell 的 apply.ts 同时声明了 selector-context」为由回迁到 `conversation.input.selector.context`，而该 key 在 DSH 任何发行版中都不存在（0.1.5 的 `ui-conversation/src/client/contract/slots.ts` 只声明 composer 扩展点；本地 `declare module SlotMap` 里的同名条目是幽灵 key，与真实 owner 联合后还会把 `sessionId` 抹掉）。现已回到 dock 单席位：声明感知 `slots.inject`、无回退定时器；dock 的 owner share 是 conversation root 发布的输入区（`{ session, input }`，`renderSlot` 的第四参），chip 从 `props.session.sessionId` 取会话 id。同批修正：入口 `inject` 必须是工厂（ui-renderer 的 `runInject` 以 `entry.inject(sessionId)` 调用），此前传的是普通对象，首帧即 `inject is not a function`。代价：冷启动（无会话）无席位。
 
 ## 背景
 
@@ -14,7 +14,7 @@
 - 条目解析锚点是配置树的 `ctx.baseUrl`（cordis.yml 所在目录的 package 依赖）。任何能由 Loader 解析、`package.json` 声明 `dshClient` + `exports["./client"]` 的包都能成为 Web 插件行——不要求包在主仓。
 - 生产先例（本机 `~/.dsh/profiles/node_modules` 与 `~/.dsh/cordis.patch.yml`）：`dsh-client-ui-task-board`、`dsh-client-ui-skin-center`、`dsh-client-ui-subagent-tree`、四个 `skin-*` 皮肤全部是外部包，走同一条链。
 - 浏览器 half 的 `apply(ctx)` 在 client-side cordis ctx 上运行，`inject` 按服务名等待（`slots`/`sessions`/`workspaces`/`connection`/`locale` 均为运行时服务）。外部 bundle 只能做 type-only 的 `@deepseek-ai/*` 导入（构建期纯度门），跨插件协作走 cordis 服务——无需主仓改动。
-- 槽位注册：`ctx.slots.register` 可注册进别家声明的槽位；对 `conversation.input.selector.context` 这类无 waitable 服务的槽位，用「检查 `slots.spec(name)` 否则 `slots.subscribe(name)` 延迟注册」范式（`ui-goal` 的 GoalDock 是现成模板，`ctx.inject(['slots','conversation',...])` 以 conversation 服务在作为注册安全信号）。
+- 槽位注册：`ctx.slots.register` 可注册进别家声明的槽位；对 `conversation.input.dock` 这类由 shell 声明、无 waitable 服务的槽位，用声明感知的 `slots.inject(name, cb)`（`ui-goal` 的 GoalBar、`ui-model-selection` 的模型胶囊是现成模板，`ctx.inject(['slots','conversation',...])` 以 conversation 服务在作为注册安全信号）。session 作用域槽位的入口 `inject` 必须是工厂：渲染器以 `entry.inject(sessionId)` 调用并把返回值并入组件 props（`ui-renderer/src/client/scoped-slots.tsx` 的 `runInject`），普通对象会在首帧抛错。
 
 ## 问题 2：host RPC 可扩展性 —— RPC map 静态封闭，但 HTTP 载体面开放
 
@@ -24,7 +24,7 @@
 ## 边界决策：方案 (a) —— 全部功能在 dsh-git-graph，主仓零改动
 
 - host half（node half，`exports["."]`）：`GitService`（workspace 门卫 + 守卫 + 真实 git 操作）+ `/git/*` JSON 路由 + `/git/events` SSE 变更推送，全部经 `ctx.httpServer`/`ctx.subprocess`/`ctx.workspace` 服务接入。
-- browser half（`dshClient` bundle，`exports["./client"]`）：注册进 `conversation.input.selector.context`（list、session-maybe、`order: 100`），自带中英文案词典（`ctx.locale.register`）。
+- browser half（`dshClient` bundle，`exports["./client"]`）：声明感知注册进 `conversation.input.dock`（list、session 作用域、`order: 100`），入口 `inject` 为工厂，自带中英文案词典（`ctx.locale.register`）。
 - 激活：`"dsh": { "bundle": { "patch": "./cordis.patch.yml" } }` + `dsh plugin --profile <name> add github:dsh-external/dsh-git-graph`（git 安装 + prepare 构建 + reconcile 进 `dsh.profile.bundles`）；本地开发用 `add link:<绝对路径>`。
 - 主仓需提供输入选择器洞契约（`conversation.input.selector.workspace`/`.context`）与官方工作区选择器；本 ADR 的「主仓零改动」前提随产品决策（自研工作区选择器下线、分支选择器并入官方选择器行）作废，主仓契约变更走主仓验证链。
 
@@ -34,7 +34,7 @@
 2. ~~工作区语义~~：项目（工作区）选择已下线（产品决策：自研 WorkspaceChip 整体移除，工作区选择与 placeholder 由官方 header 入口全权负责）；本插件不再携带任何工作区动词。
 3. **git 操作语义**：`git switch --no-guess <branch>` / `git switch --no-guess -c <name>`，在 repoRoot 执行，作用于磁盘工作树，影响该工作区所有会话。守卫（对齐 ZCode branchSwitcher 错误码）：未解决冲突（`conflicts-present`）、进行中操作（`operation-in-progress`，检查 MERGE_HEAD/CHERRY_PICK_HEAD/REVERT_HEAD/BISECT_LOG/rebase-merge/rebase-apply/sequencer 标记）、目标分支被其他 worktree 检出（`branch-in-other-worktree`，`git worktree list --porcelain`）、切换失败按 stderr 归类（tracked/untracked overwrite + 文件列表、target-branch-not-found、internal）。创建分支：客户端镜像 `check-ref-format --branch` 规则即时反馈 + host `git check-ref-format` 权威门 + 重名拒绝。
 4. **安全边界**：`/git/*` 只接受「realpath 后等于某已注册 workspace.path」的路径（`ctx.workspace.list()`），浏览器无法对任意目录执行 git。
-5. **输入选择器席位**：`conversation.input.selector.context` 是 session-maybe 洞——分支 chip 从冷启动到 active 全程挂载，与输入卡 dock 在一起（与卡片同款宽度配方）；无会话 cwd（pathOf 解析失败）或非 git 工作区（status 返回 null）时 chip 自行隐藏。hero（空白会话）有 cwd，分支胶囊照常显示——与官方工作区胶囊并排，两个相位一致。
+5. **输入 dock 席位**：`conversation.input.dock` 是 session 作用域洞——分支 chip 随会话相位挂载（空白会话也带 zone，故同样有座位），与输入卡 dock 在一起（与卡片同款宽度配方）；无会话 cwd（pathOf 解析失败）或非 git 工作区（status 返回 null）时 chip 自行隐藏。冷启动（无会话）无座位——接受的降级。
 6. **非 git 工作区降级**：分支 chip 隐藏（status 返回 null 即不渲染）。隐藏优于禁用：不产生死控件，且工作区变仓库后自动出现（SSE/打开弹层时刷新）。
 7. **刷新策略**：chip 挂载时拉取、弹层打开时重新拉取、切换/创建成功后刷新、SSE 推送与 window focus 触发刷新。
 8. ~~「远程连接」占位~~：随项目选择器一并下线（`WorkspacePopover` 移除）。
