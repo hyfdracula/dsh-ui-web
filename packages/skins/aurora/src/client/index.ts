@@ -10,7 +10,8 @@
  * body[data-dsh-aurora] 作用域声明。
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
+import { createEffortWire } from './effort/wire.ts'
 import { createRoot, type Root } from 'react-dom/client'
 import { createElement } from 'react'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
@@ -18,7 +19,7 @@ import { EffortPanel } from './effort/EffortPanel.tsx'
 import css from './aurora.module.css'
 
 /** 需要的客户端服务：connection（模型目录读写）、sessions（当前会话）。 */
-export const inject: string[] = ['connection', 'sessions']
+export const inject: string[] = ['modelDirectories', 'sessions']
 
 /** 配置变更事件（皮肤中心卡片写入后派发，本半区监听重绘）。 */
 export const AURORA_EVENT = 'dshc-aurora-config'
@@ -180,7 +181,7 @@ export function apply(ctx: ClientContext): void {
     if (root === null) root = createRoot(host)
     root.render(createElement(EffortPanel, {
       sessionId,
-      connection: ctx.get('connection') as ConnectionHandle,
+      wire: createEffortWire(ctx.get('modelDirectories') as ModelDirectoryResolver),
       onClose: hidePanel,
     }))
   }

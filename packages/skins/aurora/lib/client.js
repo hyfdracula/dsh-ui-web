@@ -7,6 +7,71 @@ window.__ModuleLoader__.load({
 		let react_dom_client = require("react-dom/client");
 		let react = require("react");
 		let react_jsx_runtime = require("react/jsx-runtime");
+		//#region src/client/effort/wire.ts
+		/**
+		* 把目录快照投影成面板消费的形状。
+		* @param state - 官方每会话目录的快照。
+		* @returns 只含面板实际读取字段的目录值。
+		*/
+		function project(state) {
+			return {
+				current: state.current === null ? null : {
+					provider: state.current.provider,
+					model: state.current.model,
+					...state.current.reasoningEffort === void 0 ? {} : { reasoningEffort: state.current.reasoningEffort }
+				},
+				groups: state.groups
+			};
+		}
+		/**
+		* 用 0.1.5 的 `ctx.modelDirectories` 实现 {@link EffortWire}。
+		* @param directories - 官方每会话模型目录服务。
+		* @returns 面板可用的读写接口。
+		*/
+		function createEffortWire(directories) {
+			const directoryFor = (sessionId) => directories.directoryFor(sessionId);
+			return {
+				async models({ sessionId }) {
+					try {
+						const directory = directoryFor(sessionId);
+						await directory.load();
+						const state = directory.store.getSnapshot();
+						if (state.status === "error") return { result: {
+							ok: false,
+							error: {
+								code: "directory/error",
+								message: state.error ?? "directory unavailable"
+							}
+						} };
+						return { result: {
+							ok: true,
+							value: project(state)
+						} };
+					} catch (error) {
+						return { result: {
+							ok: false,
+							error: {
+								code: "directory/unavailable",
+								message: error instanceof Error ? error.message : String(error)
+							}
+						} };
+					}
+				},
+				async selectModel({ sessionId, provider, model, reasoningEffort }) {
+					try {
+						await directoryFor(sessionId).select({
+							provider,
+							model,
+							reasoningEffort
+						});
+						return { result: { ok: true } };
+					} catch {
+						return { result: { ok: false } };
+					}
+				}
+			};
+		}
+		//#endregion
 		//#region src/client/effort/shaders.ts
 		/** WebGL2 fire shaders (ported from the reference effort-card demo). */
 		const VERT = `#version 300 es
@@ -497,12 +562,12 @@ window.__ModuleLoader__.load({
 		/** Panel width (must match the CSS `.panel` width). */
 		const PANEL_W = 280;
 		/** Load the per-session model directory once per panel open. */
-		function useDirectory(connection, sessionId) {
+		function useDirectory(wire, sessionId) {
 			const [directory, setDirectory] = (0, react.useState)(null);
 			(0, react.useEffect)(() => {
 				let alive = true;
 				setDirectory(null);
-				connection.api.sessions.models({ sessionId }).then((response) => {
+				wire.models({ sessionId }).then((response) => {
 					const value = response.result.ok ? response.result.value : null;
 					console.log("[aurora-effort] models:", response.result.ok ? `ok groups=${value?.groups?.length} current=${JSON.stringify(value?.current)}` : `fail ${response.result.error?.code}: ${response.result.error?.message}`);
 					if (alive && response.result.ok) setDirectory(response.result.value);
@@ -512,7 +577,7 @@ window.__ModuleLoader__.load({
 				return () => {
 					alive = false;
 				};
-			}, [connection, sessionId]);
+			}, [wire, sessionId]);
 			return directory;
 		}
 		/**
@@ -520,8 +585,8 @@ window.__ModuleLoader__.load({
 		* @param props - session + wire face + close verb.
 		*/
 		function EffortPanel(props) {
-			const { sessionId, connection, onClose } = props;
-			const directory = useDirectory(connection, sessionId);
+			const { sessionId, wire, onClose } = props;
+			const directory = useDirectory(wire, sessionId);
 			const [dragging, setDragging] = (0, react.useState)(false);
 			const [rawValue, setRawValue] = (0, react.useState)(0);
 			const disabled = directory === null;
@@ -565,7 +630,7 @@ window.__ModuleLoader__.load({
 				const idx = Math.round(v / step100);
 				const effort = efforts[idx];
 				if (effort === void 0) return;
-				connection.api.sessions.selectModel({
+				wire.selectModel({
 					sessionId,
 					provider: current.provider,
 					model: current.model,
@@ -703,7 +768,7 @@ window.__ModuleLoader__.load({
 		//#endregion
 		//#region src/client/index.ts
 		/** 需要的客户端服务：connection（模型目录读写）、sessions（当前会话）。 */
-		const inject = ["connection", "sessions"];
+		const inject = ["modelDirectories", "sessions"];
 		/** 配置变更事件（皮肤中心卡片写入后派发，本半区监听重绘）。 */
 		const AURORA_EVENT = "dshc-aurora-config";
 		const DEFAULTS = {
@@ -824,7 +889,7 @@ window.__ModuleLoader__.load({
 				if (root === null) root = (0, react_dom_client.createRoot)(host);
 				root.render((0, react.createElement)(EffortPanel, {
 					sessionId,
-					connection: ctx.get("connection"),
+					wire: createEffortWire(ctx.get("modelDirectories")),
 					onClose: hidePanel
 				}));
 			};

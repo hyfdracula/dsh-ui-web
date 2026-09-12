@@ -6,14 +6,16 @@
  * dragging and snaps to the nearest effort level on release.
  */
 import { useEffect, useRef, useState, type ReactElement } from 'react'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
+import type { DirectoryValue, EffortWire } from './wire.ts'
+
+export type { DirectoryValue, EffortLevel } from './wire.ts'
 import { useWebglFire } from './useWebglFire.ts'
 import css from './effort.module.css'
 
 /** Panel props: owning session, wire face, close verb. */
 export interface EffortPanelProps {
   sessionId: string
-  connection: ConnectionHandle
+  wire: EffortWire
   onClose: () => void
 }
 
@@ -40,13 +42,13 @@ interface DirectoryValue {
 const PANEL_W = 280
 
 /** Load the per-session model directory once per panel open. */
-function useDirectory(connection: ConnectionHandle, sessionId: string): DirectoryValue | null {
+function useDirectory(wire: EffortWire, sessionId: string): DirectoryValue | null {
   const [directory, setDirectory] = useState<DirectoryValue | null>(null)
 
   useEffect(() => {
     let alive = true
     setDirectory(null)
-    void connection.api.sessions
+    void wire
       .models({ sessionId })
       .then((response) => {
         const value = response.result.ok ? response.result.value : null
@@ -61,7 +63,7 @@ function useDirectory(connection: ConnectionHandle, sessionId: string): Director
     return () => {
       alive = false
     }
-  }, [connection, sessionId])
+  }, [wire, sessionId])
 
   return directory
 }
@@ -71,8 +73,8 @@ function useDirectory(connection: ConnectionHandle, sessionId: string): Director
  * @param props - session + wire face + close verb.
  */
 export function EffortPanel(props: EffortPanelProps): ReactElement {
-  const { sessionId, connection, onClose } = props
-  const directory = useDirectory(connection, sessionId)
+  const { sessionId, wire, onClose } = props
+  const directory = useDirectory(wire, sessionId)
   const [dragging, setDragging] = useState(false)
   // Continuous 0..100 slider position; snaps to an effort level on release.
   const [rawValue, setRawValue] = useState(0)
@@ -131,7 +133,7 @@ export function EffortPanel(props: EffortPanelProps): ReactElement {
     const idx = Math.round(v / step100)
     const effort = efforts[idx]
     if (effort === undefined) return
-    void connection.api.sessions
+    void wire
       .selectModel({
         sessionId,
         provider: current.provider,
