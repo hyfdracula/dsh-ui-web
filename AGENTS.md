@@ -19,9 +19,14 @@
 ### 例外：dsh-fork-adapt 一键适配目录
 
 - 本仓库允许保留 **`dsh-fork-adapt/`** 作为 DSH 官方源码的本地补丁适配集。当前基线是
-  0.1.5 checkout（`C:\Users\19161\deepseek-harness-next`，tag `dsh-v0.1.5-rc.2` = `fb2c4b9`），
-  一个 fork commit 一个补丁：`010-fork-f1-f4-client-features` / `020-fork-f9-web-restart-launchers` /
-  `030-fork-f7-glm-normalizer` / `040-fork-f6-turn-recovery`（全部 LF、无 BOM）。
+  0.1.5 checkout（`C:\Users\19161\deepseek-harness-next`，tag `dsh-v0.1.5-rc.2` = `fb2c4b9`；
+  fork 分支 `fork/0.1.5-rc.2`），一个 fork commit 一个补丁，当前共 **19 个**：
+  `010-fork-f1-f4-client-features` / `020-fork-f9-web-restart-launchers` /
+  `030-fork-f7-glm-normalizer` / `040-fork-f6-turn-recovery`，以及 `050`–`190`
+  （桌面入口与遥测、聚合 references、token 行按端口/轮询、profile 切到 3080、
+  窗口替换与 Edge、快捷发送框 opt-in 后删除、无人值守巡检与空闲门、窗口最大化、
+  删默认浏览器回退、巡检等待无上限）。全部 LF、无 BOM。
+  补丁表以 `FORK-CHANGES.md` 的「补丁清单（19 个）」为单一事实源，两个脚本内的表必须与之一致；
   0.1.1 时代的 8 个补丁与旧启动器副本移入 `archive-0.1.1/`，逐条取代关系写在该目录的 README 与
   `FORK-CHANGES.md` 里。
 - 该目录**不参与本仓库的插件构建与发布**，仅作为“克隆后一键重放”工具，使
