@@ -120,6 +120,66 @@ $chain = @(
     Commit  = '7e4989840ee2e5fd4377ba55e9ee7601d3e602d2'
     Feature = 'host/client aggregate references for the two fork packages + the pi-ai Usage.cost spec fixture'
   }
+  [pscustomobject]@{
+    Name    = '070-fork-token-line-per-port.patch'
+    Commit  = '6bdfbf87d3af6d0594e0b849268c31b6bef70e54'
+    Feature = 'desktop opener reads only the token line of its own port'
+  }
+  [pscustomobject]@{
+    Name    = '080-fork-cutover-profile-web-3080.patch'
+    Commit  = 'b54e834e7ffb2704c13859e41b28c7da1e01460f'
+    Feature = 'cutover to profile web on port 3080 (service config + launcher defaults)'
+  }
+  [pscustomobject]@{
+    Name    = '090-fork-opener-own-log.patch'
+    Commit  = 'e484800e8ead23c49c0c5b165589336fcb1aff18'
+    Feature = 'desktop opener also reads the host own per-port log'
+  }
+  [pscustomobject]@{
+    Name    = '100-fork-window-replacement.patch'
+    Commit  = '46c686d8734dacad5189b6b0a4d4ff8d45658d00'
+    Feature = 'app-window replacement on restart (dsh-web-browser.ps1) plus the first native quick-send box'
+  }
+  [pscustomobject]@{
+    Name    = '110-fork-quick-send-optin.patch'
+    Commit  = '0acef7b783735a5e6900617202b4d73ba800598e'
+    Feature = 'make the native quick-send box opt-in'
+  }
+  [pscustomobject]@{
+    Name    = '120-fork-unattended-restart-keeper.patch'
+    Commit  = '41826570946f722edfe80d0fd5bbb2f816fdc9a9'
+    Feature = 'unattended restart keeper (dsh-restart-agent.ps1/.vbs, request marker, idle gate)'
+  }
+  [pscustomobject]@{
+    Name    = '130-fork-app-window-maximized.patch'
+    Commit  = 'a37d3f305716a2df81b81c1297ce8dc9df5c6dca'
+    Feature = 'maximize the app window through Win32 on every open'
+  }
+  [pscustomobject]@{
+    Name    = '140-fork-token-line-race.patch'
+    Commit  = 'b8bd38b3207c91a07205d40531e3aac83827ad39'
+    Feature = 'poll every candidate log for the token line instead of racing the Host'
+  }
+  [pscustomobject]@{
+    Name    = '150-fork-no-default-browser.patch'
+    Commit  = '456ba1d9ac8636efed76f4c14d2c7985543a848e'
+    Feature = 'never fall back to the default browser (no bare 401 window)'
+  }
+  [pscustomobject]@{
+    Name    = '160-fork-edge-app-window.patch'
+    Commit  = '568dc1cf8a248e95598bd6f306b3f0f9667c2609'
+    Feature = 'Edge is the app-window browser (Chrome fallback only)'
+  }
+  [pscustomobject]@{
+    Name    = '170-fork-drop-quick-send-box.patch'
+    Commit  = 'ff9ad76f2465f0a0ab41119519293bbc5d682314'
+    Feature = 'remove the native quick-send scripts'
+  }
+  [pscustomobject]@{
+    Name    = '180-fork-drop-quick-send-switch.patch'
+    Commit  = '442038267167362ba049c8c2176dba87370f0d11'
+    Feature = 'remove the -QuickSend switch from the restart worker'
+  }
 )
 
 Log "=== regenerate DSH fork patches (0.1.5) ==="

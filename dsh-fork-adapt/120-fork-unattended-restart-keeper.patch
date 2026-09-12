@@ -1,0 +1,271 @@
+diff --git a/.gitignore b/.gitignore
+index 4e082e6e420711c30d7a446b69a1f0cfe00a1503..24cadc7950b2169ec7353c308c70bed520ec7daf 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -56,6 +56,11 @@ native/system/test/bin/
+ /dsh-web-3080.log
+ /dsh-web-3080.err.log
+ /dsh-mobile-sessions-apply.log
++# The unattended restart agent: its log, its pending-restart state and the
++# request marker anything can write to ask for a bounce.
++/dsh-restart-agent.log
++/dsh-restart-agent.state.json
++/dsh-restart.request
+ # The launcher family's browser state: the app-mode window's pid file and the
+ # dedicated Chromium profile it runs in (never committed).
+ /dsh-web-app.pid
+diff --git a/dsh-restart-agent.ps1 b/dsh-restart-agent.ps1
+new file mode 100644
+index 0000000000000000000000000000000000000000..a58272ce209c4e1674a9f36499585e3f0b415b5c
+--- /dev/null
++++ b/dsh-restart-agent.ps1
+@@ -0,0 +1,227 @@
++# dsh-restart-agent.ps1 -- unattended restart/recovery keeper for the DSH web Host.
++#
++# The user's requirement: "DSH sometimes has to restart itself; I do not want to
++# take part in that." This script is the part that makes that true. It is meant
++# to be run by a repeating Scheduled Task (every couple of minutes), and each
++# run is a stateless cycle:
++#
++#   1. Host down            -> start it again through dsh-web-open.ps1 (which also
++#                              opens the fresh tokenized app window).
++#   2. Restart requested    -> a marker file (`dsh-restart.request`) written by an
++#      or profile changed      agent, a plugin, a tool, or a newer profile/bundle
++#                              manifest than the running Host's start time.
++#   3. Wait for idle        -> before bouncing, ask the Host's own API whether any
++#                              Session is running, and wait out the grace window
++#                              so no in-flight turn is ever interrupted (nothing
++#                              has to be re-sent by hand afterwards).
++#   4. Bounce               -> hand the work to dsh-web-restart.ps1, which owns the
++#                              Scheduled-Task worker: stop -> start -> wait for the
++#                              auth fence -> replace the browser window.
++#
++# Every cycle appends one line to dsh-restart-agent.log; -DryRun reports without
++# touching anything.
++#
++# Usage:
++#   powershell -File dsh-restart-agent.ps1 -Once -DryRun          # inspect one cycle
++#   powershell -File dsh-restart-agent.ps1 -Once                  # act once
++#   powershell -File dsh-restart-agent.ps1                        # loop forever
++#
++# Keep this file ASCII-only so it parses under Windows PowerShell 5.1.
++[CmdletBinding()]
++param(
++  [int]$Port = 0,
++  [string]$Profile = '',
++  [switch]$Once,
++  [int]$IntervalSeconds = 30,
++  [int]$IdleGraceSeconds = 900,
++  [switch]$DryRun,
++  [switch]$NoBrowser,
++  [string]$Log = '',
++  [string]$RequestMarker = ''
++)
++
++$ErrorActionPreference = 'Continue'
++$RepoRoot = $PSScriptRoot
++if ([string]::IsNullOrEmpty($RepoRoot)) { $RepoRoot = 'C:\Users\19161\deepseek-harness-next' }
++
++$ServiceConfig = Join-Path $RepoRoot 'dsh-web-service.json'
++$HostLog = Join-Path $RepoRoot 'dsh-web.log'
++$OpenScript = Join-Path $RepoRoot 'dsh-web-open.ps1'
++$RestartScript = Join-Path $RepoRoot 'dsh-web-restart.ps1'
++if ([string]::IsNullOrEmpty($Log)) { $Log = Join-Path $RepoRoot 'dsh-restart-agent.log' }
++if ([string]::IsNullOrEmpty($RequestMarker)) { $RequestMarker = Join-Path $RepoRoot 'dsh-restart.request' }
++$StatePath = Join-Path $RepoRoot 'dsh-restart-agent.state.json'
++
++$service = $null
++if (Test-Path -LiteralPath $ServiceConfig -PathType Leaf) {
++  try { $service = Get-Content -LiteralPath $ServiceConfig -Raw | ConvertFrom-Json } catch { }
++}
++if ($Port -le 0) { $Port = if ($null -ne $service) { [int]$service.port } else { 3080 } }
++if ([string]::IsNullOrEmpty($Profile)) {
++  $Profile = if ($null -ne $service) { [string]$service.profile } else { 'web' }
++}
++$Url = "http://127.0.0.1:$Port/"
++
++function Write-Log {
++  param([string]$Message)
++  $line = "{0:yyyy-MM-dd HH:mm:ss} {1}" -f (Get-Date), $Message
++  try { Add-Content -LiteralPath $Log -Value $line -Encoding UTF8 } catch { }
++  Write-Host $line
++}
++
++function Test-Listening {
++  try {
++    $client = [System.Net.Sockets.TcpClient]::new()
++    $client.Connect('127.0.0.1', $Port)
++    $client.Dispose()
++    return $true
++  } catch { return $false }
++}
++
++function Get-ListeningProcessId {
++  $connection = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
++  if ($null -eq $connection) { return 0 }
++  return [int]$connection.OwningProcess
++}
++
++function Get-HostStartTime {
++  $id = Get-ListeningProcessId
++  if ($id -le 0) { return $null }
++  $process = Get-CimInstance Win32_Process -Filter "ProcessId=$id" -ErrorAction SilentlyContinue
++  if ($null -eq $process) { return $null }
++  return [datetime]$process.CreationDate
++}
++
++function Get-ProfileManifests {
++  # The files whose change means "the boot graph differs from what is running":
++  # the profile manifest, its patch layer, and each bundle's own manifest.
++  $paths = @()
++  $profileDir = Join-Path $env:USERPROFILE ('.dsh\profiles\' + $Profile)
++  $manifest = Join-Path $profileDir 'package.json'
++  if (Test-Path -LiteralPath $manifest -PathType Leaf) { $paths += $manifest }
++  $patch = Join-Path $profileDir 'cordis.patch.yml'
++  if (Test-Path -LiteralPath $patch -PathType Leaf) { $paths += $patch }
++  if (Test-Path -LiteralPath $manifest -PathType Leaf) {
++    try {
++      $state = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
++      foreach ($bundle in @($state.dsh.profile.bundles)) {
++        $bundleDir = Join-Path (Join-Path $profileDir 'node_modules') ([string]$bundle)
++        foreach ($name in @('package.json', 'cordis.patch.yml')) {
++          $candidate = Join-Path $bundleDir $name
++          if (Test-Path -LiteralPath $candidate -PathType Leaf) { $paths += $candidate }
++        }
++      }
++    } catch { }
++  }
++  return $paths
++}
++
++function Get-ChangeReason {
++  param([datetime]$HostStart)
++  $reasons = @()
++  if (Test-Path -LiteralPath $RequestMarker -PathType Leaf) {
++    $text = ''
++    try { $text = (Get-Content -LiteralPath $RequestMarker -Raw -ErrorAction SilentlyContinue) } catch { }
++    $reasons += ("request" + $(if ([string]::IsNullOrWhiteSpace($text)) { '' } else { (': ' + ($text.Trim() -replace '\s+', ' ').Substring(0, [Math]::Min(120, ($text.Trim() -replace '\s+', ' ').Length))) }))
++  }
++  foreach ($path in (Get-ProfileManifests)) {
++    $item = Get-Item -LiteralPath $path -ErrorAction SilentlyContinue
++    if ($null -eq $item) { continue }
++    if ($item.LastWriteTime -gt $HostStart.AddSeconds(2)) {
++      $reasons += ('changed: ' + $path.Substring($env:USERPROFILE.Length + 1))
++    }
++  }
++  return $reasons
++}
++
++function Get-TokenUrl {
++  $pattern = "dsh web: (http://127\.0\.0\.1:$Port/\?token=[A-Za-z0-9_\-]+)"
++  foreach ($log in @($HostLog, (Join-Path $RepoRoot "dsh-web-$Port.log"))) {
++    if (-not (Test-Path -LiteralPath $log -PathType Leaf)) { continue }
++    $hit = Select-String -LiteralPath $log -Pattern $pattern | Select-Object -Last 1
++    if ($null -ne $hit) { return [string]$hit.Matches[0].Groups[1].Value }
++  }
++  return ''
++}
++
++function Test-SessionBusy {
++  # True when any Session reports a running Agent; $null when the Host could not
++  # answer (treated as busy so a broken probe never bounces a working Host).
++  $tokenUrl = Get-TokenUrl
++  if ([string]::IsNullOrEmpty($tokenUrl)) { return $null }
++  try {
++    $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
++    Invoke-WebRequest -Uri $tokenUrl -WebSession $session -UseBasicParsing -TimeoutSec 10 | Out-Null
++    $rpcId = [guid]::NewGuid().ToString()
++    $body = '{"type":"client-request","rpcId":"' + $rpcId + '","method":"session/list","payload":{"args":{"_request":{}}}}'
++    $response = Invoke-RestMethod -Uri ("http://127.0.0.1:$Port/api/session/list") -Method Post -Body $body `
++      -ContentType 'application/json' -WebSession $session -TimeoutSec 20
++    if ($response.result.ok -ne $true) { return $null }
++    $running = @($response.result.value.items | Where-Object { $_.running -eq $true })
++    return $running.Count -gt 0
++  } catch { return $null }
++}
++
++function Read-State {
++  if (-not (Test-Path -LiteralPath $StatePath -PathType Leaf)) { return $null }
++  try { return Get-Content -LiteralPath $StatePath -Raw | ConvertFrom-Json } catch { return $null }
++}
++
++function Write-State {
++  param($State)
++  try {
++    [System.IO.File]::WriteAllText($StatePath, ($State | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding($false)))
++  } catch { }
++}
++
++function Invoke-Cycle {
++  if (-not (Test-Listening)) {
++    Write-Log ("host is down on port {0}" -f $Port)
++    if ($DryRun) { Write-Log 'dry-run: would start the host through dsh-web-open.ps1'; return }
++    $arguments = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $OpenScript)
++    if ($NoBrowser) { $arguments += '-NoBrowser' }
++    & powershell.exe @arguments | Out-Null
++    if (Test-Listening) { Write-Log 'host recovered (dsh-web-open.ps1)' } else { Write-Log 'host still down after recovery attempt' }
++    return
++  }
++
++  $hostStart = Get-HostStartTime
++  if ($null -eq $hostStart) { Write-Log 'cannot read the Host start time; skipping this cycle'; return }
++  $reasons = @(Get-ChangeReason -HostStart $hostStart)
++  if ($reasons.Count -eq 0) {
++    Write-Log ("host up since {0:HH:mm:ss}; nothing pending" -f $hostStart)
++    return
++  }
++
++  $state = Read-State
++  $pendingSince = if ($null -ne $state -and $null -ne $state.pendingSince) { [datetime]$state.pendingSince } else { Get-Date }
++  if ($null -eq $state -or $null -eq $state.pendingSince) { Write-State ([pscustomobject]@{ pendingSince = $pendingSince.ToString('o'); reasons = $reasons }) }
++
++  $busy = Test-SessionBusy
++  $waited = ((Get-Date) - $pendingSince).TotalSeconds
++  if ($busy -ne $false -and $waited -lt $IdleGraceSeconds) {
++    Write-Log ("restart pending ({0}); waiting for idle ({1:N0}s of {2}s, busy={3})" -f ($reasons -join '; '), $waited, $IdleGraceSeconds, $(if ($null -eq $busy) { 'unknown' } else { 'yes' }))
++    return
++  }
++  if ($busy -eq $true) { Write-Log ("grace window elapsed with a running turn; bouncing anyway ({0})" -f ($reasons -join '; ')) }
++
++  Write-Log ("restarting unattended: {0}" -f ($reasons -join '; '))
++  if ($DryRun) { Write-Log 'dry-run: would bounce the Host now'; return }
++  if (Test-Path -LiteralPath $RequestMarker -PathType Leaf) { Remove-Item -LiteralPath $RequestMarker -Force -ErrorAction SilentlyContinue }
++  Remove-Item -LiteralPath $StatePath -Force -ErrorAction SilentlyContinue
++  $arguments = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $RestartScript)
++  if ($NoBrowser) { $arguments += '-NoBrowser' }
++  & powershell.exe @arguments | Out-Null
++  Write-Log 'bounce handed to dsh-web-restart.ps1 (scheduled-task worker)'
++}
++
++if ($Once) {
++  Invoke-Cycle
++  exit 0
++}
++
++Write-Log ("restart agent started (port={0} profile={1} interval={2}s grace={3}s dryRun={4})" -f $Port, $Profile, $IntervalSeconds, $IdleGraceSeconds, [bool]$DryRun)
++while ($true) {
++  try { Invoke-Cycle } catch { Write-Log ("cycle failed: {0}" -f $_.Exception.Message) }
++  Start-Sleep -Seconds $IntervalSeconds
++}
+diff --git a/dsh-restart-agent.vbs b/dsh-restart-agent.vbs
+new file mode 100644
+index 0000000000000000000000000000000000000000..2f19783de3d6de6a29f5ee34c78a515e30fb5775
+--- /dev/null
++++ b/dsh-restart-agent.vbs
+@@ -0,0 +1,16 @@
++' DSH restart-agent bridge.
++' The repeating Scheduled Task runs exactly this file: wscript.exe starts
++' PowerShell with window style 0 (SW_HIDE at process creation), so a cycle that
++' runs every couple of minutes never flashes a console window.
++'
++' Usage:
++'   wscript.exe dsh-restart-agent.vbs          -> one cycle, hidden
++'
++' Keep this file ASCII-only.
++
++Option Explicit
++
++Dim shell, cmd
++Set shell = CreateObject("WScript.Shell")
++cmd = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ""C:\Users\19161\deepseek-harness-next\dsh-restart-agent.ps1"" -Once"
++shell.Run cmd, 0, False

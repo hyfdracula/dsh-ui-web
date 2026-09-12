@@ -1,0 +1,104 @@
+diff --git a/dsh-web-browser.ps1 b/dsh-web-browser.ps1
+index 856c6574657b2e9fc4694613194ad246bb59d217..b73547a490cf2295dc48be96cddfee43ee3afb41 100644
+--- a/dsh-web-browser.ps1
++++ b/dsh-web-browser.ps1
+@@ -21,6 +21,7 @@ param(
+   [switch]$KeepPrevious,
+   [switch]$NoLaunch,
+   [switch]$Windowed,
++  [string]$Prefer = 'chrome',
+   [int]$Port = 0,
+   [int]$Width = 1500,
+   [int]$Height = 950
+@@ -39,14 +40,22 @@ if ($Port -le 0) {
+   } else { $Port = 3080 }
+ }
+ 
+-function Get-BrowserPath {  $candidates = @(
+-    (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'),
+-    (Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe'),
+-    (Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe'),
++function Get-BrowserPath {
++  # Chrome first on purpose: the daily browser on this machine is Edge, and the
++  # GUI window must never be mistaken for it (nor disturb it). Either way the
++  # window runs from its own --user-data-dir.
++  param([string]$Prefer = 'chrome')
++  $chrome = @(
+     (Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'),
++    (Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe'),
+     (Join-Path $env:LOCALAPPDATA 'Google\Chrome\Application\chrome.exe')
+   )
+-  foreach ($candidate in $candidates) {
++  $edge = @(
++    (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'),
++    (Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe')
++  )
++  $order = if ($Prefer -eq 'edge') { @($edge) + @($chrome) } else { @($chrome) + @($edge) }
++  foreach ($candidate in $order) {
+     if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) { return $candidate }
+   }
+   return ''
+@@ -115,12 +124,12 @@ if (-not $KeepPrevious) {
+ 
+ if ($NoLaunch) { exit 0 }
+ 
+-$browser = Get-BrowserPath
++$browser = Get-BrowserPath -Prefer $Prefer
+ if ([string]::IsNullOrEmpty($browser)) {
+-  # No Chromium browser found: fall back to the default handler (a normal tab).
+-  Write-Host 'dsh-web-browser: no Edge/Chrome found; opening with the default browser'
+-  Start-Process $Url
+-  exit 0
++  # No Chromium browser at all: report instead of handing the URL to the default
++  # handler (that would put a bare DSH page into the everyday browser window).
++  Write-Host 'dsh-web-browser: no Edge/Chrome found; no window opened'
++  exit 1
+ }
+ 
+ New-Item -ItemType Directory -Force -Path $ProfileDir | Out-Null
+diff --git a/dsh-web-open.ps1 b/dsh-web-open.ps1
+index 93ee508b17395024652622d0d3fa3a4ce9d7e70d..f2814758cfd837801992b5a9590c49178624bf9e 100644
+--- a/dsh-web-open.ps1
++++ b/dsh-web-open.ps1
+@@ -115,10 +115,12 @@ if ($NoBrowser) {
+ if ($config.openBrowser -eq $false) { exit 0 }
+ # One owner for "show the GUI": dsh-web-browser.ps1 closes the previous DSH app
+ # window (a stale token URL is useless) and opens this one at the fresh token.
++# It is also the only place allowed to start a browser: a fallback to the default
++# handler would drop a bare 401 page into the everyday browser window.
+ $browser = Join-Path $root 'dsh-web-browser.ps1'
+-if (Test-Path -LiteralPath $browser -PathType Leaf) {
+-  & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $browser -Url $url -Port $port
+-} else {
+-  Start-Process $url
++if (-not (Test-Path -LiteralPath $browser -PathType Leaf)) {
++  Add-Content -LiteralPath $stdout -Value ("{0:yyyy-MM-dd HH:mm:ss} dsh-web-open: dsh-web-browser.ps1 missing; no window opened" -f (Get-Date))
++  exit 1
+ }
++& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $browser -Url $url -Port $port
+ exit 0
+diff --git a/dsh-web-restart.ps1 b/dsh-web-restart.ps1
+index 5c138d51e868145ee99eb1ecd8755b16ea7d661c..eaf8054d755f3038346a36bbae5016bf8ddb7832 100644
+--- a/dsh-web-restart.ps1
++++ b/dsh-web-restart.ps1
+@@ -205,13 +205,16 @@ try {
+       $browser = Join-Path $RepoRoot 'dsh-web-browser.ps1'
+       if (Test-Path -LiteralPath $browser -PathType Leaf) {
+         & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $browser -Url $tokenUrl -Port $Port
++        Write-Log ("browser opened at {0}" -f ($tokenUrl -replace 'token=[A-Za-z0-9_\-]+', 'token=***'))
+       } else {
+-        Start-Process $tokenUrl
++        # No default-browser fallback: the app window is the only window this
++        # family may open.
++        Write-Log 'dsh-web-browser.ps1 missing; no window opened'
+       }
+-      Write-Log ("browser opened at {0}" -f ($tokenUrl -replace 'token=[A-Za-z0-9_\-]+', 'token=***'))
+     } else {
+-      Start-Process $Url
+-      Write-Log ("no token line found in {0}; opened {1} (paste the token printed by the host log)" -f $HostLog, $Url)
++      # Never fall back to the default browser: that opens a bare (401) page in
++      # the user's everyday browser window, which is worse than no window at all.
++      Write-Log ("no token line found in {0} (or the per-port/previous logs); no window opened -- double-click the desktop entry to retry" -f $HostLog)
+     }
+   }
+   if ($QuickSend) {

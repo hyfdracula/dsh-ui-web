@@ -1,0 +1,541 @@
+diff --git a/.gitignore b/.gitignore
+index f497db626dac6c650d821850768e14259ad87a47..4e082e6e420711c30d7a446b69a1f0cfe00a1503 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -53,3 +53,10 @@ native/system/test/bin/
+ /dsh-web-host.lock
+ /dsh-restart-verify.log
+ /dsh-preflight.log
++/dsh-web-3080.log
++/dsh-web-3080.err.log
++/dsh-mobile-sessions-apply.log
++# The launcher family's browser state: the app-mode window's pid file and the
++# dedicated Chromium profile it runs in (never committed).
++/dsh-web-app.pid
++/.dsh-browser-profile/
+diff --git a/dsh-quick-send.ps1 b/dsh-quick-send.ps1
+new file mode 100644
+index 0000000000000000000000000000000000000000..d5aa2dd59b7732bf7a1541980cc3efe6c7287932
+--- /dev/null
++++ b/dsh-quick-send.ps1
+@@ -0,0 +1,281 @@
++# dsh-quick-send.ps1 -- the "quick send" box for the DSH web Host.
++#
++# A small always-on-top window: type a message, press Enter, and it goes into a
++# Session through the Host's own API (no browser interaction needed):
++#
++#   * "new Session @ <workspace>" -- session/create { workspaceId } then
++#     session/prompt with the typed text;
++#   * "continue the most recent Session" -- session/prompt into the newest
++#     Session the Host reports (mode 'queue', so an in-flight turn keeps it).
++#
++# Auth: the Host fences every /api route behind the cookie minted from the
++# launch token, so the script asks dsh-web-open.ps1 -NoBrowser for the current
++# tokenized URL (that call also starts the Host when it is down) and exchanges
++# it for a session cookie.
++#
++# UI strings live in dsh-quick-send.strings.json (UTF-8, no BOM) because this
++# file stays ASCII-only so Windows PowerShell 5.1 parses it reliably.
++#
++# Keep this file ASCII-only.
++[CmdletBinding()]
++param(
++  [switch]$SelfTest,
++  [string]$SelfTestTarget = 'new-first',
++  [string]$SelfTestText = 'quick-send self test'
++)
++
++$ErrorActionPreference = 'Continue'
++$root = $PSScriptRoot
++if ([string]::IsNullOrEmpty($root)) { $root = 'C:\Users\19161\deepseek-harness-next' }
++
++Add-Type -AssemblyName System.Windows.Forms
++Add-Type -AssemblyName System.Drawing
++
++# ---- strings ---------------------------------------------------------------
++$stringsPath = Join-Path $root 'dsh-quick-send.strings.json'
++$defaults = [ordered]@{
++  title = 'DSH quick send'
++  targetLabel = 'Send to'
++  newInWorkspace = 'New Session @ {0}'
++  continueLatest = 'Continue the most recent Session'
++  send = 'Send (Enter)'
++  close = 'Close (Esc)'
++  hint = 'Enter sends, Shift+Enter adds a line, Esc closes'
++  sending = 'Sending...'
++  sent = 'Sent -> {0}'
++  failed = 'Send failed: {0}'
++  empty = 'Nothing to send'
++  starting = 'Starting the Host...'
++  noTarget = 'No target available'
++}
++# Copy rather than alias: assigning an ordered dictionary shares the instance, and
++# the load loop writes into $S while iterating the defaults.
++$S = [ordered]@{}
++foreach ($key in $defaults.Keys) { $S[$key] = $defaults[$key] }
++if (Test-Path -LiteralPath $stringsPath -PathType Leaf) {
++  try {
++    $loaded = Get-Content -LiteralPath $stringsPath -Raw -Encoding UTF8 | ConvertFrom-Json
++    foreach ($key in @($defaults.Keys)) {
++      if ($null -ne $loaded.$key -and [string]$loaded.$key -ne '') { $S[$key] = [string]$loaded.$key }
++    }
++  } catch {
++    Write-Host ("dsh-quick-send: strings file unreadable ({0}); using defaults" -f $_.Exception.Message)
++  }
++}
++
++# ---- host access -----------------------------------------------------------
++function Get-DshBaseUrl {
++  $opener = Join-Path $root 'dsh-web-open.ps1'
++  if (-not (Test-Path -LiteralPath $opener -PathType Leaf)) { return '' }
++  $url = (& powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $opener -NoBrowser) | Select-Object -Last 1
++  return ([string]$url).Trim()
++}
++
++function New-DshWebSession {
++  param([string]$TokenUrl)
++  $session = New-Object Microsoft.PowerShell.Commands.WebRequestSession
++  Invoke-WebRequest -Uri $TokenUrl -WebSession $session -UseBasicParsing -TimeoutSec 15 | Out-Null
++  return $session
++}
++
++function Invoke-DshRpc {
++  param(
++    [Parameter(Mandatory = $true)][string]$Endpoint,
++    [Parameter(Mandatory = $true)][string]$ArgsJson,
++    $WebSession
++  )
++  $rpcId = [guid]::NewGuid().ToString()
++  $body = '{"type":"client-request","rpcId":"' + $rpcId + '","method":"' + $Endpoint + '","payload":{"args":' + $ArgsJson + '}}'
++  $port = ([uri]$script:BaseUrl).Port
++  $response = Invoke-RestMethod -Uri ("http://127.0.0.1:$port/api/" + $Endpoint) -Method Post -Body $body `
++    -ContentType 'application/json' -WebSession $WebSession -TimeoutSec 30
++  if ($response.result.ok -ne $true) {
++    $error = $response.result.error
++    throw ("{0}: {1}" -f $error.code, $error.message)
++  }
++  return $response.result.value
++}
++
++function Get-WorkspaceChoices {
++  $store = Join-Path $env:USERPROFILE '.dsh\storages\workspace.json'
++  $choices = @()
++  if (Test-Path -LiteralPath $store -PathType Leaf) {
++    try {
++      $state = Get-Content -LiteralPath $store -Raw -Encoding UTF8 | ConvertFrom-Json
++      foreach ($id in $state.global.workspaceIds) {
++        $record = $state.tables.workspaces.$id
++        if ($null -eq $record) { continue }
++        $choices += [pscustomobject]@{ kind = 'workspace'; workspaceId = $id; title = [string]$record.title; path = [string]$record.path }
++      }
++    } catch { }
++  }
++  return $choices
++}
++
++# ---- one send --------------------------------------------------------------
++function Send-QuickMessage {
++  param(
++    [Parameter(Mandatory = $true)][string]$Text,
++    [Parameter(Mandatory = $true)]$Target,
++    $WebSession
++  )
++  $sessionId = $null
++  if ($Target.kind -eq 'workspace') {
++    $created = Invoke-DshRpc -Endpoint 'session/create' -ArgsJson ('{"request":{"workspaceId":"' + $Target.workspaceId + '"}}') -WebSession $WebSession
++    $sessionId = [string]$created.sessionId
++  } else {
++    $list = Invoke-DshRpc -Endpoint 'session/list' -ArgsJson '{"_request":{}}' -WebSession $WebSession
++    $newest = $list.items | Sort-Object -Property updatedAt -Descending | Select-Object -First 1
++    if ($null -eq $newest) { throw $S.noTarget }
++    $sessionId = [string]$newest.sessionId
++  }
++  $requestId = [guid]::NewGuid().ToString()
++  $textJson = ($Text | ConvertTo-Json -Compress)
++  $argsJson = '{"request":{"requestId":"' + $requestId + '","sessionId":"' + $sessionId + '","mode":"queue","content":[{"type":"text","text":' + $textJson + '}]}}'
++  Invoke-DshRpc -Endpoint 'session/prompt' -ArgsJson $argsJson -WebSession $WebSession | Out-Null
++  return $sessionId
++}
++
++# ---- self test (no UI) -----------------------------------------------------
++if ($SelfTest) {
++  $script:BaseUrl = Get-DshBaseUrl
++  if ([string]::IsNullOrEmpty($script:BaseUrl)) { Write-Error 'no Host URL'; exit 1 }
++  $web = New-DshWebSession -TokenUrl $script:BaseUrl
++  $choices = Get-WorkspaceChoices
++  $target = if ($SelfTestTarget -eq 'latest') {
++    [pscustomobject]@{ kind = 'latest' }
++  } else {
++    $choices | Select-Object -First 1
++  }
++  try {
++    $sessionId = Send-QuickMessage -Text $SelfTestText -Target $target -WebSession $web
++    Write-Host ("self test OK -> {0}" -f $sessionId)
++    exit 0
++  } catch {
++    Write-Host ("self test FAILED: {0}" -f $_.Exception.Message)
++    exit 1
++  }
++}
++
++# ---- UI --------------------------------------------------------------------
++$script:BaseUrl = ''
++$script:WebSession = $null
++$script:Workspaces = @()
++
++$form = New-Object System.Windows.Forms.Form
++$form.Text = $S.title
++$form.Size = New-Object System.Drawing.Size(520, 300)
++$form.StartPosition = 'CenterScreen'
++$form.TopMost = $true
++$form.MinimizeBox = $false
++$form.KeyPreview = $true
++
++$targetLabel = New-Object System.Windows.Forms.Label
++$targetLabel.Text = $S.targetLabel
++$targetLabel.Location = New-Object System.Drawing.Point(14, 14)
++$targetLabel.AutoSize = $true
++$form.Controls.Add($targetLabel)
++
++$combo = New-Object System.Windows.Forms.ComboBox
++$combo.DropDownStyle = 'DropDownList'
++$combo.Location = New-Object System.Drawing.Point(14, 36)
++$combo.Size = New-Object System.Drawing.Size(478, 24)
++$form.Controls.Add($combo)
++
++$box = New-Object System.Windows.Forms.TextBox
++$box.Multiline = $true
++$box.AcceptsReturn = $true
++$box.ScrollBars = 'Vertical'
++$box.Location = New-Object System.Drawing.Point(14, 68)
++$box.Size = New-Object System.Drawing.Size(478, 130)
++$form.Controls.Add($box)
++
++$sendButton = New-Object System.Windows.Forms.Button
++$sendButton.Text = $S.send
++$sendButton.Location = New-Object System.Drawing.Point(14, 206)
++$sendButton.Size = New-Object System.Drawing.Size(150, 28)
++$form.Controls.Add($sendButton)
++
++$closeButton = New-Object System.Windows.Forms.Button
++$closeButton.Text = $S.close
++$closeButton.Location = New-Object System.Drawing.Point(174, 206)
++$closeButton.Size = New-Object System.Drawing.Size(120, 28)
++$form.Controls.Add($closeButton)
++
++$status = New-Object System.Windows.Forms.Label
++$status.Location = New-Object System.Drawing.Point(14, 238)
++$status.Size = New-Object System.Drawing.Size(478, 20)
++$status.Text = $S.hint
++$form.Controls.Add($status)
++
++function Initialize-DshTargets {
++  $script:Workspaces = Get-WorkspaceChoices
++  $combo.Items.Clear()
++  foreach ($workspace in $script:Workspaces) {
++    [void]$combo.Items.Add(($S.newInWorkspace -f $workspace.title))
++  }
++  [void]$combo.Items.Add($S.continueLatest)
++  if ($combo.Items.Count -gt 0) { $combo.SelectedIndex = 0 }
++}
++
++function Connect-DshHost {
++  if (-not [string]::IsNullOrEmpty($script:BaseUrl) -and $null -ne $script:WebSession) { return $true }
++  $form.Cursor = [System.Windows.Forms.Cursors]::WaitCursor
++  $status.Text = $S.starting
++  [System.Windows.Forms.Application]::DoEvents()
++  try {
++    $script:BaseUrl = Get-DshBaseUrl
++    if ([string]::IsNullOrEmpty($script:BaseUrl)) { throw 'no URL' }
++    $script:WebSession = New-DshWebSession -TokenUrl $script:BaseUrl
++    return $true
++  } catch {
++    $status.Text = ($S.failed -f $_.Exception.Message)
++    $script:WebSession = $null
++    return $false
++  } finally {
++    $form.Cursor = [System.Windows.Forms.Cursors]::Default
++  }
++}
++
++function Invoke-Send {
++  $text = $box.Text
++  if ([string]::IsNullOrWhiteSpace($text)) { $status.Text = $S.empty; return }
++  if (-not (Connect-DshHost)) { return }
++  $status.Text = $S.sending
++  [System.Windows.Forms.Application]::DoEvents()
++  try {
++    $index = $combo.SelectedIndex
++    $target = if ($index -ge 0 -and $index -lt $script:Workspaces.Count) {
++      $script:Workspaces[$index]
++    } else {
++      [pscustomobject]@{ kind = 'latest' }
++    }
++    $sessionId = Send-QuickMessage -Text $text -Target $target -WebSession $script:WebSession
++    $status.Text = ($S.sent -f $sessionId)
++    $box.Clear()
++  } catch {
++    $status.Text = ($S.failed -f $_.Exception.Message)
++    $script:WebSession = $null
++  }
++}
++
++$sendButton.Add_Click({ Invoke-Send })
++$closeButton.Add_Click({ $form.Close() })
++$box.Add_KeyDown({
++  param($sender, $event)
++  if ($event.KeyCode -eq [System.Windows.Forms.Keys]::Return -and -not $event.Shift) {
++    $event.SuppressKeyPress = $true
++    Invoke-Send
++  }
++})
++$form.Add_KeyDown({
++  param($sender, $event)
++  if ($event.KeyCode -eq [System.Windows.Forms.Keys]::Escape) { $form.Close() }
++})
++$form.Add_Shown({
++  Initialize-DshTargets
++  Connect-DshHost | Out-Null
++  $box.Focus()
++})
++
++[void]$form.ShowDialog()
+diff --git a/dsh-quick-send.strings.json b/dsh-quick-send.strings.json
+new file mode 100644
+index 0000000000000000000000000000000000000000..ad8f7d6d2e651c8956b2f5c56fa7170a3571e2bf
+--- /dev/null
++++ b/dsh-quick-send.strings.json
+@@ -0,0 +1,15 @@
++{
++  "title": "DSH 快捷发送",
++  "targetLabel": "发送到",
++  "newInWorkspace": "新建会话 @ {0}",
++  "continueLatest": "继续最近一次会话（排队）",
++  "send": "发送 (Enter)",
++  "close": "关闭 (Esc)",
++  "hint": "Enter 发送，Shift+Enter 换行，Esc 关闭",
++  "sending": "正在发送…",
++  "sent": "已发送 → {0}",
++  "failed": "发送失败：{0}",
++  "empty": "内容为空",
++  "starting": "正在确认宿主与令牌…",
++  "noTarget": "没有可用目标"
++}
+diff --git a/dsh-quick-send.vbs b/dsh-quick-send.vbs
+new file mode 100644
+index 0000000000000000000000000000000000000000..79885209d7385e4f379d42e53ba6f6ade422d950
+--- /dev/null
++++ b/dsh-quick-send.vbs
+@@ -0,0 +1,14 @@
++' DSH quick-send bridge.
++' wscript.exe (GUI subsystem) starts the WinForms dialog through PowerShell with
++' window style 0, so no console window flashes next to the dialog.
++'
++' Usage:
++'   wscript.exe dsh-quick-send.vbs
++'   (the restart worker launches exactly this after a restart)
++
++Option Explicit
++
++Dim shell, cmd
++Set shell = CreateObject("WScript.Shell")
++cmd = "powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File ""C:\Users\19161\deepseek-harness-next\dsh-quick-send.ps1"""
++shell.Run cmd, 0, False
+diff --git a/dsh-web-browser.ps1 b/dsh-web-browser.ps1
+new file mode 100644
+index 0000000000000000000000000000000000000000..e62bc3cd1bf873815cc35dc148908081f3ceed4d
+--- /dev/null
++++ b/dsh-web-browser.ps1
+@@ -0,0 +1,112 @@
++# dsh-web-browser.ps1 -- one owner for "show the DSH GUI in a browser".
++#
++# Why this exists: the desktop entry and the restart worker both need to show a
++# freshly minted tokenized URL. Opening it as a normal tab leaves the previous
++# (now unauthenticated) tab behind every restart, so the browser accumulates
++# dead DSH tabs. This script instead owns ONE dedicated app-mode window:
++#
++#   1. every process started from our own user-data-dir / --app URL is closed
++#      (the stale window disappears instead of lingering);
++#   2. a new app window is opened at the fresh token URL and its process id is
++#      recorded in dsh-web-app.pid for the next round.
++#
++# The dedicated `--user-data-dir` keeps the token cookie out of the daily
++# browsing profile and makes "which processes are ours" decidable.
++#
++# Keep this file ASCII-only so it parses under Windows PowerShell 5.1.
++[CmdletBinding()]
++param(
++  [Parameter(Mandatory = $true)][string]$Url,
++  [string]$ProfileDir = '',
++  [switch]$KeepPrevious,
++  [switch]$NoLaunch,
++  [int]$Port = 0,
++  [int]$Width = 1500,
++  [int]$Height = 950
++)
++
++$ErrorActionPreference = 'Continue'
++$root = $PSScriptRoot
++if ([string]::IsNullOrEmpty($root)) { $root = 'C:\Users\19161\deepseek-harness-next' }
++
++if ([string]::IsNullOrEmpty($ProfileDir)) { $ProfileDir = Join-Path $root '.dsh-browser-profile' }
++$pidFile = Join-Path $root 'dsh-web-app.pid'
++if ($Port -le 0) {
++  $configPath = Join-Path $root 'dsh-web-service.json'
++  if (Test-Path -LiteralPath $configPath -PathType Leaf) {
++    $Port = [int](Get-Content -LiteralPath $configPath -Raw | ConvertFrom-Json).port
++  } else { $Port = 3080 }
++}
++
++function Get-BrowserPath {
++  $candidates = @(
++    (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'),
++    (Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe'),
++    (Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe'),
++    (Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'),
++    (Join-Path $env:LOCALAPPDATA 'Google\Chrome\Application\chrome.exe')
++  )
++  foreach ($candidate in $candidates) {
++    if ($candidate -and (Test-Path -LiteralPath $candidate -PathType Leaf)) { return $candidate }
++  }
++  return ''
++}
++
++# Every browser process that belongs to this launcher family: it either carries
++# our user-data-dir (any child of the app window) or was recorded in the pid file.
++function Get-OwnedBrowserProcessIds {
++  $ids = @{}
++  if (Test-Path -LiteralPath $pidFile -PathType Leaf) {
++    foreach ($line in (Get-Content -LiteralPath $pidFile -ErrorAction SilentlyContinue)) {
++      $parsed = 0
++      if ([int]::TryParse(([string]$line).Trim(), [ref]$parsed) -and $parsed -gt 0) { $ids[$parsed] = $true }
++    }
++  }
++  $needle = $ProfileDir.ToLowerInvariant()
++  Get-CimInstance Win32_Process -Filter "Name='msedge.exe' or Name='chrome.exe'" -ErrorAction SilentlyContinue |
++    Where-Object { $_.CommandLine -and $_.CommandLine.ToLowerInvariant().Contains($needle) } |
++    ForEach-Object { $ids[[int]$_.ProcessId] = $true }
++  return @($ids.Keys | ForEach-Object { [int]$_ })
++}
++
++if (-not $KeepPrevious) {
++  $closed = 0
++  foreach ($id in (Get-OwnedBrowserProcessIds)) {
++    $process = Get-CimInstance Win32_Process -Filter "ProcessId=$id" -ErrorAction SilentlyContinue
++    if ($null -eq $process) { continue }
++    if ($process.Name -notin @('msedge.exe', 'chrome.exe')) { continue }
++    Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
++    $closed += 1
++  }
++  if (Test-Path -LiteralPath $pidFile -PathType Leaf) { Remove-Item -LiteralPath $pidFile -Force -ErrorAction SilentlyContinue }
++  Write-Host ("dsh-web-browser: closed {0} previous app-window process(es)" -f $closed)
++}
++
++if ($NoLaunch) { exit 0 }
++
++$browser = Get-BrowserPath
++if ([string]::IsNullOrEmpty($browser)) {
++  # No Chromium browser found: fall back to the default handler (a normal tab).
++  Write-Host 'dsh-web-browser: no Edge/Chrome found; opening with the default browser'
++  Start-Process $Url
++  exit 0
++}
++
++New-Item -ItemType Directory -Force -Path $ProfileDir | Out-Null
++$arguments = @(
++  "--app=$Url",
++  "--user-data-dir=$ProfileDir",
++  '--no-first-run',
++  '--no-default-browser-check',
++  '--disable-features=msEdgeSidebarV2',
++  ("--window-size={0},{1}" -f $Width, $Height)
++)
++$child = Start-Process -FilePath $browser -ArgumentList $arguments -PassThru
++if ($null -ne $child) {
++  Set-Content -LiteralPath $pidFile -Value ([string]$child.Id) -Encoding ascii
++  Write-Host ("dsh-web-browser: opened app window pid {0} at {1}" -f $child.Id, ($Url -replace 'token=[A-Za-z0-9_\-]+', 'token=***'))
++} else {
++  Write-Host 'dsh-web-browser: failed to start the browser'
++  exit 1
++}
++exit 0
+diff --git a/dsh-web-open.ps1 b/dsh-web-open.ps1
+index cf7170b85c90e09cee4171ed4edff79536129791..93ee508b17395024652622d0d3fa3a4ce9d7e70d 100644
+--- a/dsh-web-open.ps1
++++ b/dsh-web-open.ps1
+@@ -6,7 +6,7 @@
+ # 0.1.5 differences from the 0.1.1 launcher:
+ #   - 0.1.5 answers an unauthenticated request with 401 (the auth fence), so a
+ #     bare http://127.0.0.1:<port>/ can never be opened directly: the launch
+-#     token printed by the Host (`dsh web: http://…/?token=…`) is the only URL
++#     token printed by the Host (`dsh web: http://.../?token=...`) is the only URL
+ #     a browser can use, and every start mints a new one. This script therefore
+ #     reads the token line out of dsh-web.log after readiness.
+ #   - profile/port/node come from the sibling dsh-web-service.json, so a
+@@ -61,7 +61,7 @@ function Test-HostReady {
+ }
+ 
+ # The tokenized URL of the Host this config points at. Only lines for THIS port
+-# count — another checkout's Host can have written the same shared log.
++# count - another checkout's Host can have written the same shared log.
+ #
+ # Search order: the current Host's log, then the per-port log a Host started
+ # with its own redirection writes (the cutover's interim/foreground starts did
+@@ -113,5 +113,12 @@ if ($NoBrowser) {
+   exit 0
+ }
+ if ($config.openBrowser -eq $false) { exit 0 }
+-Start-Process $url
++# One owner for "show the GUI": dsh-web-browser.ps1 closes the previous DSH app
++# window (a stale token URL is useless) and opens this one at the fresh token.
++$browser = Join-Path $root 'dsh-web-browser.ps1'
++if (Test-Path -LiteralPath $browser -PathType Leaf) {
++  & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $browser -Url $url -Port $port
++} else {
++  Start-Process $url
++}
+ exit 0
+diff --git a/dsh-web-restart.ps1 b/dsh-web-restart.ps1
+index 6d0870a7835359ad1b03b8dabed4dab5f4f55f19..4c6091ef6a1028cc86d3b7478d2828ea4198a065 100644
+--- a/dsh-web-restart.ps1
++++ b/dsh-web-restart.ps1
+@@ -21,6 +21,7 @@ param(
+   [int]$TimeoutSeconds = 90,
+   [switch]$Worker,
+   [switch]$NoBrowser,
++  [switch]$NoQuickSend,
+   [string]$TaskName
+ )
+ 
+@@ -180,13 +181,30 @@ try {
+   if (-not $NoBrowser) {
+     $tokenUrl = Get-FreshTokenUrl
+     if ($null -ne $tokenUrl) {
+-      Start-Process $tokenUrl
++      # dsh-web-browser.ps1 owns the window: it closes the previous (now
++      # unauthenticated) DSH window and opens this one as a dedicated app window,
++      # so a restart replaces the page instead of piling up dead tabs.
++      $browser = Join-Path $RepoRoot 'dsh-web-browser.ps1'
++      if (Test-Path -LiteralPath $browser -PathType Leaf) {
++        & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $browser -Url $tokenUrl -Port $Port
++      } else {
++        Start-Process $tokenUrl
++      }
+       Write-Log ("browser opened at {0}" -f ($tokenUrl -replace 'token=[A-Za-z0-9_\-]+', 'token=***'))
+     } else {
+       Start-Process $Url
+       Write-Log ("no token line found in {0}; opened {1} (paste the token printed by the host log)" -f $HostLog, $Url)
+     }
+   }
++  if (-not $NoQuickSend) {
++    $quickSend = Join-Path $RepoRoot 'dsh-quick-send.vbs'
++    if (Test-Path -LiteralPath $quickSend -PathType Leaf) {
++      Start-Process (Join-Path $env:WINDIR 'System32\wscript.exe') -ArgumentList ('"' + $quickSend + '"')
++      Write-Log 'quick-send dialog opened'
++    } else {
++      Write-Log 'quick-send launcher not found; skipped'
++    }
++  }
+   Write-Log '=== DSH Web restart worker end: success ==='
+   exit 0
+ } catch {

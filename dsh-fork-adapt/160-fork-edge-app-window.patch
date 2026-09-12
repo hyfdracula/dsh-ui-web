@@ -1,0 +1,29 @@
+diff --git a/dsh-web-browser.ps1 b/dsh-web-browser.ps1
+index b73547a490cf2295dc48be96cddfee43ee3afb41..acf5f6b72422326495e681fba99eb79ef1e6592b 100644
+--- a/dsh-web-browser.ps1
++++ b/dsh-web-browser.ps1
+@@ -21,7 +21,7 @@ param(
+   [switch]$KeepPrevious,
+   [switch]$NoLaunch,
+   [switch]$Windowed,
+-  [string]$Prefer = 'chrome',
++  [string]$Prefer = 'edge',
+   [int]$Port = 0,
+   [int]$Width = 1500,
+   [int]$Height = 950
+@@ -41,10 +41,11 @@ if ($Port -le 0) {
+ }
+ 
+ function Get-BrowserPath {
+-  # Chrome first on purpose: the daily browser on this machine is Edge, and the
+-  # GUI window must never be mistaken for it (nor disturb it). Either way the
+-  # window runs from its own --user-data-dir.
+-  param([string]$Prefer = 'chrome')
++  # Edge is the browser the user wants for the DSH window; Chrome is only a
++  # fallback. Either way the window is an app window (`--app=`) from its own
++  # --user-data-dir, so it has no address bar / bookmarks bar and the taskbar
++  # shows the DSH page icon instead of the browser's.
++  param([string]$Prefer = 'edge')
+   $chrome = @(
+     (Join-Path $env:ProgramFiles 'Google\Chrome\Application\chrome.exe'),
+     (Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe'),

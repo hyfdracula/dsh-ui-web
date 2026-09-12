@@ -1,0 +1,39 @@
+diff --git a/dsh-web-restart.ps1 b/dsh-web-restart.ps1
+index 9ee61d5998c24d1d695972c80b627577944c5da8..5c138d51e868145ee99eb1ecd8755b16ea7d661c 100644
+--- a/dsh-web-restart.ps1
++++ b/dsh-web-restart.ps1
+@@ -89,11 +89,29 @@ function Get-HttpStatus {
+ function Get-FreshTokenUrl {
+   # The host launcher rotates dsh-web.log per run, so the LAST token line in it
+   # belongs to the host we just started.
+-  if (-not (Test-Path -LiteralPath $HostLog -PathType Leaf)) { return $null }
+-  $matches = Select-String -LiteralPath $HostLog -Pattern 'http://127\.0\.0\.1:(\d+)/\?token=([A-Za-z0-9_\-]+)' -AllMatches
+-  if ($null -eq $matches -or $matches.Count -eq 0) { return $null }
+-  $last = $matches[$matches.Count - 1].Matches[0].Value
+-  return $last
++  #
++  # Readiness answers before the Host prints its own token line (the fence comes
++  # up first), and a different start path can write the per-port or rotated log
++  # instead. So: try every candidate log and poll for a few seconds -- reading
++  # once raced the print and opened a bare 401 URL instead of the token URL.
++  param([int]$TimeoutSeconds = 20)
++  $candidates = @(
++    $HostLog,
++    (Join-Path $RepoRoot ("dsh-web-{0}.log" -f $Port)),
++    (Join-Path $RepoRoot 'dsh-web.previous.log')
++  )
++  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
++  do {
++    foreach ($log in $candidates) {
++      if (-not (Test-Path -LiteralPath $log -PathType Leaf)) { continue }
++      $matches = Select-String -LiteralPath $log -Pattern ('http://127\.0\.0\.1:' + $Port + '/\?token=([A-Za-z0-9_\-]+)') -AllMatches
++      if ($null -ne $matches -and $matches.Count -gt 0) {
++        return $matches[$matches.Count - 1].Matches[0].Value
++      }
++    }
++    Start-Sleep -Milliseconds 500
++  } while ((Get-Date) -lt $deadline)
++  return $null
+ }
+ 
+ function Test-HostReady {

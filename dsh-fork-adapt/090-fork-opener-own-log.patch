@@ -1,0 +1,28 @@
+diff --git a/dsh-web-open.ps1 b/dsh-web-open.ps1
+index e7d524246216aceaa0ade71168178423abe229a0..cf7170b85c90e09cee4171ed4edff79536129791 100644
+--- a/dsh-web-open.ps1
++++ b/dsh-web-open.ps1
+@@ -61,11 +61,20 @@ function Test-HostReady {
+ }
+ 
+ # The tokenized URL of the Host this config points at. Only lines for THIS port
+-# count — another checkout's Host can have written the same shared log — and the
+-# current log wins over the rotated one.
++# count — another checkout's Host can have written the same shared log.
++#
++# Search order: the current Host's log, then the per-port log a Host started
++# with its own redirection writes (the cutover's interim/foreground starts did
++# that while the shared log was still held open by the host being retired), then
++# the rotated log of the previous start.
+ function Get-LaunchUrl {
+   $pattern = "dsh web: (http://127\.0\.0\.1:$port/\?token=[A-Za-z0-9_\-]+)"
+-  foreach ($log in @($stdout, (Join-Path $root 'dsh-web.previous.log'))) {
++  $candidates = @(
++    $stdout,
++    (Join-Path $root "dsh-web-$port.log"),
++    (Join-Path $root 'dsh-web.previous.log')
++  )
++  foreach ($log in $candidates) {
+     if (-not (Test-Path -LiteralPath $log -PathType Leaf)) { continue }
+     $hit = Select-String -LiteralPath $log -Pattern $pattern | Select-Object -Last 1
+     if ($null -ne $hit) { return [string]$hit.Matches[0].Groups[1].Value }

@@ -17,7 +17,7 @@
 - 校验：`git apply --check` 干跑 + 每套一个补丁就 `git add -A && git write-tree`，
   与对应提交的 tree 逐字节比对（见文末验证记录）
 
-## 补丁清单（6 个）
+## 补丁清单（18 个）
 
 | 补丁 | fork 提交 | 功能 | 字节 | 行数 | 文件 |
 | --- | --- | --- | --- | --- | --- |
@@ -27,6 +27,22 @@
 | `040-fork-f6-turn-recovery.patch` | `8016f4f` | F6 | 28143 | 690 LF / 0 CR | 16 |
 | `050-fork-desktop-entry-and-telemetry.patch` | `0e0f067` | 桌面入口 + 遥测退出 + host 键 | 7871 | 见 `regenerate -Verify` 输出 | 4 |
 | `060-fork-aggregate-refs-and-spec-fixture.patch` | `7e49898` | 两个聚合 tsconfig 引用 + GLM 规格夹具 | 2444 | 同上 | 3 |
+| `070-fork-token-line-per-port.patch` | `6bdfbf8` | 入口只读本端口那一行 token | 1192 | 23 LF / 0 CR | 1 |
+| `080-fork-cutover-profile-web-3080.patch` | `b54e834` | 切到 profile `web` / 3080 的服务配置 | 644 | 13 LF / 0 CR | 1 |
+| `090-fork-opener-own-log.patch` | `e484800` | 入口也读宿主自己的按端口日志 | 1389 | 28 LF / 0 CR | 1 |
+| `100-fork-window-replacement.patch` | `46c686d` | 重启替换旧窗口（`dsh-web-browser.ps1`）+ 原生快捷发送框 | 21445 | 541 LF / 0 CR | 7 |
+| `110-fork-quick-send-optin.patch` | `0acef7b` | 原生快捷发送框改成 opt-in | 1126 | 29 LF / 0 CR | 1 |
+| `120-fork-unattended-restart-keeper.patch` | `4182657` | 无人值守巡检（`dsh-restart-agent.ps1/.vbs` + 请求标记 + 空闲门） | 12295 | 271 LF / 0 CR | 3 |
+| `130-fork-app-window-maximized.patch` | `a37d3f3` | app 窗口默认最大化（Win32 兜底） | 3445 | 80 LF / 0 CR | 1 |
+| `140-fork-token-line-race.patch` | `b8bd38b` | token 行改成多日志轮询，不再抢跑 | 1824 | 39 LF / 0 CR | 1 |
+| `150-fork-no-default-browser.patch` | `456ba1d` | 删掉默认浏览器回退（不再往日常浏览器塞 401 页） | 5045 | 104 LF / 0 CR | 3 |
+| `160-fork-edge-app-window.patch` | `568dc1c` | 窗口用 Edge（Chrome 仅兜底） | 1235 | 29 LF / 0 CR | 1 |
+| `170-fork-drop-quick-send-box.patch` | `ff9ad76` | 删掉原生快捷发送脚本 | 12406 | 328 LF / 0 CR | 3 |
+| `180-fork-drop-quick-send-switch.patch` | `4420382` | 删掉 worker 里的 `-QuickSend` 开关 | 1146 | 30 LF / 0 CR | 1 |
+
+`070`–`180` 是 2026-09-12 晚上补进来的 12 个提交（迁移收尾 3 个 + 启动器/巡检 9 个），
+一次 `regenerate-fork-patches.ps1 -Verify` 重放全部 18 个补丁并逐提交比对 tree。
+
 
 最后两个补丁是迁移收尾时加的：`050` 给桌面快捷方式一个能用的入口（`dsh-web-open.ps1/.vbs`：读 `dsh-web-service.json`、
 必要时经同一 funnel 拉起 Host、再从 `dsh-web.log` 取带 token 的 URL 开浏览器），并把 `DSH_TELEMETRY_DISABLED=1`
@@ -270,13 +286,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\dsh-web-restart.ps1
   以及若干运行日志。这些内容仍在持续变动（同一 checkout 上还有别的会话在改），
   要用它们就先在 fork 里提交，再跑 `regenerate-fork-patches.ps1`（新增提交应成为新的 `050-fork-*.patch`，
   并同步更新两个脚本里的补丁表与基线）。
-- **补丁表落后于分支 HEAD（2026-09-12 20:30 实测）**：`regenerate-fork-patches.ps1` 的表固定到
-  `7e49898`（`060`）为止，而分支 `fork/0.1.5-rc.2` 之后又提交了 4 个：
-  `6bdfbf8`（只读本端口的 token 行）、`b54e834`（切到 profile web / 3080）、
-  `e484800`（读宿主自己的日志）、`46c686d`（重启替换旧窗口 + 快捷发送框：新增
-  `dsh-web-browser.ps1`、`dsh-quick-send.ps1/.vbs/.strings.json`，改 `dsh-web-open.ps1` /
-  `dsh-web-restart.ps1`，`.gitignore` 收纳运行产物）。这 4 个提交**尚未**进补丁集，
-  一键重放目前只到 `060`；补齐做法是把它们按顺序加进 regenerate/apply 两张表后重跑 `-Verify`。
+- **补丁表已补齐到分支 HEAD（2026-09-12 23:16 实测）**：原先两张表停在 `7e49898`（`060`），
+  落后 12 个提交。现在 `070`–`180` 按提交顺序补齐：`6bdfbf8`（只读本端口的 token 行）、
+  `b54e834`（切到 profile web / 3080）、`e484800`（读宿主自己的日志）、
+  `46c686d`（重启替换旧窗口 + 首个原生快捷发送框）、`0acef7b`（该框改 opt-in）、
+  `4182657`（无人值守巡检）、`a37d3f3`（窗口默认最大化）、`b8bd38b`（token 行多日志轮询）、
+  `456ba1d`（删默认浏览器回退）、`568dc1c`（窗口用 Edge）、`ff9ad76`（删原生快捷发送脚本）、
+  `4420382`（删 `-QuickSend` 开关）。`regenerate-fork-patches.ps1 -Verify` 在一次性 worktree 里
+  重放 **18/18**（每个补丁 strict apply + `git write-tree` 与该提交 tree 逐字节相等），
+  随后对真实 checkout 的 `-Check` 报告 "already integrated"。
+
 - **050/060 的通用文件输入链未移植**：0.1.1 fork 曾在输入层加过 `addFiles/removeFile/pruneFiles`、
   `fileIds`、`releaseSessionFiles` 与 InputBar 文件 chip。0.1.5 上游与 fork 提交都没有这套成员，
   因此当前 0.1.5 fork **不具备**「粘贴任意文件」能力（图片附件走上游原生路径）。如仍需该能力，

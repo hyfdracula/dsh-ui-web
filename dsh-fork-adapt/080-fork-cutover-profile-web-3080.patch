@@ -1,0 +1,13 @@
+diff --git a/dsh-web-service.json b/dsh-web-service.json
+index c7cf4b824f867b26565eda804b73404902e4d6d4..bb57ab89c921cc21065c0b74ad8f013e37c7ac33 100644
+--- a/dsh-web-service.json
++++ b/dsh-web-service.json
+@@ -1,6 +1,6 @@
+ {
+-  "profile": "web-next",
+-  "port": 3081,
++  "profile": "web",
++  "port": 3080,
+   "openBrowser": true,
+   "node": "C:\\Users\\19161\\AppData\\Local\\Programs\\kimi-desktop\\resources\\resources\\runtime\\node.exe",
+   "_comment": "Single source of truth for the DSH Web service in THIS checkout. At cutover set profile=web and port=3080, then update the web-restart row in the profile's cordis.patch.yml to match.",

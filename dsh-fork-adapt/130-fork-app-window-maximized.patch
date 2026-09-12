@@ -1,0 +1,80 @@
+diff --git a/dsh-web-browser.ps1 b/dsh-web-browser.ps1
+index e62bc3cd1bf873815cc35dc148908081f3ceed4d..856c6574657b2e9fc4694613194ad246bb59d217 100644
+--- a/dsh-web-browser.ps1
++++ b/dsh-web-browser.ps1
+@@ -20,6 +20,7 @@ param(
+   [string]$ProfileDir = '',
+   [switch]$KeepPrevious,
+   [switch]$NoLaunch,
++  [switch]$Windowed,
+   [int]$Port = 0,
+   [int]$Width = 1500,
+   [int]$Height = 950
+@@ -38,8 +39,7 @@ if ($Port -le 0) {
+   } else { $Port = 3080 }
+ }
+ 
+-function Get-BrowserPath {
+-  $candidates = @(
++function Get-BrowserPath {  $candidates = @(
+     (Join-Path ${env:ProgramFiles(x86)} 'Microsoft\Edge\Application\msedge.exe'),
+     (Join-Path $env:ProgramFiles 'Microsoft\Edge\Application\msedge.exe'),
+     (Join-Path ${env:ProgramFiles(x86)} 'Google\Chrome\Application\chrome.exe'),
+@@ -52,6 +52,37 @@ function Get-BrowserPath {
+   return ''
+ }
+ 
++# Maximize the app window through Win32 once it exists. Chromium's own
++# `--start-maximized` is not reliable for `--app` windows, and the dedicated
++# profile would otherwise reopen at whatever placement it last saw.
++function Set-AppWindowMaximized {
++  param([int]$ProcessId, [int]$TimeoutSeconds = 20)
++  $signature = @'
++[DllImport("user32.dll")] public static extern bool ShowWindow(System.IntPtr hWnd, int nCmdShow);
++[DllImport("user32.dll")] public static extern bool IsZoomed(System.IntPtr hWnd);
++'@
++  if (-not ('Dsh.WindowNative' -as [type])) {
++    try { Add-Type -Namespace Dsh -Name WindowNative -MemberDefinition $signature -ErrorAction Stop } catch { return $false }
++  }
++  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
++  do {
++    $process = Get-Process -Id $ProcessId -ErrorAction SilentlyContinue
++    if ($null -ne $process) {
++      $process.Refresh()
++      $handle = $process.MainWindowHandle
++      if ($handle -ne [IntPtr]::Zero) {
++        try {
++          if (-not [Dsh.WindowNative]::IsZoomed($handle)) { [void][Dsh.WindowNative]::ShowWindow($handle, 3) }
++          Start-Sleep -Milliseconds 400
++          return [bool][Dsh.WindowNative]::IsZoomed($handle)
++        } catch { return $false }
++      }
++    }
++    Start-Sleep -Milliseconds 400
++  } while ((Get-Date) -lt $deadline)
++  return $false
++}
++
+ # Every browser process that belongs to this launcher family: it either carries
+ # our user-data-dir (any child of the app window) or was recorded in the pid file.
+ function Get-OwnedBrowserProcessIds {
+@@ -101,10 +132,19 @@ $arguments = @(
+   '--disable-features=msEdgeSidebarV2',
+   ("--window-size={0},{1}" -f $Width, $Height)
+ )
++if (-not $Windowed) { $arguments += '--start-maximized' }
+ $child = Start-Process -FilePath $browser -ArgumentList $arguments -PassThru
+ if ($null -ne $child) {
+   Set-Content -LiteralPath $pidFile -Value ([string]$child.Id) -Encoding ascii
+   Write-Host ("dsh-web-browser: opened app window pid {0} at {1}" -f $child.Id, ($Url -replace 'token=[A-Za-z0-9_\-]+', 'token=***'))
++  if (-not $Windowed) {
++    # Chromium's --start-maximized is honoured inconsistently for app windows, and
++    # the dedicated profile remembers whatever placement it saw last. Ask Win32
++    # directly once the window exists, so "double-click opens maximized" holds even
++    # right after the profile was created.
++    $maximized = Set-AppWindowMaximized -ProcessId $child.Id
++    Write-Host ("dsh-web-browser: maximized={0}" -f $maximized)
++  }
+ } else {
+   Write-Host 'dsh-web-browser: failed to start the browser'
+   exit 1

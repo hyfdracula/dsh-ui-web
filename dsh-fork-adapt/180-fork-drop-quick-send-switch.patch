@@ -1,0 +1,30 @@
+diff --git a/dsh-web-restart.ps1 b/dsh-web-restart.ps1
+index eaf8054d755f3038346a36bbae5016bf8ddb7832..465e43febe1b1039e54ad8f1c74cecb924acfbf0 100644
+--- a/dsh-web-restart.ps1
++++ b/dsh-web-restart.ps1
+@@ -21,7 +21,6 @@ param(
+   [int]$TimeoutSeconds = 90,
+   [switch]$Worker,
+   [switch]$NoBrowser,
+-  [switch]$QuickSend,
+   [string]$TaskName
+ )
+ 
+@@ -217,17 +216,6 @@ try {
+       Write-Log ("no token line found in {0} (or the per-port/previous logs); no window opened -- double-click the desktop entry to retry" -f $HostLog)
+     }
+   }
+-  if ($QuickSend) {
+-    # Opt-in only: the native box is NOT part of DSH, and the in-GUI quick-send
+-    # surface (composer dock) owns this job instead.
+-    $quickSend = Join-Path $RepoRoot 'dsh-quick-send.vbs'
+-    if (Test-Path -LiteralPath $quickSend -PathType Leaf) {
+-      Start-Process (Join-Path $env:WINDIR 'System32\wscript.exe') -ArgumentList ('"' + $quickSend + '"')
+-      Write-Log 'quick-send dialog opened (-QuickSend)'
+-    } else {
+-      Write-Log 'quick-send launcher not found; skipped'
+-    }
+-  }
+   Write-Log '=== DSH Web restart worker end: success ==='
+   exit 0
+ } catch {
