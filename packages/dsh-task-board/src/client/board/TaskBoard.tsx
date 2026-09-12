@@ -6,7 +6,8 @@
  * jump-back), so the board and the live conversation stay visibly linked.
  */
 import { useEffect, useState, useSyncExternalStore } from 'react'
-import type { SessionId, SessionListState, SessionSummary } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { selectedTaskOf, type BoardController } from '../../core/controller.ts'
 import { COLUMNS, type TaskRecord, type TaskStatus } from '../../core/tasks.ts'
 import { t, type TaskBoardKey } from '../locales.ts'

@@ -13,7 +13,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import { createRoot, type Root } from 'react-dom/client'
 import { createElement } from 'react'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { EffortPanel } from './effort/EffortPanel.tsx'
 import css from './aurora.module.css'
 

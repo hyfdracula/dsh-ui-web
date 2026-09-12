@@ -9,7 +9,7 @@
 import { useCallback, useState, type FC } from 'react'
 import { createPortal } from 'react-dom'
 import type { InjectFace, PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { BiliApi } from './api.ts'
 import type { BiliCookies, CookieSettings } from '../protocol.ts'
 import { cookiesToSettings, settingsToCookies } from '../protocol.ts'

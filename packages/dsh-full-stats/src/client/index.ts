@@ -11,7 +11,7 @@
  *    投影（缓存命中/输入输出 token）。
  */
 import { createElement, memo } from 'react'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import { FullStatsSettingsCard, FULL_STATS_EVENT, type FullStatsConfig } from './FullStatsSettingsCard.tsx'
 
 /** 需要的客户端服务：插槽（覆盖注册 + 配置卡片）。 */
