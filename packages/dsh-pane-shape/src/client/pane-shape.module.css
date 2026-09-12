@@ -1,0 +1,104 @@
+/* ============================================================================
+ * dsh-pane-shape — the cross-skin SHAPE layer for the three-column frame.
+ *
+ * Why it is not a skin: the shell insets and rounds the sidebar column and the
+ * conversation header card, but the right column was left flush to the ceiling
+ * and the floor, and the sidebar's top row sat ~35px below its card edge while
+ * the other two started at ~10px. Those are shape decisions, not colour ones —
+ * every skin wants them.
+ *
+ * Division of labour with a skin (for example Aqua):
+ *   - this layer owns SHAPE: insets, corner radius, which boxes stay
+ *     transparent, the hairline between panes, and a neutral fill/blur that is
+ *     only a fallback;
+ *   - the skin owns MATERIAL: the glass recipe, the blur knob, typography and
+ *     any brand flourishes. A skin overrides the fallback simply by setting the
+ *     same properties from its own (equally specific) rules — so this bundle
+ *     must be listed BEFORE the skin in `dsh.profile.bundles`.
+ *
+ * Every rule is gated on `data-dsh-pane-shape`, which the browser half puts on
+ * <html> while the plugin is mounted; removing the plugin removes the layer.
+ * Selectors use official hooks only (`data-sidebar-right-panel`,
+ * `data-dockkit-*`, `data-phase`) plus this layer's own stamps.
+ * ========================================================================== */
+
+[data-dsh-pane-shape] {
+  /* Knobs a skin can override without touching this file. */
+  --dsh-pane-inset: 12px;
+  --dsh-pane-radius: 24px;
+  --dsh-pane-blur: 14px;
+  --dsh-pane-fill: color-mix(in srgb, rgb(255 255 255) 55%, transparent);
+  --dsh-pane-hairline: rgba(19, 45, 83, 0.22);
+  --dsh-pane-shadow: 0 8px 28px rgba(19, 45, 83, 0.1);
+}
+
+[data-dsh-pane-shape] body[data-ds-dark-theme] {
+  --dsh-pane-fill: color-mix(in srgb, rgb(28 32 40) 55%, transparent);
+  --dsh-pane-hairline: rgba(148, 180, 220, 0.3);
+  --dsh-pane-shadow: 0 8px 28px rgba(2, 6, 14, 0.4);
+}
+
+/* ---------- One radius for every card-like pane: the conversation header card,
+   the sidebar column, the right column's docked bubble. ---------- */
+[data-dsh-pane-shape] [data-phase] header,
+[data-dsh-pane-shape] [data-dsh-pane-shape-col],
+[data-dsh-pane-shape] [data-sidebar-right-panel='push'] {
+  border-radius: var(--dsh-pane-radius);
+}
+
+/* ---------- Right column: the panel paints its own opaque base fill, so the
+   ambient background never reaches it. Lift it onto the fallback material and
+   keep the boxes inside it transparent. ---------- */
+[data-dsh-pane-shape] [data-sidebar-right-panel] {
+  background: var(--dsh-pane-fill);
+  border-left: 1px solid var(--dsh-pane-hairline);
+  backdrop-filter: blur(var(--dsh-pane-blur));
+}
+
+[data-dsh-pane-shape] [data-sidebar-right-panel] [data-dockkit-surface],
+[data-dsh-pane-shape] [data-sidebar-right-panel] [data-dockkit-pane] {
+  background: transparent;
+}
+
+[data-dsh-pane-shape] [data-sidebar-right-panel] [data-dockkit-strip] {
+  border-bottom: 1px solid var(--dsh-pane-hairline);
+}
+
+/* ---------- Right column as a bubble, matching the sidebar column and the
+   conversation header card (both inset by 12px). Scoped to the docked `push`
+   presentation: the suite's own fullscreen/overlay modes must keep covering the
+   window exactly as they were designed. ---------- */
+[data-dsh-pane-shape] [data-sidebar-right-panel='push'] {
+  margin: 0;
+  inset: var(--dsh-pane-inset) var(--dsh-pane-inset) var(--dsh-pane-inset) auto;
+  height: auto;
+  box-shadow: var(--dsh-pane-shadow);
+}
+
+/* ---------- Sidebar column: the one pane without the frosted material, which
+   is what made it read as flat paint; and its top row sits lower than the other
+   two, so pull the brand row up until the three top rows share one line. ---------- */
+[data-dsh-pane-shape] [data-dsh-pane-shape-col] {
+  backdrop-filter: blur(var(--dsh-pane-blur));
+  box-shadow: var(--dsh-pane-shadow);
+  padding-top: 0;
+}
+
+/* WHY the frost stands down while a modal lives in this column: a
+   backdrop-filter makes its element a CONTAINING BLOCK for position:fixed
+   descendants. The settings dialog is registered INTO the sidebar column
+   (`sidebar.settings`) and its overlay is `position: fixed; inset: 0`, so with
+   the filter on, that overlay resolved against the ~256px column instead of the
+   viewport and the whole settings panel collapsed into the sidebar. Dropping the
+   filter only while a modal is inside keeps the frost everywhere else. */
+[data-dsh-pane-shape] [data-dsh-pane-shape-col]:has([aria-modal='true']) {
+  backdrop-filter: none;
+}
+
+[data-dsh-pane-shape] [data-dsh-pane-shape-col] > * > *:first-child {
+  padding-top: 0;
+}
+
+[data-dsh-pane-shape] [data-dsh-pane-shape-brand] {
+  margin-top: -13px;
+}

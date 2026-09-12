@@ -1,0 +1,11 @@
+# dsh-pane-shape bundle patch: inserts the cross-skin pane-shape layer into the
+# web profile roster. The browser half stamps its own attributes and loads one
+# stylesheet; there is no host-side behaviour.
+#
+# Load order matters: this layer supplies the SHAPE (inset, radius, transparency,
+# blur fallback) and a skin is expected to override the MATERIAL (fill recipe,
+# blur knob). Append it before the skin bundle in dsh.profile.bundles so the
+# skin's rules win the cascade tie.
+- insert:
+    - id: ui-pane-shape
+      name: '@captain1275/dsh-pane-shape'
