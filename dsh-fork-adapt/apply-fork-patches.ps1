@@ -126,8 +126,8 @@ $patches = @(
   [pscustomobject]@{
     Name = '060-fork-aggregate-refs-and-spec-fixture.patch'
     From = '0e0f0673ca6cc8c3144a94d7391258757ab4c3fb'
-    To   = 'ecccb300f1e092d6950ddc79a7f2996e2743b9f9'
-    Tree = '8d1d68bc297c4a5210a90bd243027af5849d4745'
+    To   = '7e4989840ee2e5fd4377ba55e9ee7601d3e602d2'
+    Tree = 'b709e594073c07ff97b4e8fe2fd76e8359e50d81'
     What = 'host/client aggregate references for the two fork packages plus the pi-ai Usage.cost spec fixture'
   }
 )

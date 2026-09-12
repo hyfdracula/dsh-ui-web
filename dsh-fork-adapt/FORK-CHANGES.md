@@ -1,4 +1,4 @@
-# DSH Fork 改动适配清单（0.1.5）
+﻿# DSH Fork 改动适配清单（0.1.5）
 
 > 用途：记录本 fork 相对 DSH 官方源码的全部改动，一处一份补丁，升级/换 checkout 后按此清单重放。
 > 历史教训：rc.8 升级时 SettingsRoot 改动曾因未入库、未生成补丁而丢失（2026-08-20）。
@@ -26,7 +26,7 @@
 | `030-fork-f7-glm-normalizer.patch` | `c41e032` | F7 | 60032 | 1401 LF / 0 CR | 17 |
 | `040-fork-f6-turn-recovery.patch` | `8016f4f` | F6 | 28143 | 690 LF / 0 CR | 16 |
 | `050-fork-desktop-entry-and-telemetry.patch` | `0e0f067` | 桌面入口 + 遥测退出 + host 键 | 7871 | 见 `regenerate -Verify` 输出 | 4 |
-| `060-fork-aggregate-refs-and-spec-fixture.patch` | `ecccb30` | 两个聚合 tsconfig 引用 + GLM 规格夹具 | 2444 | 同上 | 3 |
+| `060-fork-aggregate-refs-and-spec-fixture.patch` | `7e49898` | 两个聚合 tsconfig 引用 + GLM 规格夹具 | 2444 | 同上 | 3 |
 
 最后两个补丁是迁移收尾时加的：`050` 给桌面快捷方式一个能用的入口（`dsh-web-open.ps1/.vbs`：读 `dsh-web-service.json`、
 必要时经同一 funnel 拉起 Host、再从 `dsh-web.log` 取带 token 的 URL 开浏览器），并把 `DSH_TELEMETRY_DISABLED=1`

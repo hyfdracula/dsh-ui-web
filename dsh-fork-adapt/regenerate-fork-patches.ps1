@@ -1,4 +1,4 @@
-# Regenerate the DSH fork adaptation patches from the fork checkout's commits.
+﻿# Regenerate the DSH fork adaptation patches from the fork checkout's commits.
 #
 # WHAT THIS IS
 #   The 0.1.5 fork work lives as real commits on branch fork/0.1.5-rc.2 in
@@ -117,7 +117,7 @@ $chain = @(
   }
   [pscustomobject]@{
     Name    = '060-fork-aggregate-refs-and-spec-fixture.patch'
-    Commit  = 'ecccb300f1e092d6950ddc79a7f2996e2743b9f9'
+    Commit  = '7e4989840ee2e5fd4377ba55e9ee7601d3e602d2'
     Feature = 'host/client aggregate references for the two fork packages + the pi-ai Usage.cost spec fixture'
   }
 )
